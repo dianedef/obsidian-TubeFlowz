@@ -1,14 +1,22 @@
 const { Plugin, Notice, Modal, ItemView, WorkspaceLeaf, MarkdownView } = require('obsidian');
 const { EditorView, ViewPlugin, Decoration, WidgetType } = require('@codemirror/view');
 
-
 class YouTubeFlowPlugin extends Plugin {
-   settings = {
+   DEFAULT_SETTINGS = {
       lastVideoId: null,
       isVideoOpen: false
-   };
+   }
+   
    async onload() {
-      console.log("settings:", this.settings);
+      await this.loadSettings();
+
+      if (this.settings.isVideoOpen) {
+         new SplitView(this.app, this.settings.lastVideoId, this).open();
+      }
+
+
+      this.settings = Object.assign({}, this.DEFAULT_SETTINGS, await this.loadData());
+
    // Si une vidéo était ouverte lors du dernier chargement, la rouvrir
       if (this.settings.isVideoOpen) {
          new SplitView(this.app, this.settings.lastVideoId, this).open();
@@ -103,6 +111,7 @@ class YouTubeFlowPlugin extends Plugin {
                            super();
                            this.videoId = videoId;
                            this.app = plugin.app;
+                           this.plugin = plugin;
                         }
    // Ajouter le widget sparkle
                         toDOM() {
@@ -117,7 +126,7 @@ class YouTubeFlowPlugin extends Plugin {
                            sparkle.addEventListener('click', (e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              new SplitView(this.app, this.videoId).open();
+                              new SplitView(this.app, this.videoId, this.plugin).open();
                            });
                            
                            return sparkle;
@@ -145,71 +154,34 @@ class YouTubeFlowPlugin extends Plugin {
          decorations: v => v.decorations,
       });
    }
-}
+   async loadSettings() {
+      this.settings = Object.assign({}, this.DEFAULT_SETTINGS, await this.loadData());
+   }
 
+      async saveSettings(data) {
+         console.log("Sauvegarde des paramètres:", data);
+         this.settings = Object.assign({}, this.settings, data);
+         await this.saveData(this.settings);
+      } 
+   }
 class SplitView extends Plugin {
-   constructor(app, videoId) {
+   static activeView = null;
+
+   constructor(app, videoId, plugin) {
       super(app);
       this.videoId = videoId;
       this.leaf = null;
+      this.plugin = plugin;
    }
-   /*    async onOpen() {
-      console.log("Tentative d'ouverture de la modale YouTube");
-      
-      try {
-         const leaf = this.app.workspace.getLeaf('split');
-         console.log("Leaf obtenu:", leaf);
-         
-         if (!leaf) {
-            console.error("Impossible d'obtenir un leaf");
-            return;
-         }
-         
-         this.leaf = leaf;
-         
-         await this.leaf.setViewState({
-            type: 'youtube-player',
-            active: true,
-            state: {}
-         });
-         console.log("ViewState défini");
-
-         this.leaf.resize(40);
-         console.log("Leaf redimensionné");
-
-         if (this.leaf.view instanceof YouTubeView) {
-            console.log("Vue YouTube trouvée, définition du videoId:", this.videoId);
-            this.leaf.view.setVideoId(this.videoId);
-         } else {
-            console.error("La vue n'est pas une YouTubeView:", this.leaf.view);
-         }
-      } catch (error) {
-         console.error("Erreur complète lors de la création du split:", error);
-      }
-   }   */
-
-      /*    createPlayer(container) {
-      // Attendre que l'API YouTube soit chargée
-      if (typeof YT === 'undefined' || !YT.Player) {
-         setTimeout(() => this.createPlayer(container), 100);
-         return;
-      }
-
-      new YT.Player(container, {
-         height: '360',
-         width: '640',
-         videoId: this.videoId,
-         playerVars: {
-               autoplay: 1,
-               modestbranding: 1,
-               rel: 0
-         }
-      });
-   } */
+/* 
+si on réouvre l'app alors on a un lastvieoId et un open yes 
+ */
    async open() {
-      console.log("Ouvrir la vidéo:", this.videoId);
+      console.log("Ouvrir la vidéo:", this.lastVideoId);
    // Charger l'état de la vidéo
-
+      this.plugin.settings.isVideoOpen ? this.videoId = this.plugin.settings.lastVideoId : this.videoId;
+      this.plugin.settings.isVideoOpen = true;
+      await this.plugin.saveSettings();
    // Réutiliser la vue existante si elle existe
       if (SplitView.activeView) {
          const container = SplitView.activeView.containerEl.children[0];
@@ -250,16 +222,17 @@ class SplitView extends Plugin {
    }
 
    onClose() {
-      this.settings.isVideoOpen = false;
-      this.settings.lastVideoId = null;
-      this.saveData(this.settings);
       if (this.leaf) {
+   // Mettre à jour l'état lors de la fermeture
+      this.plugin.settings.isVideoOpen = false;
+      this.plugin.saveSettings();
+
+         SplitView.activeView = null;
          this.leaf.detach();
       }
       super.onClose();
    }
 }
-
 class YouTubePlayer {
    constructor(plugin) {
       this.plugin = plugin;
@@ -429,6 +402,5 @@ class HotkeyManager {
       return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
    }
 }
-
 
 module.exports = YouTubeFlowPlugin;
