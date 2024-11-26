@@ -1,13 +1,13 @@
-const { Plugin, Notice, Modal, ItemView } = require('obsidian');
+const { Plugin, Notice, Modal, ItemView, WorkspaceLeaf, MarkdownView } = require('obsidian');
 const { EditorView, ViewPlugin, Decoration, WidgetType } = require('@codemirror/view');
 
-class YouTubeModal extends Modal {
+class SplitView extends Plugin {
    constructor(app, videoId) {
       super(app);
       this.videoId = videoId;
       this.leaf = null;
    }
-   async onOpen() {
+   /*    async onOpen() {
       console.log("Tentative d'ouverture de la modale YouTube");
       
       try {
@@ -40,9 +40,9 @@ class YouTubeModal extends Modal {
       } catch (error) {
          console.error("Erreur complète lors de la création du split:", error);
       }
-   }  
+   }   */
 
-   createPlayer(container) {
+      /*    createPlayer(container) {
       // Attendre que l'API YouTube soit chargée
       if (typeof YT === 'undefined' || !YT.Player) {
          setTimeout(() => this.createPlayer(container), 100);
@@ -59,6 +59,32 @@ class YouTubeModal extends Modal {
                rel: 0
          }
       });
+   } */
+   async open() {
+      // Créer une nouvelle feuille à droite
+      const newLeaf = this.app.workspace.splitActiveLeaf('vertical');
+      
+      // Créer un conteneur pour l'iframe
+      const container = newLeaf.view.containerEl.children[0];
+      container.empty();
+      
+      // Ajouter un style pour contrôler la hauteur du conteneur
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.alignItems = 'center';
+      container.style.justifyContent = 'center';
+      container.style.height = '100%';
+      
+      // Créer l'iframe pour YouTube
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('src', 'https://www.youtube.com/embed/Rkv4rrdFBU0');
+      iframe.setAttribute('width', '100%');
+      iframe.setAttribute('height', '100%');
+      iframe.setAttribute('frameborder', '0');
+      iframe.setAttribute('allowfullscreen', 'true');
+      
+      // Ajouter l'iframe au conteneur
+      container.appendChild(iframe);
    }
 
    onClose() {
@@ -68,36 +94,7 @@ class YouTubeModal extends Modal {
       super.onClose();
    }
 }
-class UIController {
-   constructor(plugin) {
-      this.plugin = plugin;
-   }
-   addYouTubeButton(link) {
-      console.log('Ajout du bouton YouTube pour:', link.href);
-      
-      // Ajouter un écouteur d'événement sur le lien
-      link.addEventListener('click', (e) => {
-         console.log('Clic sur le lien YouTube:', link.href);
-         new YouTubeModal(this.plugin.app, this.plugin.player.getVideoId(link.href)).open();
-      });
 
-      const button = document.createElement('button');
-      button.className = 'youtube-flow-button';
-      button.innerHTML = '▶';
-      button.onclick = (e) => {
-         e.preventDefault();
-         e.stopPropagation(); // Empêcher la propagation de l'événement
-         console.log('Clic sur le bouton YouTube');
-         const videoId = this.plugin.player.getVideoId(link.href);
-         if (videoId) {
-               new YouTubeModal(this.plugin.app, videoId).open();
-         } else {
-               new Notice('ID de vidéo YouTube invalide');
-         }
-      };
-      link.parentElement?.insertBefore(button, link.nextSibling);
-   }
-}
 class YouTubePlayer {
    constructor(plugin) {
       this.plugin = plugin;
@@ -267,14 +264,6 @@ class HotkeyManager {
       return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
    }
 }
-class YouTubeUtils {
-   static getVideoId(url) {
-      const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/;
-      const match = url.match(regex);
-      return match ? match[1] : '';
-   }
-}
-
 
 class YouTubeFlowPlugin extends Plugin {
    async onload() {
@@ -293,36 +282,15 @@ class YouTubeFlowPlugin extends Plugin {
          }
       );
 
-      // Tester immédiatement la création d'une vue
-      try {
-         const leaf = this.app.workspace.getLeaf('split');
-         console.log("Test de création leaf:", leaf);
-         
-         await leaf.setViewState({
-            type: 'youtube-player',
-            active: true,
-            state: {}
-         });
-         
-         console.log("Vue YouTube créée avec succès");
-      } catch (error) {
-         console.error("Erreur lors du test de création de la vue:", error);
-      }
-
-      // Charger l'API YouTube
+   /*       // Charger l'API YouTube
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       const firstScriptTag = document.getElementsByTagName('script')[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
       
-      // Initialiser les composants
-      this.ui = new UIController(this);
       this.player = new YouTubePlayer(this);
       this.hotkeys = new HotkeyManager(this);
-
-      this.hotkeys.registerHotkeys();
-
-      this.registerEditorExtension([youtubeViewPlugin]);
+      this.hotkeys.registerHotkeys(); */
    }
 
    createSparkleDecoration() {
@@ -361,7 +329,7 @@ class YouTubeFlowPlugin extends Plugin {
                const url = match[2];
                const pos = match.index + fullMatch.length;
                
-               // Vérifier si c'est un lien YouTube
+   // Vérifier si c'est un lien YouTube
                const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/;
                const youtubeMatch = url.match(youtubeRegex);
                
@@ -374,7 +342,7 @@ class YouTubeFlowPlugin extends Plugin {
                      position: pos
                   });
                   
-                  // Ajouter la décoration mark pour le lien YouTube
+   // Ajouter la décoration mark pour le lien YouTube
                   decorations.push(Decoration.mark({
                      class: "youtube-link",
                      attributes: {
@@ -382,7 +350,6 @@ class YouTubeFlowPlugin extends Plugin {
                      }
                   }).range(match.index, match.index + fullMatch.length));
                   
-                  // Ajouter le widget sparkle
                   const sparkleDecoration = Decoration.widget({
                      widget: new class extends WidgetType {
                         constructor() {
@@ -390,20 +357,20 @@ class YouTubeFlowPlugin extends Plugin {
                            this.videoId = videoId;
                            this.app = plugin.app;
                         }
-                        
+   // Ajouter le widget sparkle
                         toDOM() {
                            const sparkle = document.createElement('span');
-                           sparkle.innerHTML = '▶️ Ouvrir le player✨';  // Changé pour un symbole play
+                           sparkle.innerHTML = '▶️ Ouvrir le player ✨';
                            sparkle.setAttribute('aria-label', 'Play YouTube video');
                            sparkle.className = 'youtube-sparkle-decoration';
                            sparkle.style.display = 'inline-block';
                            sparkle.style.marginLeft = '2px';
                            sparkle.style.cursor = 'pointer';
-                           
+   // eventlistener                          
                            sparkle.addEventListener('click', (e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              new YouTubeModal(this.app, this.videoId).open();
+                              new SplitView(this.app, this.videoId).open();
                            });
                            
                            return sparkle;
@@ -429,69 +396,8 @@ class YouTubeFlowPlugin extends Plugin {
          }
       }, {
          decorations: v => v.decorations,
-         eventHandlers: {
-            mousedown: (e, view) => {
-               if (e.target.classList.contains("youtube-link")) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
-                  const videoId = e.target.getAttribute("data-video-id");
-                  console.log("Click sur lien YouTube, Video ID:", videoId);
-                  if (videoId) {
-                     new YouTubeModal(this.app, videoId).open();
-                  }
-                  return true;
-               }
-            }
-         }
       });
    }
 }
-class YouTubeView extends ItemView {
-   constructor(leaf) {
-      super(leaf);
-      this.videoId = null;
-   }
 
-   getViewType() {
-      return 'youtube-player';
-   }
-
-   getDisplayText() {
-      return 'YouTube Player';
-   }
-
-   async onOpen() {
-      const {contentEl} = this;
-      contentEl.empty();
-      contentEl.addClass('youtube-flow-container');
-      
-      const container = contentEl.createDiv('youtube-flow-player');
-      
-      // Si on a un videoId, on crée le player
-      if (this.videoId) {
-         if (typeof YT === 'undefined' || !YT.Player) {
-            setTimeout(() => this.createPlayer(container), 100);
-            return;
-         }
-
-         new YT.Player(container, {
-            height: '360',
-            width: '640',
-            videoId: this.videoId,
-            playerVars: {
-               autoplay: 1,
-               modestbranding: 1,
-               rel: 0
-            }
-         });
-      }
-   }
-
-   // Méthode pour mettre à jour la vidéo
-   setVideoId(videoId) {
-      this.videoId = videoId;
-      this.onOpen(); // Recharger la vue avec la nouvelle vidéo
-   }
-} 
 module.exports = YouTubeFlowPlugin;
