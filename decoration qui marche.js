@@ -25,6 +25,7 @@ class SparkleLinkPlugin extends Plugin {
          buildDecorations(view) {
                const decorations = [];
                
+               // Obtenir le fichier actif via l'app
                const activeFile = this.app.workspace.getActiveFile();
                console.log("Fichier actif:", activeFile?.path);
                
@@ -33,7 +34,11 @@ class SparkleLinkPlugin extends Plugin {
                   return Decoration.none;
                }
                
+               // Obtenir le contenu du document
                const docContent = view.state.doc.toString();
+               console.log("Contenu du document:", docContent);
+               
+               // Rechercher les liens Markdown standard [texte](url)
                const markdownLinkRegex = /\[([^\]]+)\]\(([^\)]+)\)/g;
                let match;
                
@@ -49,14 +54,9 @@ class SparkleLinkPlugin extends Plugin {
                      position: pos
                   });
                   
+                  // Création de la décoration avec la structure complète
                   const sparkleDecoration = Decoration.widget({
                         widget: new class extends WidgetType {
-                           constructor() {
-                              super();
-                              this.url = url;
-                              this.linkText = linkText;
-                           }
-                           
                            toDOM() {
                               const sparkle = document.createElement('span');
                               sparkle.innerHTML = '✨';
@@ -64,43 +64,16 @@ class SparkleLinkPlugin extends Plugin {
                               sparkle.className = 'sparkle-decoration';
                               sparkle.style.display = 'inline-block';
                               sparkle.style.marginLeft = '2px';
-                              sparkle.style.cursor = 'pointer';
-                              
-                              sparkle.addEventListener('click', (e) => {
-                                 e.preventDefault();
-                                 e.stopPropagation();
-                                 
-                                 const menu = new this.app.Menu();
-                                 
-                                 menu.addItem((item) => {
-                                    item.setTitle("Ouvrir le lien")
-                                        .setIcon("external-link")
-                                        .onClick(() => {
-                                           window.open(this.url, '_blank');
-                                        });
-                                 });
-                                 
-                                 menu.addItem((item) => {
-                                    item.setTitle("Copier le lien")
-                                        .setIcon("copy")
-                                        .onClick(() => {
-                                           navigator.clipboard.writeText(this.url);
-                                        });
-                                 });
-                                 
-                                 menu.showAtMouseEvent(e);
-                              });
-                              
                               return sparkle;
                            }
                            
-                           eq(other) { return this.url === other.url; }
+                           eq(other) { return true; }
                            
                            destroy() { }
                            
                            estimatedHeight = -1;
                            
-                           ignoreEvent() { return false; }
+                           ignoreEvent() { return true; }
                         },
                         side: 1,
                         block: false,

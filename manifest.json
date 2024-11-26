@@ -1,9 +1,10 @@
 {
-    "id": "obsidian-youtube-flow",
-    "name": "YouTube Flow",
-    "version": "1.0.0",
-    "minAppVersion": "0.15.0",
-    "description": "Améliore l'expérience YouTube dans Obsidian avec des contrôles de lecture intégrés",
-    "author": "Shadow",
-    "isDesktopOnly": false
-} 
+	"id": "obsidian-youtube-flow",
+	"name": "YouTube Flow",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Améliore l'expérience YouTube dans Obsidian avec des contrôles de lecture intégrés",
+	"author": "Shadow",
+	"isDesktopOnly": false,
+	"type": "module"
+}
