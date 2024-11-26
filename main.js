@@ -191,62 +191,10 @@ class SplitView {
    constructor(app, videoId, settingsManager) {
       this.app = app;
       this.videoId = videoId;
-      this.leaf = null;
       this.settingsManager = settingsManager;
+      this.leaf = null;
    }
-   /*    async onOpen() {
-      console.log("Tentative d'ouverture de la modale YouTube");
-      
-      try {
-         const leaf = this.app.workspace.getLeaf('split');
-         console.log("Leaf obtenu:", leaf);
-         
-         if (!leaf) {
-            console.error("Impossible d'obtenir un leaf");
-            return;
-         }
-         
-         this.leaf = leaf;
-         
-         await this.leaf.setViewState({
-            type: 'youtube-player',
-            active: true,
-            state: {}
-         });
-         console.log("ViewState défini");
 
-         this.leaf.resize(40);
-         console.log("Leaf redimensionné");
-
-         if (this.leaf.view instanceof YouTubeView) {
-            console.log("Vue YouTube trouvée, définition du videoId:", this.videoId);
-            this.leaf.view.setVideoId(this.videoId);
-         } else {
-            console.error("La vue n'est pas une YouTubeView:", this.leaf.view);
-         }
-      } catch (error) {
-         console.error("Erreur complète lors de la création du split:", error);
-      }
-   }   */
-
-      /*    createPlayer(container) {
-      // Attendre que l'API YouTube soit chargée
-      if (typeof YT === 'undefined' || !YT.Player) {
-         setTimeout(() => this.createPlayer(container), 100);
-         return;
-      }
-
-      new YT.Player(container, {
-         height: '360',
-         width: '640',
-         videoId: this.videoId,
-         playerVars: {
-               autoplay: 1,
-               modestbranding: 1,
-               rel: 0
-         }
-      });
-   } */
    async open() {
       console.log("settingsManager:", this.settingsManager);
       console.log("videoId:", this.videoId);
@@ -259,7 +207,7 @@ class SplitView {
       this.settingsManager.settings.isVideoOpen = true;
       await this.settingsManager.save();
 
-   // Réutiliser la vue existante si elle existe
+      // Réutiliser la vue existante si elle existe
       if (SplitView.activeView) {
          const container = SplitView.activeView.containerEl.children[0];
          container.empty();
@@ -274,7 +222,11 @@ class SplitView {
          container.appendChild(iframe);
          return;
       }
-   // Sinon créer une nouvelle vue avec un conteneur, une hauteur et l'iframe YouTube
+
+      // Attendre qu'une feuille soit active
+      await this.waitForActiveLeaf();
+
+      // Créer une nouvelle vue
       const newLeaf = this.app.workspace.splitActiveLeaf('vertical');
       SplitView.activeView = newLeaf.view;
       this.leaf = newLeaf;
@@ -296,6 +248,20 @@ class SplitView {
       iframe.setAttribute('allowfullscreen', 'true');
       
       container.appendChild(iframe);
+   }
+
+   async waitForActiveLeaf() {
+      return new Promise((resolve) => {
+         const checkLeaf = () => {
+            const activeLeaf = this.app.workspace.activeLeaf;
+            if (activeLeaf) {
+               resolve();
+            } else {
+               setTimeout(checkLeaf, 100);
+            }
+         };
+         checkLeaf();
+      });
    }
 
    onClose() {
