@@ -63,13 +63,32 @@ class VideoViewManager {
 // closePreviousVideos() : Fermer toutes vues précédentes et réinitialiser les états
    async closePreviousVideos() {
       console.log("=== Début closePreviousVideos ===");
+      
+      // Fermer les overlays existants et restaurer les éditeurs
+      const overlays = document.querySelectorAll('.youtube-overlay');
+      overlays.forEach(overlay => {
+         // Trouver l'éditeur associé à cet overlay
+         const containerEl = overlay.closest('.workspace-leaf');
+         if (containerEl) {
+            const editor = containerEl.querySelector('.cm-editor');
+            if (editor) {
+               editor.style.height = '100%';
+               editor.style.top = '0';
+            }
+         }
+         overlay.remove();
+      });
+
+      // Fermer les vues YouTube normales
       const leaves = this.plugin.app.workspace.getLeavesOfType('youtube-player');
       for (const leaf of leaves) {
          if (leaf && !leaf.detached) {
             leaf.detach();
          }
       }
+
       this.activeView = null;
+      this.activeLeafId = null;
       
       console.log("État après fermeture:", {
          activeLeafId: !!this.activeLeafId,
@@ -116,16 +135,77 @@ class VideoViewManager {
       const activeLeaf = this.plugin.app.workspace.activeLeaf;
       if (!activeLeaf) return;
 
-      const view = new YouTubePlayerView(activeLeaf, this.plugin);
-      this.activeView = view;
+      // Récupérer la zone d'édition
+      const editorEl = activeLeaf.view.containerEl.querySelector('.cm-editor');
+      if (!editorEl) return;
+
+      // Ajuster la taille de la zone d'édition pour faire de la place pour la vidéo
+      editorEl.style.height = '40%';
+      editorEl.style.position = 'relative';
+      editorEl.style.top = '60%';  // Déplacer l'éditeur en bas
+
+      // Créer un conteneur pour la vidéo
+      const overlayContainer = activeLeaf.view.containerEl.createDiv('youtube-overlay');
+      overlayContainer.style.cssText = `
+         position: absolute;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 60%;
+         background: var(--background-primary);
+         z-index: 100;
+         display: flex;
+         flex-direction: column;
+         align-items: center;
+      `;
+
+      // Ajouter un bouton pour fermer l'overlay
+      const closeButton = overlayContainer.createDiv('youtube-overlay-close');
+      closeButton.innerHTML = '✕';
       
-      await activeLeaf.setViewState({
-         type: 'youtube-player',
-         state: { videoId }
+      // Créer l'iframe YouTube
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed/${videoId}`;
+      iframe.style.cssText = `
+         width: 100%;
+         height: 100%;
+         border: none;
+      `;
+      
+      overlayContainer.appendChild(iframe);
+      
+      closeButton.addEventListener('click', async () => {
+         overlayContainer.remove();
+         // Restaurer la taille originale de l'éditeur
+         editorEl.style.height = '100%';
+         editorEl.style.top = '0';
+         this.plugin.settingsManager.settings.isVideoOpen = false;
+         await this.plugin.settingsManager.save();
       });
 
+      // Mettre à jour les settings
       this.activeLeafId = activeLeaf.id;
-      console.log("Overlay créé avec ID:", activeLeaf.id);
+      this.plugin.settingsManager.settings.lastVideoId = videoId;
+      this.plugin.settingsManager.settings.isVideoOpen = true;
+      await this.plugin.settingsManager.save();
+
+      // Gérer la fermeture de la leaf
+      this.registerOverlayCleanup(activeLeaf, overlayContainer, editorEl);
+   }
+
+   registerOverlayCleanup(leaf, overlayContainer, editorEl) {
+      // Nettoyer l'overlay si la leaf est fermée
+      const cleanup = () => {
+         overlayContainer.remove();
+         this.plugin.settingsManager.settings.isVideoOpen = false;
+         this.plugin.settingsManager.save();
+         // Restaurer la taille originale de l'éditeur
+         editorEl.style.height = '100%';
+         editorEl.style.top = '0';
+      };
+
+      // Ajouter un écouteur pour la fermeture de la leaf
+      leaf.on('unload', cleanup);
    }
 }
 class YouTubeFlowSettingTab extends PluginSettingTab {
@@ -315,6 +395,8 @@ class YouTubeFlowPlugin extends Plugin {
       this.registerEditorExtension([
          this.createSparkleDecoration()
       ]);
+
+      this.registerStyles();
    }
    async onunload() {
       await this.videoManager.closePreviousVideos();
@@ -379,7 +461,7 @@ class YouTubeFlowPlugin extends Plugin {
                            sparkle.addEventListener('click', (e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              plugin.videoManager.displayVideo(this.videoId, 'tab');
+                              plugin.videoManager.displayVideo(this.videoId, plugin.settingsManager.settings.currentMode);
                            });
 
                            return sparkle;
@@ -399,6 +481,37 @@ class YouTubeFlowPlugin extends Plugin {
       }, {
          decorations: v => v.decorations,
       });
+   }
+
+   registerStyles() {
+      document.head.appendChild(document.createElement('style')).textContent = `
+         .youtube-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--background-primary);
+            z-index: 100;
+         }
+
+         .youtube-overlay-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            z-index: 101;
+            padding: 5px;
+            background: var(--background-secondary);
+            border-radius: 3px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+         }
+
+         .youtube-overlay-close:hover {
+            opacity: 1;
+         }
+      `;
    }
 }
 
