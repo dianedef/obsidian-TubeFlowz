@@ -311,9 +311,94 @@ class YouTubeFlowPlugin extends Plugin {
       });
 
       this.addSettingTab(new YouTubeFlowSettingTab(this.app, this));
+
+      this.registerEditorExtension([
+         this.createSparkleDecoration()
+      ]);
    }
    async onunload() {
       await this.videoManager.closePreviousVideos();
+   }
+
+   createSparkleDecoration() {
+      const plugin = this;
+
+      return ViewPlugin.fromClass(class {
+         constructor(view) {
+            this.decorations = this.buildDecorations(view);
+         }
+
+         update(update) {
+            if (update.docChanged) {
+               const transaction = update.transactions[0];
+               const isPaste = transaction?.annotations?.[0]?.value === "paste";
+               const isFileOpen = transaction?.annotations?.[0]?.value === "load";
+
+               if (isPaste || isFileOpen) {
+                  this.decorations = this.buildDecorations(update.view);
+               }
+            }
+         }
+
+         buildDecorations(view) {
+            const decorations = [];
+            const docContent = view.state.doc.toString();
+            const markdownLinkRegex = /\[([^\]]+)\]\(([^\)]+)\)/g;
+            let match;
+
+            while ((match = markdownLinkRegex.exec(docContent)) !== null) {
+               const fullMatch = match[0];
+               const url = match[2];
+               const pos = match.index + fullMatch.length;
+
+               const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/;
+               const youtubeMatch = url.match(youtubeRegex);
+
+               if (youtubeMatch) {
+                  const videoId = youtubeMatch[1];
+
+                  decorations.push(Decoration.mark({
+                     class: "youtube-link",
+                     attributes: {
+                        "data-video-id": videoId
+                     }
+                  }).range(match.index, match.index + fullMatch.length));
+
+                  const sparkleDecoration = Decoration.widget({
+                     widget: new class extends WidgetType {
+                        constructor() {
+                           super();
+                           this.videoId = videoId;
+                        }
+
+                        toDOM() {
+                           const sparkle = document.createElement('span');
+                           sparkle.innerHTML = '▶️ Ouvrir le player ✨';
+                           sparkle.className = 'youtube-sparkle-decoration';
+                           sparkle.style.cursor = 'pointer';
+                           sparkle.addEventListener('click', (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              plugin.videoManager.displayVideo(this.videoId, 'tab');
+                           });
+
+                           return sparkle;
+                        }
+
+                        eq(other) { return this.videoId === other.videoId; }
+                     },
+                     side: 1
+                  });
+
+                  decorations.push(sparkleDecoration.range(pos));
+               }
+            }
+
+            return Decoration.set(decorations, true);
+         }
+      }, {
+         decorations: v => v.decorations,
+      });
    }
 }
 
