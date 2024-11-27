@@ -1,57 +1,90 @@
-const { Plugin, Notice, Modal, ItemView, WorkspaceLeaf, MarkdownView } = require('obsidian');
+const { Plugin, Notice, Modal, ItemView, WorkspaceLeaf, MarkdownView, PluginSettingTab, Setting } = require('obsidian');
 const { EditorView, ViewPlugin, Decoration, WidgetType } = require('@codemirror/view');
 
 class SettingsManager {
    constructor() {
          this.settings = {
             lastVideoId: null,
-            isVideoOpen: false
+            isVideoOpen: false,
+            playlist: [],
+            openInSidebar: true
          };
-         console.log("settings:", this.settings);
    }
 
    async load(plugin) {
-         this.settings = Object.assign({}, this.settings, await plugin.loadData());
-         this.plugin = plugin;
-         console.log("settings:", this.settings);
+      console.log("=== Début load settings ===");
+      const savedData = await plugin.loadData() || {};
+      
+      this.settings = {
+         ...this.settings,
+         ...savedData
+      };
+      
+      this.plugin = plugin;
+      console.log("Settings finaux après load:", this.settings);
    }
 
    async save() {
-         await this.plugin.saveData(this.settings);
-         console.log("settings:", this.settings);
+      if (!this.plugin) return;
+      console.log("Sauvegarde des settings:", this.settings);
+      await this.plugin.saveData(this.settings);
    }
 
-   getVideoState() {
-         console.log("getVideoState:", this.settings);
-         return {
-            lastVideoId: this.settings.lastVideoId,
-            isVideoOpen: this.settings.isVideoOpen
-         };
+   async getVideoState() {
+      return {
+         lastVideoId: this.settings.lastVideoId,
+         isVideoOpen: this.settings.isVideoOpen,
+         openInSidebar: this.settings.openInSidebar
+      };
    }
 }
+
 class YouTubeFlowPlugin extends Plugin {
    async onload() {
       console.log('Chargement du plugin YouTube Flow...');
-      console.log("this:", this);
+      
       this.settingsManager = new SettingsManager();
-      console.log("settingsManager:", this.settingsManager);
       await this.settingsManager.load(this);
-      console.log("settingsManager:", this.settingsManager);
-      // Si une vidéo était ouverte lors du dernier chargement, la rouvrir
-      if (this.settingsManager.settings.isVideoOpen) {
-         new SplitView(
-            this.app, 
-            this.settingsManager.settings.lastVideoId, 
-            this.settingsManager
-         ).open();
-         console.log("settingsManager:", this.settingsManager);
-      }
+      
+      // Attendre que l'application soit prête
+      this.app.workspace.onLayoutReady(async () => {
+         console.log("Layout ready, checking state:", this.settingsManager.settings);
+         
+         // Vérifier si une vue existe déjà
+         const existingLeaf = this.settingsManager.settings.openInSidebar 
+            ? this.app.workspace.getLeavesOfType('youtube-player')[0]
+            : SplitView.activeLeaf;
 
+         // Si la vidéo était fermée, fermer aussi le panneau s'il existe
+         if (!this.settingsManager.settings.isVideoOpen && existingLeaf) {
+            console.log("Fermeture du panneau existant car vidéo fermée");
+            existingLeaf.detach();
+            return;
+         }
+
+         // Restaurer uniquement si la vidéo était ouverte
+         if (this.settingsManager.settings.isVideoOpen && 
+             this.settingsManager.settings.lastVideoId) {
+            console.log("Restauration de la vue vidéo...");
+            new SplitView(
+               this.app, 
+               this.settingsManager.settings.lastVideoId, 
+               this.settingsManager,
+               this
+            ).open();
+         } else {
+            console.log("Pas de restauration nécessaire:", {
+               isVideoOpen: this.settingsManager.settings.isVideoOpen,
+               existingLeaf: !!existingLeaf
+            });
+         }
+      });
+
+      this.addSettingTab(new YouTubeFlowSettingTab(this.app, this));
 
       this.registerEditorExtension([
          this.createSparkleDecoration()
       ]);
-
    }
 
    createSparkleDecoration() {
@@ -118,12 +151,6 @@ class YouTubeFlowPlugin extends Plugin {
                
                if (youtubeMatch) {
                   const videoId = youtubeMatch[1];
-                  console.log("Lien YouTube trouvé:", {
-                     texte: linkText,
-                     url: url,
-                     videoId: videoId,
-                     position: pos
-                  });
                   
    // Ajouter la décoration mark pour le lien YouTube
                   decorations.push(Decoration.mark({
@@ -156,7 +183,8 @@ class YouTubeFlowPlugin extends Plugin {
                               new SplitView(
                                  this.app, 
                                  this.videoId, 
-                                 plugin.settingsManager  // Passer le settingsManager au lieu du plugin
+                                 plugin.settingsManager,
+                                 plugin
                               ).open();
                         });
                            
@@ -188,90 +216,158 @@ class YouTubeFlowPlugin extends Plugin {
 }
 
 class SplitView {
-   constructor(app, videoId, settingsManager) {
+   static activeLeaf = null;
+   static activeView = null;
+
+   constructor(app, videoId, settingsManager, plugin) {
       this.app = app;
       this.videoId = videoId;
       this.settingsManager = settingsManager;
-      this.leaf = null;
+      this.plugin = plugin;
    }
 
    async open() {
-      console.log("settingsManager:", this.settingsManager);
-      console.log("videoId:", this.videoId);
-      const state = await this.settingsManager.getVideoState();
+      console.log("=== Début open() ===");
+      console.log("Mode:", this.settingsManager.settings.openInSidebar ? "sidebar" : "tab");
 
-      console.log("Ouvrir la vidéo:", this.videoId);
-        
-      // Sauvegarder l'état
-      this.settingsManager.settings.lastVideoId = this.videoId;
-      this.settingsManager.settings.isVideoOpen = true;
-      await this.settingsManager.save();
+      let leaf;
+      if (this.settingsManager.settings.openInSidebar) {
+         // Mode sidebar
+         const existingLeaf = this.app.workspace.getLeavesOfType('youtube-player')[0];
+         if (existingLeaf && !existingLeaf.detached) {
+            console.log("Réutilisation du leaf sidebar existant");
+            leaf = existingLeaf;
+         } else {
+            console.log("Création d'un nouveau leaf sidebar");
+            leaf = this.app.workspace.getRightLeaf(false);
+            await leaf.setViewState({
+               type: 'youtube-player',
+               active: true,
+               icon: 'play-circle',
+               title: 'YouTube Player'
+            });
+         }
+      } else {
+         // Mode onglet
+         if (SplitView.activeLeaf && !SplitView.activeLeaf.detached) {
+            console.log("Réutilisation du leaf tab existant");
+            leaf = SplitView.activeLeaf;
+         } else {
+            const activeLeaf = this.app.workspace.activeLeaf;
+            if (activeLeaf) {
+               console.log("Création d'un nouveau leaf tab");
+               leaf = this.app.workspace.splitActiveLeaf('vertical');
+            }
+         }
+      }
 
-      // Réutiliser la vue existante si elle existe
-      if (SplitView.activeView) {
-         const container = SplitView.activeView.containerEl.children[0];
-         container.empty();
-         
-         const iframe = document.createElement('iframe');
-         iframe.setAttribute('src', `https://www.youtube.com/embed/${this.videoId}`);
-         iframe.setAttribute('width', '100%');
-         iframe.setAttribute('height', '100%');
-         iframe.setAttribute('frameborder', '0');
-         iframe.setAttribute('allowfullscreen', 'true');
-         
-         container.appendChild(iframe);
+      if (!leaf) {
+         console.error("Impossible de créer un leaf");
          return;
       }
 
-      // Attendre qu'une feuille soit active
-      await this.waitForActiveLeaf();
+      // Mise à jour des références
+      SplitView.activeLeaf = leaf;
+      SplitView.activeView = leaf.view;
+      this.leaf = leaf;
 
-      // Créer une nouvelle vue
-      const newLeaf = this.app.workspace.splitActiveLeaf('vertical');
-      SplitView.activeView = newLeaf.view;
-      this.leaf = newLeaf;
+      // Configuration de la vue
+      const container = leaf.view.containerEl.children[0];
+      if (!container) {
+         console.error("Container non trouvé");
+         return;
+      }
       
-      const container = newLeaf.view.containerEl.children[0];
       container.empty();
-      
       container.style.display = 'flex';
       container.style.flexDirection = 'column';
       container.style.alignItems = 'center';
       container.style.justifyContent = 'center';
       container.style.height = '100%';
+      container.style.position = 'relative'; // Important pour le bouton de fermeture
       
+      this.createVideoIframe(container);
+
+      // Sauvegarder l'état initial
+      this.settingsManager.settings.lastVideoId = this.videoId;
+      this.settingsManager.settings.isVideoOpen = true;
+      await this.settingsManager.save();
+
+      // Créer le gestionnaire de fermeture
+      const handleClose = async () => {
+         console.log("=== Événement de fermeture déclenché ===");
+         this.settingsManager.settings.isVideoOpen = false;
+         await this.settingsManager.save();
+         SplitView.activeLeaf = null;
+         SplitView.activeView = null;
+         console.log("État après fermeture:", this.settingsManager.settings);
+      };
+
+      // Supprimer les anciens écouteurs
+      leaf.off('unload');
+      leaf.off('detach');
+      leaf.off('resize');
+      leaf.off('hide');
+
+      // Ajouter tous les écouteurs possibles
+      leaf.on('unload', handleClose);
+      leaf.on('detach', handleClose);
+      leaf.on('hide', handleClose);
+      
+      // Écouter les événements de workspace
+      this.app.workspace.on('layout-change', () => {
+         if (!this.app.workspace.getLeavesOfType('youtube-player').length) {
+            handleClose();
+         }
+      });
+
+      // Ajouter le bouton de fermeture en mode sidebar
+      if (this.settingsManager.settings.openInSidebar && container) {
+         const closeButton = document.createElement('button');
+         closeButton.innerHTML = '❌';
+         closeButton.className = 'youtube-close-button';
+         closeButton.style.cssText = `
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            z-index: 1000;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+         `;
+         closeButton.onclick = async () => {
+            await handleClose();
+            leaf.detach();
+         };
+         container.appendChild(closeButton);
+      }
+   }
+
+   createVideoIframe(container) {
+      console.log("=== Début createVideoIframe() ===");
       const iframe = document.createElement('iframe');
       iframe.setAttribute('src', `https://www.youtube.com/embed/${this.videoId}`);
       iframe.setAttribute('width', '100%');
       iframe.setAttribute('height', '100%');
       iframe.setAttribute('frameborder', '0');
       iframe.setAttribute('allowfullscreen', 'true');
-      
       container.appendChild(iframe);
+      console.log("Iframe créée et ajoutée au container");
+      console.log("=== Fin createVideoIframe() ===");
    }
 
-   async waitForActiveLeaf() {
-      return new Promise((resolve) => {
-         const checkLeaf = () => {
-            const activeLeaf = this.app.workspace.activeLeaf;
-            if (activeLeaf) {
-               resolve();
-            } else {
-               setTimeout(checkLeaf, 100);
-            }
-         };
-         checkLeaf();
-      });
-   }
-
-   onClose() {
-/*       this.settings.isVideoOpen = false;
-      this.settings.lastVideoId = null;
-      this.saveData(this.settings); */
+   async onClose() {
+      console.log("=== Début onClose() ===");
       if (this.leaf) {
+         this.settingsManager.settings.isVideoOpen = false;
+         await this.settingsManager.save();
          this.leaf.detach();
+         SplitView.activeLeaf = null;
+         SplitView.activeView = null;
+         console.log("Vue fermée et état sauvegardé:", this.settingsManager.settings);
       }
-      super.onClose();
+      console.log("=== Fin onClose() ===");
    }
 }
 
@@ -602,6 +698,31 @@ class PlaylistManager {
    togglePlaylist() {
       const isVisible = this.playlistContainer.style.transform !== 'translateX(100%)';
       this.playlistContainer.style.transform = isVisible ? 'translateX(100%)' : 'translateX(0)';
+   }
+}
+
+// Nouvelle classe pour les paramètres
+class YouTubeFlowSettingTab extends PluginSettingTab {
+   constructor(app, plugin) {
+      super(app, plugin);
+      this.plugin = plugin;
+   }
+
+   display() {
+      const {containerEl} = this;
+      containerEl.empty();
+
+      new Setting(containerEl)
+         .setName('Mode d\'affichage')
+         .setDesc('Choisir où afficher les vidéos YouTube')
+         .addDropdown(dropdown => dropdown
+               .addOption('sidebar', 'Panneau latéral')
+               .addOption('tab', 'Nouvel onglet')
+               .setValue(this.plugin.settingsManager.settings.openInSidebar ? 'sidebar' : 'tab')
+               .onChange(async (value) => {
+                  this.plugin.settingsManager.settings.openInSidebar = (value === 'sidebar');
+                  await this.plugin.settingsManager.save();
+               }));
    }
 }
 

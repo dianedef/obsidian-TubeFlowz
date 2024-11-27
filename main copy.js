@@ -1,70 +1,98 @@
 const { Plugin, Notice, Modal, ItemView, WorkspaceLeaf, MarkdownView } = require('obsidian');
 const { EditorView, ViewPlugin, Decoration, WidgetType } = require('@codemirror/view');
 
-class YouTubeFlowPlugin extends Plugin {
-   DEFAULT_SETTINGS = {
-      lastVideoId: null,
-      isVideoOpen: false
+class SettingsManager {
+   constructor() {
+         this.settings = {
+            lastVideoId: null,
+            isVideoOpen: false
+         };
+         console.log("settings:", this.settings);
    }
-   
+
+   async load(plugin) {
+         this.settings = Object.assign({}, this.settings, await plugin.loadData());
+         this.plugin = plugin;
+         console.log("settings:", this.settings);
+   }
+
+   async save() {
+         await this.plugin.saveData(this.settings);
+         console.log("settings:", this.settings);
+   }
+
+   getVideoState() {
+         console.log("getVideoState:", this.settings);
+         return {
+            lastVideoId: this.settings.lastVideoId,
+            isVideoOpen: this.settings.isVideoOpen
+         };
+   }
+}
+class YouTubeFlowPlugin extends Plugin {
    async onload() {
-      await this.loadSettings();
-
-      if (this.settings.isVideoOpen) {
-         new SplitView(this.app, this.settings.lastVideoId, this).open();
-      }
-
-
-      this.settings = Object.assign({}, this.DEFAULT_SETTINGS, await this.loadData());
-
-   // Si une vidéo était ouverte lors du dernier chargement, la rouvrir
-      if (this.settings.isVideoOpen) {
-         new SplitView(this.app, this.settings.lastVideoId, this).open();
-      }
-
       console.log('Chargement du plugin YouTube Flow...');
+      console.log("this:", this);
+      this.settingsManager = new SettingsManager();
+      console.log("settingsManager:", this.settingsManager);
+      await this.settingsManager.load(this);
+      console.log("settingsManager:", this.settingsManager);
+      // Si une vidéo était ouverte lors du dernier chargement, la rouvrir
+      if (this.settingsManager.settings.isVideoOpen) {
+         new SplitView(
+            this.app, 
+            this.settingsManager.settings.lastVideoId, 
+            this.settingsManager
+         ).open();
+         console.log("settingsManager:", this.settingsManager);
+      }
+
 
       this.registerEditorExtension([
          this.createSparkleDecoration()
       ]);
 
-      // Enregistrer la vue personnalisée AVANT tout le reste
-      this.registerView(
-         'youtube-player',
-         (leaf) => {
-            console.log("Création d'une nouvelle vue YouTube");
-            return new YouTubeView(leaf);
-         }
-      );
-
-   /*       // Charger l'API YouTube
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-      
-      this.player = new YouTubePlayer(this);
-      this.hotkeys = new HotkeyManager(this);
-      this.hotkeys.registerHotkeys(); */
    }
 
    createSparkleDecoration() {
       const plugin = this;
+      console.log("settingsManager:", this.settingsManager);
+
       return ViewPlugin.fromClass(class {
          constructor(view) {
                this.app = plugin.app;
+               // Parse initial à l'ouverture du fichier
                this.decorations = this.buildDecorations(view);
          }
 
          update(update) {
+               // Ne parse que lors d'un collage ou d'une ouverture de fichier
                if (update.docChanged) {
-                  this.decorations = this.buildDecorations(update.view);
+                  const transaction = update.transactions[0];
+                  
+                  // Debug: voir les types de transactions disponibles
+                  console.log("Transaction:", {
+                     type: transaction?.annotation?.type,
+                     annotations: transaction?.annotations,
+                     transaction: transaction,
+                     userEvent: transaction?.annotations?.[0]?.value
+                  });
+                  
+                  // Vérifier si c'est un collage ou une ouverture de fichier
+                  const isPaste = transaction?.annotations?.[0]?.value === "paste";
+                  const isFileOpen = transaction?.annotations?.[0]?.value === "load";
+                  
+                  if (isPaste || isFileOpen) {
+                     console.log("Parsing triggered by:", isPaste ? "paste" : "file open");
+                     this.decorations = this.buildDecorations(update.view);
+                  }
                }
          }
 
          buildDecorations(view) {
             const decorations = [];
-            const plugin = this;
+            console.log("settingsManager:", plugin.settingsManager);
+
             
             const activeFile = this.app.workspace.getActiveFile();
             console.log("Fichier actif:", activeFile?.path);
@@ -111,7 +139,6 @@ class YouTubeFlowPlugin extends Plugin {
                            super();
                            this.videoId = videoId;
                            this.app = plugin.app;
-                           this.plugin = plugin;
                         }
    // Ajouter le widget sparkle
                         toDOM() {
@@ -122,12 +149,16 @@ class YouTubeFlowPlugin extends Plugin {
                            sparkle.style.display = 'inline-block';
                            sparkle.style.marginLeft = '2px';
                            sparkle.style.cursor = 'pointer';
-   // eventlistener                          
+                        // eventlistener                          
                            sparkle.addEventListener('click', (e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              new SplitView(this.app, this.videoId, this.plugin).open();
-                           });
+                              new SplitView(
+                                 this.app, 
+                                 this.videoId, 
+                                 plugin.settingsManager  // Passer le settingsManager au lieu du plugin
+                              ).open();
+                        });
                            
                            return sparkle;
                         }
@@ -154,35 +185,29 @@ class YouTubeFlowPlugin extends Plugin {
          decorations: v => v.decorations,
       });
    }
-   async loadSettings() {
-      this.settings = Object.assign({}, this.DEFAULT_SETTINGS, await this.loadData());
-   }
+}
 
-      async saveSettings(data) {
-         console.log("Sauvegarde des paramètres:", data);
-         this.settings = Object.assign({}, this.settings, data);
-         await this.saveData(this.settings);
-      } 
-   }
-class SplitView extends Plugin {
-   static activeView = null;
-
-   constructor(app, videoId, plugin) {
-      super(app);
+class SplitView {
+   constructor(app, videoId, settingsManager) {
+      this.app = app;
       this.videoId = videoId;
+      this.settingsManager = settingsManager;
       this.leaf = null;
-      this.plugin = plugin;
    }
-/* 
-si on réouvre l'app alors on a un lastvieoId et un open yes 
- */
+
    async open() {
-      console.log("Ouvrir la vidéo:", this.lastVideoId);
-   // Charger l'état de la vidéo
-      this.plugin.settings.isVideoOpen ? this.videoId = this.plugin.settings.lastVideoId : this.videoId;
-      this.plugin.settings.isVideoOpen = true;
-      await this.plugin.saveSettings();
-   // Réutiliser la vue existante si elle existe
+      console.log("settingsManager:", this.settingsManager);
+      console.log("videoId:", this.videoId);
+      const state = await this.settingsManager.getVideoState();
+
+      console.log("Ouvrir la vidéo:", this.videoId);
+        
+      // Sauvegarder l'état
+      this.settingsManager.settings.lastVideoId = this.videoId;
+      this.settingsManager.settings.isVideoOpen = true;
+      await this.settingsManager.save();
+
+      // Réutiliser la vue existante si elle existe
       if (SplitView.activeView) {
          const container = SplitView.activeView.containerEl.children[0];
          container.empty();
@@ -197,7 +222,11 @@ si on réouvre l'app alors on a un lastvieoId et un open yes
          container.appendChild(iframe);
          return;
       }
-   // Sinon créer une nouvelle vue avec un conteneur, une hauteur et l'iframe YouTube
+
+      // Attendre qu'une feuille soit active
+      await this.waitForActiveLeaf();
+
+      // Créer une nouvelle vue
       const newLeaf = this.app.workspace.splitActiveLeaf('vertical');
       SplitView.activeView = newLeaf.view;
       this.leaf = newLeaf;
@@ -221,18 +250,31 @@ si on réouvre l'app alors on a un lastvieoId et un open yes
       container.appendChild(iframe);
    }
 
-   onClose() {
-      if (this.leaf) {
-   // Mettre à jour l'état lors de la fermeture
-      this.plugin.settings.isVideoOpen = false;
-      this.plugin.saveSettings();
+   async waitForActiveLeaf() {
+      return new Promise((resolve) => {
+         const checkLeaf = () => {
+            const activeLeaf = this.app.workspace.activeLeaf;
+            if (activeLeaf) {
+               resolve();
+            } else {
+               setTimeout(checkLeaf, 100);
+            }
+         };
+         checkLeaf();
+      });
+   }
 
-         SplitView.activeView = null;
+   onClose() {
+/*       this.settings.isVideoOpen = false;
+      this.settings.lastVideoId = null;
+      this.saveData(this.settings); */
+      if (this.leaf) {
          this.leaf.detach();
       }
       super.onClose();
    }
 }
+
 class YouTubePlayer {
    constructor(plugin) {
       this.plugin = plugin;
@@ -400,6 +442,166 @@ class HotkeyManager {
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = seconds % 60;
       return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+   }
+}
+
+class PlaylistManager {
+   constructor(plugin) {
+      this.plugin = plugin;
+      this.playlist = [];
+      this.createPlaylistUI();
+   }
+
+   createPlaylistUI() {
+      // Créer le conteneur de la playlist
+      this.playlistContainer = document.createElement('div');
+      this.playlistContainer.className = 'youtube-flow-playlist';
+      this.playlistContainer.style.cssText = `
+         position: absolute;
+         right: 0;
+         top: 0;
+         width: 300px;
+         height: 100%;
+         background: var(--background-secondary);
+         border-left: 1px solid var(--background-modifier-border);
+         display: flex;
+         flex-direction: column;
+         overflow: hidden;
+      `;
+
+      // En-tête de la playlist
+      const header = document.createElement('div');
+      header.className = 'youtube-flow-playlist-header';
+      header.style.cssText = `
+         padding: 10px;
+         border-bottom: 1px solid var(--background-modifier-border);
+         display: flex;
+         justify-content: space-between;
+         align-items: center;
+      `;
+      
+      const title = document.createElement('h3');
+      title.textContent = 'Playlist';
+      title.style.margin = '0';
+      
+      const toggleBtn = document.createElement('button');
+      toggleBtn.innerHTML = '⬅️';
+      toggleBtn.onclick = () => this.togglePlaylist();
+      
+      header.appendChild(title);
+      header.appendChild(toggleBtn);
+      
+      // Liste des vidéos
+      this.playlistList = document.createElement('div');
+      this.playlistList.className = 'youtube-flow-playlist-items';
+      this.playlistList.style.cssText = `
+         flex: 1;
+         overflow-y: auto;
+         padding: 10px;
+      `;
+
+      this.playlistContainer.appendChild(header);
+      this.playlistContainer.appendChild(this.playlistList);
+   }
+
+   // À appeler dans SplitView.open() après la création de l'iframe
+   attachToContainer(container) {
+      container.style.position = 'relative';
+      container.appendChild(this.playlistContainer);
+   }
+
+   addVideo(videoId, title) {
+      // Vérifier si la vidéo existe déjà
+      if (!this.playlist.some(video => video.videoId === videoId)) {
+         this.playlist.push({ 
+            videoId, 
+            title,
+            addedAt: new Date().toISOString()
+         });
+         this.updatePlaylistUI();
+         this.savePlaylist();  // TODO: Implémenter la sauvegarde dans les settings
+      }
+   }
+
+   removeVideo(videoId) {
+      this.playlist = this.playlist.filter(video => video.videoId !== videoId);
+      this.updatePlaylistUI();
+      this.savePlaylist();
+   }
+
+   clearPlaylist() {
+      this.playlist = [];
+      this.updatePlaylistUI();
+      this.savePlaylist();
+   }
+
+   // Mise à jour de updatePlaylistUI pour inclure le bouton de suppression
+   updatePlaylistUI() {
+      this.playlistList.innerHTML = '';
+      this.playlist.forEach((video, index) => {
+         const item = document.createElement('div');
+         item.className = 'youtube-flow-playlist-item';
+         item.style.cssText = `
+               padding: 8px;
+               margin-bottom: 5px;
+               background: var(--background-primary);
+               border-radius: 4px;
+               cursor: pointer;
+               display: flex;
+               align-items: center;
+               gap: 8px;
+         `;
+
+            const thumbnail = document.createElement('img');
+            thumbnail.src = `https://img.youtube.com/vi/${video.videoId}/default.jpg`;
+            thumbnail.style.width = '80px';
+
+            const videoInfo = document.createElement('div');
+            videoInfo.textContent = video.title || `Vidéo ${index + 1}`;
+
+            item.appendChild(thumbnail);
+            item.appendChild(videoInfo);
+
+            // Ajouter un bouton de suppression
+            const removeBtn = document.createElement('button');
+            removeBtn.innerHTML = '❌';
+            removeBtn.style.marginLeft = 'auto';
+            removeBtn.onclick = (e) => {
+               e.stopPropagation();  // Empêcher le clic de propager à l'item
+               this.removeVideo(video.videoId);
+            };
+
+            item.appendChild(removeBtn);
+            this.playlistList.appendChild(item);
+      });
+
+      // Ajouter un bouton pour vider la playlist
+      if (this.playlist.length > 0) {
+         const clearBtn = document.createElement('button');
+         clearBtn.textContent = 'Vider la playlist';
+         clearBtn.onclick = () => this.clearPlaylist();
+         this.playlistList.appendChild(clearBtn);
+      }
+   }
+
+   // Méthodes pour la persistance
+   async savePlaylist() {
+      // TODO: Sauvegarder this.playlist dans les settings du plugin
+      // this.plugin.settingsManager.settings.playlist = this.playlist;
+      // await this.plugin.settingsManager.save();
+   }
+
+   async loadPlaylist() {
+      // TODO: Charger la playlist depuis les settings du plugin
+      // if (this.plugin.settingsManager.settings.playlist) {
+      //     this.playlist = this.plugin.settingsManager.settings.playlist;
+      //     this.updatePlaylistUI();
+      // }
+   }
+
+   togglePlaylist() {
+      const isVisible = this.playlistContainer.style.transform !== 'translateX(100%)';
+      this.playlistContainer.style.transform = isVisible ? 'translateX(100%)' : 'translateX(0)';
    }
 }
 
