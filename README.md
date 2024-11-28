@@ -1,4 +1,4 @@
-# TubeFowz - YouTube for Obsidian
+# ObsiTubeFlowz - YouTube for Obsidian
 (version FR en dessous)
 
 A powerful Obsidian plugin that transforms YouTube videos into rich Markdown notes with advanced AI features.
@@ -27,7 +27,7 @@ A powerful Obsidian plugin that transforms YouTube videos into rich Markdown not
 
 1. In Obsidian, go to Settings > Third-party plugins
 2. Disable restricted mode
-3. Click "Browse" and search for "TubeFowz"
+3. Click "Browse" and search for "ObsiTubeFlowz"
 4. Install the plugin
 
 ### ⚙️ Configuration
@@ -55,7 +55,7 @@ A powerful Obsidian plugin that transforms YouTube videos into rich Markdown not
 - Secure API communication
 
 
-# TubeFowz - YouTube for Obsidian
+# ObsiTubeFlowz - YouTube for Obsidian
 
 ## 🇫🇷 Français
 
@@ -85,7 +85,7 @@ Un plugin puissant pour Obsidian qui transforme vos vidéos YouTube en notes Mar
 
 1. Dans Obsidian, allez dans Paramètres > Extensions tierces
 2. Désactivez le mode restreint
-3. Cliquez sur "Parcourir" et recherchez "TubeFowz"
+3. Cliquez sur "Parcourir" et recherchez "ObsiTubeFlowz"
 4. Installez l'extension
 
 ### ⚙️ Configuration

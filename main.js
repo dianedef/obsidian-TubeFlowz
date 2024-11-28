@@ -20,6 +20,7 @@ class Store {
       this.settingsManager = null;  // On initialise à null
       this.videoManager = null;     // On initialise à null
       this.player = null;           // On initialise à null
+      this.resizeHandler = null;      // Ajout du ResizeHandler
       
       Store.instance = this;
    }
@@ -31,6 +32,7 @@ class Store {
       await store.settingsManager.load();
       
       store.videoManager = new VideoViewManager();
+      store.resizeHandler = new ResizeHandler();  // Initialisation
       
       return store;
    }
@@ -53,7 +55,9 @@ class SettingsManager {
          lastVideoId: 'aZyghlNOmiU',
          isVideoOpen: null,
          playlist: [],
-         currentMode: null
+         currentMode: null,
+         viewHeight: 60,
+         overlayHeight: 60
       };
    }
 
@@ -166,10 +170,6 @@ class VideoViewManager {
    async closePreviousVideos() {
       console.log("=== Début closePreviousVideos ===");
       
-      // D'abord vérifier si on a une leaf active à conserver
-      const activeLeaf = this.app.workspace.getLeafById(this.activeLeafId);
-      const keepActiveLeaf = activeLeaf && activeLeaf.view.getViewType() === 'youtube-player';
-      
       // Gérer les overlays
       const overlays = document.querySelectorAll('.youtube-overlay');
       overlays.forEach(overlay => {
@@ -184,25 +184,20 @@ class VideoViewManager {
          overlay.remove();
       });
 
-      // Gérer les leaves en préservant la leaf active
+      // Gérer les leaves (tab et sidebar)
       const leaves = this.app.workspace.getLeavesOfType('youtube-player');
       for (const leaf of leaves) {
          if (leaf && !leaf.detached) {
-            if (keepActiveLeaf && leaf.id === this.activeLeafId) {
-               console.log("Préservation de la leaf active:", leaf.id);
-               continue;
-            }
             leaf.detach();
          }
       }
 
-      if (!keepActiveLeaf) {
-         this.activeView = null;
-         this.activeLeafId = null;
-      }
+      // Réinitialiser les états
+      this.activeView = null;
+      this.activeLeafId = null;
+      this.settingsManager.settings.isVideoOpen = false;
       
       console.log("État après fermeture:", {
-         keepActiveLeaf,
          activeLeafId: this.activeLeafId
       });
       
@@ -324,9 +319,38 @@ class VideoViewManager {
 
       const closeButton = overlayContainer.createDiv('youtube-overlay-close');
       closeButton.innerHTML = '✕';
+      closeButton.style.cssText = `
+         cursor: pointer;
+         padding: 5px;
+         background: var(--background-secondary);
+         border-radius: 3px;
+         opacity: 0.8;
+      `;
       
-      const resizeHandle = overlayContainer.createDiv('youtube-overlay-resize-handle');
-      
+      const { resizeHandler } = Store.get();
+      resizeHandler.createResizer({
+         container: activeLeaf.view.containerEl,
+         targetElement: overlayContainer,
+         mode: 'overlay',
+         onResize: (height) => {
+            overlayContainer.style.height = `${height}%`;
+            editorEl.style.height = `${100 - height}%`;
+            editorEl.style.top = `${height}%`;
+         }
+      });
+
+      const controlsContainer = overlayContainer.createDiv('youtube-view-controls');
+      controlsContainer.style.cssText = `
+         position: absolute;
+         top: 10px;
+         right: 10px;
+         z-index: 101;
+         display: flex;
+         gap: 5px;
+      `;
+
+      controlsContainer.appendChild(closeButton);
+
       const iframe = document.createElement('iframe');
       iframe.src = `https://www.youtube.com/embed/${videoId}`;
       iframe.style.cssText = `
@@ -338,82 +362,8 @@ class VideoViewManager {
       overlayContainer.appendChild(iframe);
       
       closeButton.addEventListener('click', async () => {
-         overlayContainer.remove();
-         editorEl.style.height = '100%';
-         editorEl.style.top = '0';
-         this.settingsManager.settings.isVideoOpen = false;
-      });
-
-      const updateSize = (newHeight) => {
-         if (rafId) {
-            cancelAnimationFrame(rafId);
-         }
-         
-         rafId = requestAnimationFrame(() => {
-            const clampedHeight = Math.min(Math.max(newHeight, 20), 90);
-            overlayContainer.style.height = `${clampedHeight}%`;
-            editorEl.style.height = `${100 - clampedHeight}%`;
-            editorEl.style.top = `${clampedHeight}%`;
-            
-            const now = Date.now();
-            if (now - lastSaveTime >= 300) {
-               this.settingsManager.settings.overlayHeight = clampedHeight;
-               this.settingsManager.save();
-               lastSaveTime = now;
-            }
-            
-            rafId = null;
-         });
-      };
-
-      const handleDrag = (e) => {
-         const deltaY = e.clientY - startY;
-         const newHeight = startHeight + (deltaY / window.innerHeight * 100);
-         updateSize(newHeight);
-      };
-
-      resizeHandle.addEventListener('mousedown', (e) => {
-         startY = e.clientY;
-         startHeight = parseFloat(overlayContainer.style.height);
-         document.body.style.cursor = 'ns-resize';
-         
-         // Créer une couche transparente pour capturer les événements
-         const overlay = document.createElement('div');
-         overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 9999;
-            cursor: ns-resize;
-         `;
-         document.body.appendChild(overlay);
-         
-         const handleMouseUp = () => {
-            overlay.remove();
-            document.removeEventListener('mousemove', handleDrag);
-            document.removeEventListener('mouseup', handleMouseUp);
-            document.body.style.cursor = '';
-            
-            if (rafId) {
-               cancelAnimationFrame(rafId);
-            }
-         };
-         
-         document.addEventListener('mousemove', handleDrag);
-         document.addEventListener('mouseup', handleMouseUp);
-         
-         e.preventDefault();
-         e.stopPropagation();
-      });
-      
-      closeButton.addEventListener('click', async () => {
-         overlayContainer.remove();
-         editorEl.style.height = '100%';
-         editorEl.style.top = '0';
-         this.settingsManager.settings.isVideoOpen = false;
-         await this.settingsManager.save();
+         const { videoManager } = Store.get();
+         await videoManager.closePreviousVideos();
       });
 
       this.settingsManager.settings.lastVideoId = videoId;
@@ -523,48 +473,50 @@ class YouTubePlayerView extends ItemView {
          flex-direction: column;
          align-items: center;
          height: 100%;
-         transition: all 0.2s ease-in-out;
          background: var(--background-primary);
          position: relative;
       `;
 
-      // Ajouter le bouton de fermeture
-      const closeButton = container.createDiv('youtube-view-close');
-      closeButton.innerHTML = '✕';
-      closeButton.style.cssText = `
+      // Créer un conteneur pour les contrôles
+      const controlsContainer = container.createDiv('youtube-view-controls');
+      controlsContainer.style.cssText = `
          position: absolute;
          top: 10px;
          right: 10px;
-         cursor: pointer;
          z-index: 101;
+         display: flex;
+         gap: 5px;
+      `;
+
+      // Ajouter le bouton de fermeture
+      const closeButton = controlsContainer.createDiv('youtube-view-close');
+      closeButton.innerHTML = '✕';
+      closeButton.style.cssText = `
+         cursor: pointer;
          padding: 5px;
          background: var(--background-secondary);
          border-radius: 3px;
          opacity: 0.8;
-         transition: opacity 0.2s;
       `;
-      
+
+      // Ajouter l'événement click sur le bouton de fermeture
       closeButton.addEventListener('click', async () => {
-         // Fermer la leaf
-         this.leaf.detach();
-         // Mettre à jour les settings
-         this.settingsManager.settings.isVideoOpen = false;
-         await this.settingsManager.save();
+         const { videoManager } = Store.get();
+         await videoManager.closePreviousVideos();
       });
 
-      closeButton.addEventListener('mouseenter', () => {
-         closeButton.style.opacity = '1';
-      });
-
-      closeButton.addEventListener('mouseleave', () => {
-         closeButton.style.opacity = '0.8';
-      });
+      // Déterminer la hauteur selon le mode
+      const mode = this.settingsManager.settings.currentMode;
+      const defaultHeight = mode === 'overlay' 
+         ? this.settingsManager.settings.overlayHeight 
+         : this.settingsManager.settings.viewHeight;
 
       const videoContainer = document.createElement('div');
       videoContainer.style.cssText = `
          width: 100%;
-         height: 60%; 
+         height: ${defaultHeight || 60}%; 
          min-height: 100px;
+         position: relative;
       `;
 
       const iframe = document.createElement('iframe');
@@ -576,7 +528,19 @@ class YouTubePlayerView extends ItemView {
          height: 100%;
          border: none;
       `;
-      
+
+      const { resizeHandler } = Store.get();
+      resizeHandler.createResizer({
+         container: container,
+         targetElement: videoContainer,
+         mode: this.settingsManager.settings.currentMode,
+         onResize: (height) => {
+            videoContainer.style.height = `${height}%`;
+         }
+      });
+
+      controlsContainer.appendChild(closeButton);
+
       videoContainer.appendChild(iframe);
       container.appendChild(videoContainer);
    }
@@ -597,17 +561,6 @@ class YouTubeFlowPlugin extends Plugin {
    async onload() {
       await Store.init(this);
       const { videoManager, settingsManager } = Store.get();
-
-      // Utiliser registerStyles au lieu de addStyle
-      this.registerStyles(`
-         .loading-overlay {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-         }
-         .loading-overlay.ready {
-            opacity: 1;
-         }
-      `);
 
       this.app.workspace.onLayoutReady(() => {
          console.log("Layout prêt, initialisation des écouteurs...");
@@ -678,6 +631,16 @@ class YouTubeFlowPlugin extends Plugin {
             item.setTitle("YouTube Tab")
                .setIcon("tab")
                .onClick(async () => {
+                  // Sauvegarder la taille actuelle avant de changer de mode
+                  const overlay = document.querySelector('.youtube-overlay');
+                  if (overlay) {
+                     const height = parseFloat(overlay.style.height);
+                     if (!isNaN(height)) {
+                        settingsManager.settings.viewHeight = height;
+                        settingsManager.settings.overlayHeight = height;
+                        await settingsManager.save();
+                     }
+                  }
                   // Forcer la fermeture des vues précédentes avant de changer de mode
                   await videoManager.closePreviousVideos();
                   // Réinitialiser l'activeLeafId pour forcer la création d'une nouvelle vue
@@ -689,6 +652,16 @@ class YouTubeFlowPlugin extends Plugin {
             item.setTitle("YouTube Sidebar")
                .setIcon("layout-sidebar-right")
                .onClick(async () => {
+                  // Sauvegarder la taille actuelle avant de changer de mode
+                  const overlay = document.querySelector('.youtube-overlay');
+                  if (overlay) {
+                     const height = parseFloat(overlay.style.height);
+                     if (!isNaN(height)) {
+                        settingsManager.settings.viewHeight = height;
+                        settingsManager.settings.overlayHeight = height;
+                        await settingsManager.save();
+                     }
+                  }
                   await videoManager.closePreviousVideos();
                   videoManager.activeLeafId = null;
                   videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'sidebar');
@@ -698,6 +671,16 @@ class YouTubeFlowPlugin extends Plugin {
             item.setTitle("YouTube Overlay")
                .setIcon("layout-top")
                .onClick(async () => {
+                  // Sauvegarder la taille actuelle avant de changer de mode
+                  const videoContainer = document.querySelector('.youtube-player div[style*="height"]');
+                  if (videoContainer) {
+                     const height = parseFloat(videoContainer.style.height);
+                     if (!isNaN(height)) {
+                        settingsManager.settings.viewHeight = height;
+                        settingsManager.settings.overlayHeight = height;
+                        await settingsManager.save();
+                     }
+                  }
                   await videoManager.closePreviousVideos();
                   videoManager.activeLeafId = null;
                   videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'overlay');
@@ -763,42 +746,68 @@ class YouTubeFlowPlugin extends Plugin {
             z-index: 100;
          }
 
-         .youtube-overlay-close {
+         .youtube-view-controls {
             position: absolute;
             top: 10px;
             right: 10px;
-            cursor: pointer;
             z-index: 101;
-            padding: 5px;
+            display: flex;
+            gap: 5px;
             background: var(--background-secondary);
-            border-radius: 3px;
+            padding: 5px;
+            border-radius: 5px;
             opacity: 0.8;
-            transition: opacity 0.2s;
          }
 
-         .youtube-overlay-close:hover {
-            opacity: 1;
+         .youtube-view-close {
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 3px;
          }
 
-         .youtube-overlay-resize-handle {
+         .resize-handle {
             position: absolute;
-            bottom: 0;
+            bottom: -6px;
             left: 0;
             width: 100%;
-            height: 6px;
+            height: 12px;
             background: transparent;
             cursor: ns-resize;
             z-index: 102;
          }
 
-         .youtube-overlay-resize-handle:hover {
+         .resize-handle:hover {
             background: var(--interactive-accent);
             opacity: 0.3;
          }
 
-         .youtube-overlay-resize-handle:active {
+         .resize-handle:active {
             background: var(--interactive-accent);
             opacity: 0.5;
+         }
+
+         .loading-overlay {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+         }
+         
+         .loading-overlay.ready {
+            opacity: 1;
+         }
+
+         .youtube-overlay-close {
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 3px;
+            background: var(--background-secondary);
+         }
+
+         .youtube-overlay-close:hover {
+            opacity: 0.8;
+         }
+
+         .youtube-view-close:hover {
+            opacity: 0.8;
          }
       `;
    }
@@ -1236,6 +1245,115 @@ class PlaylistManager {
    togglePlaylist() {
       const isVisible = this.playlistContainer.style.transform !== 'translateX(100%)';
       this.playlistContainer.style.transform = isVisible ? 'translateX(100%)' : 'translateX(0)';
+   }
+}
+
+class ResizeHandler {
+   constructor() {
+      const { settingsManager } = Store.get();
+      this.settingsManager = settingsManager;
+   }
+
+   createResizer(options) {
+      const {
+         container,
+         targetElement,
+         onResize,
+         mode,
+         minHeight = 20,
+         maxHeight = 90
+      } = options;
+
+      const handle = document.createElement('div');
+      handle.className = 'resize-handle';
+      targetElement.appendChild(handle);
+
+      let startY = 0;
+      let startHeight = 0;
+      let rafId = null;
+      let lastSaveTime = Date.now();
+
+      const updateSize = (newHeight) => {
+         if (rafId) cancelAnimationFrame(rafId);
+         
+         rafId = requestAnimationFrame(() => {
+            const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
+            
+            if (mode === 'overlay') {
+               // Pour l'overlay, mise à jour directe
+               targetElement.style.height = `${clampedHeight}%`;
+               const editorEl = targetElement.closest('.workspace-leaf').querySelector('.cm-editor');
+               if (editorEl) {
+                  editorEl.style.height = `${100 - clampedHeight}%`;
+                  editorEl.style.top = `${clampedHeight}%`;
+               }
+            } else {
+               // Pour tab/sidebar, mise à jour directe
+               targetElement.style.height = `${clampedHeight}%`;
+               
+               // Mettre à jour l'iframe pour qu'elle suive immédiatement
+               const iframe = targetElement.querySelector('iframe');
+               if (iframe) {
+                  iframe.style.height = '100%';
+               }
+            }
+            
+            // Sauvegarder la hauteur globalement
+            const now = Date.now();
+            if (now - lastSaveTime >= 300) {
+               this.settingsManager.settings.viewHeight = clampedHeight;
+               this.settingsManager.settings.overlayHeight = clampedHeight;
+               this.settingsManager.save();
+               lastSaveTime = now;
+            }
+            
+            rafId = null;
+         });
+      };
+
+      const handleDrag = (e) => {
+         const deltaY = e.clientY - startY;
+         const containerHeight = container.getBoundingClientRect().height;
+         const newHeight = startHeight + (deltaY / containerHeight * 100);
+         updateSize(newHeight);
+      };
+
+      handle.addEventListener('mousedown', (e) => {
+         startY = e.clientY;
+         startHeight = parseFloat(targetElement.style.height);
+         document.body.style.cursor = 'ns-resize';
+         
+         const overlay = document.createElement('div');
+         overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            cursor: ns-resize;
+         `;
+         document.body.appendChild(overlay);
+         
+         const handleMouseUp = () => {
+            overlay.remove();
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+            
+            if (rafId) {
+               cancelAnimationFrame(rafId);
+            }
+         };
+         
+         document.addEventListener('mousemove', handleDrag);
+         document.addEventListener('mouseup', handleMouseUp);
+         
+         e.preventDefault();
+         e.stopPropagation();
+      });
+
+      return handle;
    }
 }
 
