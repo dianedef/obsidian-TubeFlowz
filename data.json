@@ -1,11 +1,11 @@
 {
-  "lastVideoId": "U8QNTdWJfT8",
-  "isVideoOpen": true,
+  "lastVideoId": "Rkv4rrdFBU0",
+  "isVideoOpen": false,
   "playlist": [],
-  "currentMode": "overlay",
-  "viewHeight": 70.02423048664195,
-  "overlayHeight": 70.02423048664195,
-  "activeLeafId": "d3ff1862698a1678",
+  "currentMode": "sidebar",
+  "viewHeight": 20.8285,
+  "overlayHeight": 20.8285,
+  "activeLeafId": "0da1770da1cf4c70",
   "isRestoring": false,
   "overlayLeafId": "d3ff1862698a1678",
   "isChangingMode": false
