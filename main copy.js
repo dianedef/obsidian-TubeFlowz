@@ -25,18 +25,14 @@ class Store {
    }
 
    static async init(plugin) {
-      if (!Store.instance) {
-         const store = new Store(plugin);
-         // Créer les managers dans le bon ordre
-         store.settingsManager = new SettingsManager();
-         await store.settingsManager.load();
-         
-         store.videoManager = new VideoViewManager();
-         store.player = new YouTubePlayer();
-         
-         return store;
-      }
-      return Store.instance;
+      const store = new Store(plugin);
+      // Créer les managers dans le bon ordre
+      store.settingsManager = new SettingsManager();
+      await store.settingsManager.load();
+      
+      store.videoManager = new VideoViewManager();
+      
+      return store;
    }
 
    static get() {
@@ -57,8 +53,7 @@ class SettingsManager {
          lastVideoId: 'aZyghlNOmiU',
          isVideoOpen: null,
          playlist: [],
-         currentMode: null,
-         overlayHeight: 60
+         currentMode: null
       };
    }
 
@@ -78,33 +73,43 @@ class VideoViewManager {
       const { app, settingsManager } = Store.get();
       this.app = app;
       this.settingsManager = settingsManager;
-      
       this.activeLeafId = null;
       this.activeView = null;
-      this.restoreLastSession();
    }
 // restoreLastSession() : Restaurer la dernière session
    async restoreLastSession() {
-      await this.closePreviousVideos();
       const settings = this.settingsManager.settings;
       
-      console.log("lancement de restoreLastSession avec activeLeafId:", this.activeLeafId);
-      if (settings.isVideoOpen && settings.lastVideoId) {
+      console.log("lancement de restoreLastSession", settings);
+      
+      // Ne restaurer que si une vidéo était ouverte et qu'on a un ID valide
+      if (settings.isVideoOpen && settings.lastVideoId && settings.currentMode) {
+         // S'assurer qu'il n'y a pas de vues existantes
+         await this.closePreviousVideos();
+         console.log("Restauration de la session avec:", {
+            videoId: settings.lastVideoId,
+            mode: settings.currentMode
+         });
+         
+         
          // Attendre un peu que l'éditeur soit prêt pour le mode overlay
          if (settings.currentMode === 'overlay') {
-            // Petit délai pour s'assurer que l'éditeur est chargé
             setTimeout(() => {
                this.displayVideo(settings.lastVideoId, settings.currentMode);
             }, 500);
          } else {
             await this.displayVideo(settings.lastVideoId, settings.currentMode);
          }
+      } else {
+         // Réinitialiser l'état si les conditions ne sont pas remplies
+         settings.isVideoOpen = false;
+         await this.settingsManager.save();
       }
    }
-
+// displayVideo() : Afficher la vidéo
    async displayVideo(videoId, mode) {
-      console.log(`Affichage vidéo ${videoId} en mode ${mode}`);
-      await this.closePreviousVideos();
+      console.log(`displayVideo() ${videoId} en mode ${mode}`);
+      this.settingsManager.settings.currentMode = mode;
       
       switch(mode) {
          case 'sidebar':
@@ -120,7 +125,6 @@ class VideoViewManager {
 
       this.settingsManager.settings.lastVideoId = videoId;
       this.settingsManager.settings.isVideoOpen = true;
-      this.settingsManager.settings.currentMode = mode;
       this.settingsManager.settings.activeLeafId = this.activeLeafId;
       await this.settingsManager.save();
    }
@@ -128,23 +132,42 @@ class VideoViewManager {
    async closePreviousVideos() {
       console.log("=== Début closePreviousVideos ===");
       
+      // Gérer les overlays avec une transition
       const overlays = document.querySelectorAll('.youtube-overlay');
       overlays.forEach(overlay => {
-         const containerEl = overlay.closest('.workspace-leaf');
-         if (containerEl) {
-            const editor = containerEl.querySelector('.cm-editor');
-            if (editor) {
-               editor.style.height = '100%';
-               editor.style.top = '0';
+         overlay.style.transition = 'opacity 0.2s ease-out';
+         overlay.style.opacity = '0';
+         
+         setTimeout(() => {
+            const containerEl = overlay.closest('.workspace-leaf');
+            if (containerEl) {
+               const editor = containerEl.querySelector('.cm-editor');
+               if (editor) {
+                  editor.style.transition = 'all 0.2s ease-out';
+                  editor.style.height = '100%';
+                  editor.style.top = '0';
+               }
             }
-         }
-         overlay.remove();
+            overlay.remove();
+         }, 200);
       });
 
+      // Gérer les leaves avec une transition
       const leaves = this.app.workspace.getLeavesOfType('youtube-player');
       for (const leaf of leaves) {
          if (leaf && !leaf.detached) {
-            leaf.detach();
+            // Préparer la transition
+            const container = leaf.containerEl;
+            container.style.transition = 'all 0.2s ease-out';
+            container.style.opacity = '0';
+            
+            // Attendre la fin de la transition avant de détacher
+            await new Promise(resolve => {
+               container.addEventListener('transitionend', () => {
+                  leaf.detach();
+                  resolve();
+               }, { once: true });
+            });
          }
       }
 
@@ -162,6 +185,8 @@ class VideoViewManager {
    
 // createSidebarView(videoId) : Créer la vue en sidebar
    async createSidebarView(videoId) {
+      await this.closePreviousVideos();
+
       const leaf = this.app.workspace.getRightLeaf(false);
       
       this.app.workspace.revealLeaf(leaf);
@@ -179,6 +204,8 @@ class VideoViewManager {
    }
 // createTabView(videoId) : Créer la vue en tab
    async createTabView(videoId) {
+      await this.closePreviousVideos();
+
       const leaf = this.app.workspace.splitActiveLeaf('vertical');
       
       this.activeLeafId = leaf.id;
@@ -195,20 +222,28 @@ class VideoViewManager {
 // createOverlayView(videoId) : Créer la vue en overlay
    async createOverlayView(videoId) {
       const activeLeaf = this.app.workspace.activeLeaf;
+      let startY, startHeight;
+      let rafId = null;
+      let lastSaveTime = Date.now();
       if (!activeLeaf) return;
 
       const editorEl = activeLeaf.view.containerEl.querySelector('.cm-editor');
       if (!editorEl) return;
 
+      // Sauvegarder l'ID de la feuille active pour la restauration
       this.settingsManager.settings.overlayLeafId = activeLeaf.id;
       
+      // Utiliser la hauteur sauvegardée ou la valeur par défaut (60%)
       const overlayHeight = this.settingsManager.settings.overlayHeight || 60;
       
+      // Appliquer immédiatement la hauteur sauvegardée
       editorEl.style.height = `${100 - overlayHeight}%`;
       editorEl.style.position = 'relative';
       editorEl.style.top = `${overlayHeight}%`;
 
       const overlayContainer = activeLeaf.view.containerEl.createDiv('youtube-overlay');
+      // Appliquer la même hauteur au container
+      overlayContainer.style.height = `${overlayHeight}%`;
       overlayContainer.style.cssText = `
          position: absolute;
          top: 0;
@@ -220,67 +255,12 @@ class VideoViewManager {
          display: flex;
          flex-direction: column;
          align-items: center;
-         will-change: transform;
-         transform: translateZ(0);
       `;
-
-      const resizeHandle = overlayContainer.createDiv('youtube-overlay-resize-handle');
-
-      let startY, startHeight;
-      let rafId = null;
-      let lastSaveTime = Date.now();
-      
-      const updateSize = (newHeight) => {
-         if (rafId) {
-            cancelAnimationFrame(rafId);
-         }
-         
-         rafId = requestAnimationFrame(() => {
-            const clampedHeight = Math.min(Math.max(newHeight, 20), 90);
-            overlayContainer.style.height = `${clampedHeight}%`;
-            editorEl.style.height = `${100 - clampedHeight}%`;
-            editorEl.style.top = `${clampedHeight}%`;
-            
-            // Ne sauvegarder que si suffisamment de temps s'est écoulé
-            const now = Date.now();
-            if (now - lastSaveTime >= 200) {
-               this.settingsManager.settings.overlayHeight = clampedHeight;
-               this.settingsManager.save();
-               lastSaveTime = now;
-            }
-            
-            rafId = null;
-         });
-      };
-
-      const handleDrag = (e) => {
-         const deltaY = e.clientY - startY;
-         const newHeight = startHeight + (deltaY / window.innerHeight * 100);
-         updateSize(newHeight);
-      };
-
-      const handleMouseUp = () => {
-         document.removeEventListener('mousemove', handleDrag);
-         document.removeEventListener('mouseup', handleMouseUp);
-         document.body.style.cursor = '';
-         if (rafId) {
-            cancelAnimationFrame(rafId);
-         }
-      };
-
-      resizeHandle.addEventListener('mousedown', (e) => {
-         startY = e.clientY;
-         startHeight = parseFloat(overlayContainer.style.height);
-         document.body.style.cursor = 'ns-resize';
-         
-         document.addEventListener('mousemove', handleDrag);
-         document.addEventListener('mouseup', handleMouseUp);
-         
-         e.preventDefault();
-      });
 
       const closeButton = overlayContainer.createDiv('youtube-overlay-close');
       closeButton.innerHTML = '✕';
+      
+      const resizeHandle = overlayContainer.createDiv('youtube-overlay-resize-handle');
       
       const iframe = document.createElement('iframe');
       iframe.src = `https://www.youtube.com/embed/${videoId}`;
@@ -297,6 +277,77 @@ class VideoViewManager {
          editorEl.style.height = '100%';
          editorEl.style.top = '0';
          this.settingsManager.settings.isVideoOpen = false;
+      });
+
+      const updateSize = (newHeight) => {
+         if (rafId) {
+            cancelAnimationFrame(rafId);
+         }
+         
+         rafId = requestAnimationFrame(() => {
+            const clampedHeight = Math.min(Math.max(newHeight, 20), 90);
+            overlayContainer.style.height = `${clampedHeight}%`;
+            editorEl.style.height = `${100 - clampedHeight}%`;
+            editorEl.style.top = `${clampedHeight}%`;
+            
+            const now = Date.now();
+            if (now - lastSaveTime >= 300) {
+               this.settingsManager.settings.overlayHeight = clampedHeight;
+               this.settingsManager.save();
+               lastSaveTime = now;
+            }
+            
+            rafId = null;
+         });
+      };
+
+      const handleDrag = (e) => {
+         const deltaY = e.clientY - startY;
+         const newHeight = startHeight + (deltaY / window.innerHeight * 100);
+         updateSize(newHeight);
+      };
+
+      resizeHandle.addEventListener('mousedown', (e) => {
+         startY = e.clientY;
+         startHeight = parseFloat(overlayContainer.style.height);
+         document.body.style.cursor = 'ns-resize';
+         
+         // Créer une couche transparente pour capturer les événements
+         const overlay = document.createElement('div');
+         overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            cursor: ns-resize;
+         `;
+         document.body.appendChild(overlay);
+         
+         const handleMouseUp = () => {
+            overlay.remove();
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+            
+            if (rafId) {
+               cancelAnimationFrame(rafId);
+            }
+         };
+         
+         document.addEventListener('mousemove', handleDrag);
+         document.addEventListener('mouseup', handleMouseUp);
+         
+         e.preventDefault();
+         e.stopPropagation();
+      });
+      
+      closeButton.addEventListener('click', async () => {
+         overlayContainer.remove();
+         editorEl.style.height = '100%';
+         editorEl.style.top = '0';
+         this.settingsManager.settings.isVideoOpen = false;
          await this.settingsManager.save();
       });
 
@@ -304,7 +355,6 @@ class VideoViewManager {
       this.settingsManager.settings.lastVideoId = videoId;
       this.settingsManager.settings.isVideoOpen = true;
       this.settingsManager.settings.currentMode = 'overlay';
-      await this.settingsManager.save();
 
       this.registerOverlayCleanup(activeLeaf, overlayContainer, editorEl);
    }
@@ -376,6 +426,7 @@ class YouTubePlayerView extends ItemView {
          align-items: center;
          padding: 10px;
          height: 100%;
+         transition: all 0.2s ease-in-out;
       `;
 
       const videoContainer = document.createElement('div');
@@ -409,23 +460,59 @@ class YouTubePlayerView extends ItemView {
    }
 // onClose() : Mettre à jour les settings quand la vue est fermée
    async onClose() {
-      console.log("YouTubePlayerView onClose called");
       this.settingsManager.settings.isVideoOpen = false;
-      this.settingsManager.settings.currentMode = null;
       await this.settingsManager.save();
-      console.log("Nettoyage de la vue YouTube avec settings :", this.settingsManager.settings);
+      console.log("onClose avec settings :", this.settingsManager.settings);
    }
 }
 class YouTubeFlowPlugin extends Plugin {
 // Logique : Chargement des settings, initialisation de VideoViewManager lorsque le layout est prêt
    async onload() {
-      // Initialiser le Store AVANT tout
       await Store.init(this);
       const { videoManager, settingsManager } = Store.get();
+
+      // Utiliser registerStyles au lieu de addStyle
+      this.registerStyles(`
+         .loading-overlay {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+         }
+         .loading-overlay.ready {
+            opacity: 1;
+         }
+      `);
 
       this.app.workspace.onLayoutReady(() => {
          console.log("Layout prêt, initialisation des écouteurs...");
          
+         if (settingsManager.settings.isVideoOpen && 
+            settingsManager.settings.currentMode === 'overlay') {
+            
+            // Déplacer la déclaration de editorEl en dehors du if
+            let editorEl = null;
+            
+            // Masquer l'éditeur immédiatement
+            const activeLeaf = this.app.workspace.activeLeaf;
+            if (activeLeaf) {
+               editorEl = activeLeaf.view.containerEl.querySelector('.cm-editor');
+               if (editorEl) {
+                  editorEl.style.opacity = '0';
+                  editorEl.style.transition = 'opacity 0.3s ease';
+               }
+            }
+
+            setTimeout(() => {
+               videoManager.displayVideo(
+                  settingsManager.settings.lastVideoId, 
+                  settingsManager.settings.currentMode
+               ).then(() => {
+                  if (editorEl) {
+                     editorEl.style.opacity = '1';
+                  }
+               });
+            }, 100);
+         }
+
          this.registerView(
             'youtube-player',
             (leaf) => new YouTubePlayerView(leaf)
@@ -445,7 +532,6 @@ class YouTubeFlowPlugin extends Plugin {
                   });
                   return;
                }
-
                
                if (videoManager && leaf?.id && 
                   leaf.id === videoManager.activeLeafId) {
@@ -464,17 +550,26 @@ class YouTubeFlowPlugin extends Plugin {
          menu.addItem((item) => {
             item.setTitle("YouTube Tab")
                .setIcon("tab")
-               .onClick(() => videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'tab'));
+               .onClick(async () => {
+                  await videoManager.closePreviousVideos();
+                  videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'tab');
+               });
          });
          menu.addItem((item) => {
             item.setTitle("YouTube Sidebar")
                .setIcon("layout-sidebar-right")
-               .onClick(() => videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'sidebar'));
+               .onClick(async () => {
+                  await videoManager.closePreviousVideos();
+                  videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'sidebar');
+               });
          });
          menu.addItem((item) => {
             item.setTitle("YouTube Overlay")
                .setIcon("layout-top")
-               .onClick(() => videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'overlay'));
+               .onClick(async () => {
+                  await videoManager.closePreviousVideos();
+                  videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'overlay');
+               });
          });
 
          const iconRect = ribbonIcon.getBoundingClientRect();
@@ -664,10 +759,6 @@ class YouTubeWidget extends WidgetType {
    
    eq(other) {
       return other.videoId === this.videoId;
-   }
-   
-   ignoreEvent() {
-      return false;  // Important : permettre la propagation des événements
    }
 }
 
