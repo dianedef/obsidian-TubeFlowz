@@ -130,42 +130,7 @@ class VideoViewManager {
       this.settingsManager.settings.isChangingMode = false;
       await this.settingsManager.save();
    }
-
-   async closePreviousVideos() {
-      console.log("=== Début closePreviousVideos ===");
-      
-      // Gérer les overlays
-      const overlays = document.querySelectorAll('.youtube-overlay');
-      overlays.forEach(overlay => {
-         const containerEl = overlay.closest('.workspace-leaf');
-         if (containerEl) {
-            const editor = containerEl.querySelector('.cm-editor');
-            if (editor) {
-               editor.style.height = '100%';
-               editor.style.top = '0';
-            }
-         }
-         overlay.remove();
-      });
-
-      // Gérer toutes les leaves YouTube sans exception lors d'un changement de mode
-      const leaves = this.app.workspace.getLeavesOfType('youtube-player');
-      for (const leaf of leaves) {
-         if (leaf && !leaf.detached) {
-            leaf.detach();
-         }
-      }
-
-      // Réinitialiser les états
-      this.activeView = null;
-      this.activeLeafId = null;
-      
-      console.log("État après fermeture:", {
-         activeLeafId: this.activeLeafId
-      });
-      
-      await this.settingsManager.save();
-   }
+// restoreLastSession() : Restaurer la dernière session
 
    async restoreLastSession() {
       const settings = this.settingsManager.settings;
@@ -196,7 +161,55 @@ class VideoViewManager {
          await this.settingsManager.save();
       }
    }
+// closePreviousVideos() : Fermer toutes vues précédentes et réinitialiser les états
 
+   async closePreviousVideos() {
+      console.log("=== Début closePreviousVideos ===");
+      
+      // D'abord vérifier si on a une leaf active à conserver
+      const activeLeaf = this.app.workspace.getLeafById(this.activeLeafId);
+      const keepActiveLeaf = activeLeaf && activeLeaf.view.getViewType() === 'youtube-player';
+      
+      // Gérer les overlays
+      const overlays = document.querySelectorAll('.youtube-overlay');
+      overlays.forEach(overlay => {
+         const containerEl = overlay.closest('.workspace-leaf');
+         if (containerEl) {
+            const editor = containerEl.querySelector('.cm-editor');
+            if (editor) {
+               editor.style.height = '100%';
+               editor.style.top = '0';
+            }
+         }
+         overlay.remove();
+      });
+
+      // Gérer les leaves en préservant la leaf active
+      const leaves = this.app.workspace.getLeavesOfType('youtube-player');
+      for (const leaf of leaves) {
+         if (leaf && !leaf.detached) {
+            if (keepActiveLeaf && leaf.id === this.activeLeafId) {
+               console.log("Préservation de la leaf active:", leaf.id);
+               continue;
+            }
+            leaf.detach();
+         }
+      }
+
+      if (!keepActiveLeaf) {
+         this.activeView = null;
+         this.activeLeafId = null;
+      }
+      
+      console.log("État après fermeture:", {
+         keepActiveLeaf,
+         activeLeafId: this.activeLeafId
+      });
+      
+      await this.settingsManager.save();
+   }
+   
+// createSidebarView(videoId) : Créer la vue en sidebar
    async createSidebarView(videoId) {
       const existingLeaves = this.app.workspace.getLeavesOfType('youtube-player');
       const existingSidebar = existingLeaves.find(leaf => 
@@ -225,7 +238,7 @@ class VideoViewManager {
       this.activeLeafId = leaf.id;
       this.activeView = leaf.view;
    }
-
+// createTabView(videoId) : Créer la vue en tab
    async createTabView(videoId) {
       // Chercher une tab YouTube existante
       const existingLeaves = this.app.workspace.getLeavesOfType('youtube-player');
@@ -257,7 +270,7 @@ class VideoViewManager {
       // Activer la leaf pour la mettre au premier plan
       this.app.workspace.setActiveLeaf(leaf);
    }
-
+// createOverlayView(videoId) : Créer la vue en overlay
    async createOverlayView(videoId) {
       const activeLeaf = this.app.workspace.activeLeaf;
       let startY, startHeight;
@@ -794,7 +807,6 @@ class YouTubeFlowPlugin extends Plugin {
 }
 
 function createDecorations(view) {
-// Identifier les liens YouTube et ajouter les décorations
    const decorations = [];
    const doc = view.state.doc;
    
@@ -802,12 +814,12 @@ function createDecorations(view) {
       const line = doc.lineAt(pos);
       const lineText = line.text;
       
-      const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+      const linkRegex = /(?:\[([^\]]+)\]\(([^)]+)\)|(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+))/g;
       let match;
       
       while ((match = linkRegex.exec(lineText)) !== null) {
          const fullMatch = match[0];
-         const url = match[2];
+         const url = match[2] || fullMatch;
          const startPos = line.from + match.index;
          const endPos = startPos + fullMatch.length;
          
