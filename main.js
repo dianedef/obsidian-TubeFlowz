@@ -3,8 +3,56 @@ const { EditorView, ViewPlugin, Decoration, WidgetType } = require('@codemirror/
 const { EditorState } = require('@codemirror/state');
 const { syntaxTreeAvailable } = require('@codemirror/language');
 
+// 1. D'abord définir Store
+class Store {
+   static instance = null;
+   
+   constructor(plugin) {
+      if (Store.instance) {
+         return Store.instance;
+      }
+      
+      // Services Obsidian
+      this.app = plugin.app;
+      this.plugin = plugin;
+      
+      // Nos managers
+      this.settingsManager = null;  // On initialise à null
+      this.videoManager = null;     // On initialise à null
+      this.player = null;           // On initialise à null
+      
+      Store.instance = this;
+   }
+
+   static async init(plugin) {
+      if (!Store.instance) {
+         const store = new Store(plugin);
+         // Créer les managers dans le bon ordre
+         store.settingsManager = new SettingsManager();
+         await store.settingsManager.load();
+         
+         store.videoManager = new VideoViewManager();
+         store.player = new YouTubePlayer();
+         
+         return store;
+      }
+      return Store.instance;
+   }
+
+   static get() {
+      if (!Store.instance) {
+         throw new Error('Store not initialized! Call Store.init(plugin) first');
+      }
+      return Store.instance;
+   }
+}
+
+// 2. Ensuite les autres classes
 class SettingsManager {
    constructor() {
+      const { plugin: youtubeFlowPlugin } = Store.get();
+      this.youtubeFlowPlugin = youtubeFlowPlugin;
+      
       this.settings = {
          lastVideoId: 'aZyghlNOmiU',
          isVideoOpen: null,
@@ -13,21 +61,23 @@ class SettingsManager {
       };
    }
 
-   async load(plugin) {
-      const savedData = await plugin.loadData() || {};
+   async load() {
+      const savedData = await this.youtubeFlowPlugin.loadData() || {};
       this.settings = { ...this.settings, ...savedData };
-      this.plugin = plugin;
       console.log("Settings chargées:", this.settings);
    }
+
    async save() {
-      if (!this.plugin) return;
-      await this.plugin.saveData(this.settings);
+      await this.youtubeFlowPlugin.saveData(this.settings);
       console.log("Settings sauvegardées:", this.settings);
    }
 }
 class VideoViewManager {
-   constructor(plugin) {
-      this.plugin = plugin;
+   constructor() {
+      const { app, settingsManager } = Store.get();
+      this.app = app;
+      this.settingsManager = settingsManager;
+      
       this.activeLeafId = null;
       this.activeView = null;
       this.restoreLastSession();
@@ -35,16 +85,26 @@ class VideoViewManager {
 // restoreLastSession() : Restaurer la dernière session
    async restoreLastSession() {
       await this.closePreviousVideos();
-      const settings = this.plugin.settingsManager.settings;
+      const settings = this.settingsManager.settings;
+      
       console.log("lancement de restoreLastSession avec activeLeafId:", this.activeLeafId);
       if (settings.isVideoOpen && settings.lastVideoId) {
-         await this.displayVideo(settings.lastVideoId, settings.currentMode);
+         // Attendre un peu que l'éditeur soit prêt pour le mode overlay
+         if (settings.currentMode === 'overlay') {
+            // Petit délai pour s'assurer que l'éditeur est chargé
+            setTimeout(() => {
+               this.displayVideo(settings.lastVideoId, settings.currentMode);
+            }, 500);
+         } else {
+            await this.displayVideo(settings.lastVideoId, settings.currentMode);
+         }
       }
    }
-// displayVideo(videoId, mode) : Créer la nouvelle vue selon le mode et mettre à jour les settings
+
    async displayVideo(videoId, mode) {
       console.log(`Affichage vidéo ${videoId} en mode ${mode}`);
-      this.closePreviousVideos();
+      await this.closePreviousVideos();
+      
       switch(mode) {
          case 'sidebar':
             await this.createSidebarView(videoId);
@@ -56,20 +116,19 @@ class VideoViewManager {
             await this.createOverlayView(videoId);
             break;
       }
-      this.plugin.settingsManager.settings.lastVideoId = videoId;
-      this.plugin.settingsManager.settings.isVideoOpen = true;
-      this.plugin.settingsManager.settings.currentMode = mode;
-      this.plugin.settingsManager.settings.activeLeafId = this.activeLeafId;
-      await this.plugin.settingsManager.save();
+
+      this.settingsManager.settings.lastVideoId = videoId;
+      this.settingsManager.settings.isVideoOpen = true;
+      this.settingsManager.settings.currentMode = mode;
+      this.settingsManager.settings.activeLeafId = this.activeLeafId;
+      await this.settingsManager.save();
    }
 // closePreviousVideos() : Fermer toutes vues précédentes et réinitialiser les états
    async closePreviousVideos() {
       console.log("=== Début closePreviousVideos ===");
       
-      // Fermer les overlays existants et restaurer les éditeurs
       const overlays = document.querySelectorAll('.youtube-overlay');
       overlays.forEach(overlay => {
-         // Trouver l'éditeur associé à cet overlay
          const containerEl = overlay.closest('.workspace-leaf');
          if (containerEl) {
             const editor = containerEl.querySelector('.cm-editor');
@@ -81,8 +140,7 @@ class VideoViewManager {
          overlay.remove();
       });
 
-      // Fermer les vues YouTube normales
-      const leaves = this.plugin.app.workspace.getLeavesOfType('youtube-player');
+      const leaves = this.app.workspace.getLeavesOfType('youtube-player');
       for (const leaf of leaves) {
          if (leaf && !leaf.detached) {
             leaf.detach();
@@ -93,23 +151,24 @@ class VideoViewManager {
       this.activeLeafId = null;
       
       console.log("État après fermeture:", {
-         activeLeafId: !!this.activeLeafId,
-         settings: this.plugin.settingsManager.settings
+         activeLeafId: this.activeLeafId,
+         settings: this.settingsManager.settings
       });
+      
       console.log("=== Fin closePreviousVideos ===");
-      await this.plugin.settingsManager.save();
+      await this.settingsManager.save();
    }
    
 // createSidebarView(videoId) : Créer la vue en sidebar
    async createSidebarView(videoId) {
-      const leaf = this.plugin.app.workspace.getRightLeaf(false);
+      const leaf = this.app.workspace.getRightLeaf(false);
       
-      this.plugin.app.workspace.revealLeaf(leaf);
+      this.app.workspace.revealLeaf(leaf);
       
       this.activeLeafId = leaf.id;
       console.log("Nouvelle sidebar créée avec ID:", leaf.id);
       
-      const view = new YouTubePlayerView(leaf, this.plugin);
+      const view = new YouTubePlayerView(leaf);
       this.activeView = view;
       
       await leaf.setViewState({
@@ -119,12 +178,12 @@ class VideoViewManager {
    }
 // createTabView(videoId) : Créer la vue en tab
    async createTabView(videoId) {
-      const leaf = this.plugin.app.workspace.splitActiveLeaf('vertical');
+      const leaf = this.app.workspace.splitActiveLeaf('vertical');
       
       this.activeLeafId = leaf.id;
       console.log("Nouvelle leaf créée avec ID:", leaf.id);
       
-      const view = new YouTubePlayerView(leaf, this.plugin);
+      const view = new YouTubePlayerView(leaf);
       this.activeView = view;
       
       await leaf.setViewState({
@@ -134,19 +193,19 @@ class VideoViewManager {
    }
 // createOverlayView(videoId) : Créer la vue en overlay
    async createOverlayView(videoId) {
-      const activeLeaf = this.plugin.app.workspace.activeLeaf;
+      const activeLeaf = this.app.workspace.activeLeaf;
       if (!activeLeaf) return;
 
-      // Récupérer la zone d'édition
       const editorEl = activeLeaf.view.containerEl.querySelector('.cm-editor');
       if (!editorEl) return;
 
-      // Ajuster la taille de la zone d'édition pour faire de la place pour la vidéo
+      // Sauvegarder l'ID de la feuille active pour la restauration
+      this.settingsManager.settings.overlayLeafId = activeLeaf.id;
+      
       editorEl.style.height = '40%';
       editorEl.style.position = 'relative';
-      editorEl.style.top = '60%';  // Déplacer l'éditeur en bas
+      editorEl.style.top = '60%';
 
-      // Créer un conteneur pour la vidéo
       const overlayContainer = activeLeaf.view.containerEl.createDiv('youtube-overlay');
       overlayContainer.style.cssText = `
          position: absolute;
@@ -161,11 +220,9 @@ class VideoViewManager {
          align-items: center;
       `;
 
-      // Ajouter un bouton pour fermer l'overlay
       const closeButton = overlayContainer.createDiv('youtube-overlay-close');
       closeButton.innerHTML = '✕';
       
-      // Créer l'iframe YouTube
       const iframe = document.createElement('iframe');
       iframe.src = `https://www.youtube.com/embed/${videoId}`;
       iframe.style.cssText = `
@@ -178,20 +235,18 @@ class VideoViewManager {
       
       closeButton.addEventListener('click', async () => {
          overlayContainer.remove();
-         // Restaurer la taille originale de l'éditeur
          editorEl.style.height = '100%';
          editorEl.style.top = '0';
-         this.plugin.settingsManager.settings.isVideoOpen = false;
-         await this.plugin.settingsManager.save();
+         this.settingsManager.settings.isVideoOpen = false;
+         await this.settingsManager.save();
       });
 
-      // Mettre à jour les settings
       this.activeLeafId = activeLeaf.id;
-      this.plugin.settingsManager.settings.lastVideoId = videoId;
-      this.plugin.settingsManager.settings.isVideoOpen = true;
-      await this.plugin.settingsManager.save();
+      this.settingsManager.settings.lastVideoId = videoId;
+      this.settingsManager.settings.isVideoOpen = true;
+      this.settingsManager.settings.currentMode = 'overlay';  // Ajouter explicitement le mode
+      await this.settingsManager.save();
 
-      // Gérer la fermeture de la leaf
       this.registerOverlayCleanup(activeLeaf, overlayContainer, editorEl);
    }
 
@@ -202,8 +257,9 @@ class VideoViewManager {
             editorEl.style.height = '100%';
             editorEl.style.top = '0';
          }
-         this.plugin.settingsManager.settings.isVideoOpen = false;
-         this.plugin.settingsManager.save();
+         this.settingsManager.settings.isVideoOpen = false;
+         this.settingsManager.settings.overlayLeafId = null;  // Nettoyer l'ID
+         this.settingsManager.save();
       };
 
       leaf.on('unload', cleanup);
@@ -212,8 +268,10 @@ class VideoViewManager {
 class YouTubeFlowSettingTab extends PluginSettingTab {
    constructor(app, plugin) {
       super(app, plugin);
-      this.plugin = plugin;
+      const { settingsManager } = Store.get();
+      this.settingsManager = settingsManager;
    }
+
    display() {
       const {containerEl} = this;
       containerEl.empty();
@@ -226,17 +284,18 @@ class YouTubeFlowSettingTab extends PluginSettingTab {
             .addOption('tab', 'Onglet')
             .addOption('sidebar', 'Barre latérale')
             .addOption('overlay', 'Superposition')
-            .setValue(this.plugin.settingsManager.settings.currentMode)
+            .setValue(this.settingsManager.settings.currentMode)
             .onChange(async (value) => {
-               this.plugin.settingsManager.settings.currentMode = value;
-               await this.plugin.settingsManager.save();
+               this.settingsManager.settings.currentMode = value;
+               await this.settingsManager.save();
             }));
    }
 }
 class YouTubePlayerView extends ItemView {
-   constructor(leaf, plugin) {
+   constructor(leaf) {
       super(leaf);
-      this.plugin = plugin;
+      const { settingsManager } = Store.get();
+      this.settingsManager = settingsManager;
    }
 
    getViewType() {
@@ -260,7 +319,6 @@ class YouTubePlayerView extends ItemView {
          height: 100%;
       `;
 
-      // Création d'un conteneur pour la vidéo
       const videoContainer = document.createElement('div');
       videoContainer.style.cssText = `
          width: 100%;
@@ -293,49 +351,45 @@ class YouTubePlayerView extends ItemView {
 // onClose() : Mettre à jour les settings quand la vue est fermée
    async onClose() {
       console.log("YouTubePlayerView onClose called");
-      if (!this.plugin?.settingsManager) {
-         console.warn("Plugin ou SettingsManager non initialisé dans YouTubePlayerView");
-         return;
-      }
-
-      this.plugin.settingsManager.settings.isVideoOpen = false;
-      this.plugin.settingsManager.settings.currentMode = null;
-      await this.plugin.settingsManager.save();
-      console.log("Nettoyage de la vue YouTube avec settings :", this.plugin.settingsManager.settings);
+      this.settingsManager.settings.isVideoOpen = false;
+      this.settingsManager.settings.currentMode = null;
+      await this.settingsManager.save();
+      console.log("Nettoyage de la vue YouTube avec settings :", this.settingsManager.settings);
    }
 }
 class YouTubeFlowPlugin extends Plugin {
 // Logique : Chargement des settings, initialisation de VideoViewManager lorsque le layout est prêt
    async onload() {
-      this.settingsManager = new SettingsManager();
-      await this.settingsManager.load(this);
+      // Initialiser le Store AVANT tout
+      await Store.init(this);
+      const { videoManager, settingsManager } = Store.get();
 
       this.app.workspace.onLayoutReady(() => {
          console.log("Layout prêt, initialisation des écouteurs...");
-         this.videoManager = new VideoViewManager(this);
+         
          this.registerView(
             'youtube-player',
-            (leaf) => new YouTubePlayerView(leaf, this)
+            (leaf) => new YouTubePlayerView(leaf)
          );
          this.registerEvent(
             this.app.workspace.on('leaf-closed', (leaf) => {
                console.log("evenement leaf-closed détecté!", {
                   ferméeId: leaf?.id,
-                  activeId: this.videoManager?.activeLeafId,
-                  match: leaf?.id === this.videoManager?.activeLeafId
+                  activeId: videoManager?.activeLeafId,
+                  match: leaf?.id === videoManager?.activeLeafId
                });
                if (!leaf) {
                      console.log("Feuille fermée détectée!", {
                      ferméeId: leaf?.id,
-                     activeId: this.videoManager?.activeLeafId,
-                     match: leaf?.id === this.videoManager?.activeLeafId
+                     activeId: videoManager?.activeLeafId,
+                     match: leaf?.id === videoManager?.activeLeafId
                   });
                   return;
                }
 
                
-               if (this.videoManager && leaf?.id && 
-                  leaf.id === this.videoManager.activeLeafId) {
+               if (videoManager && leaf?.id && 
+                  leaf.id === videoManager.activeLeafId) {
                   console.log("Vue YouTube fermée manuellement, nettoyage...");
                }
             })
@@ -351,17 +405,17 @@ class YouTubeFlowPlugin extends Plugin {
          menu.addItem((item) => {
             item.setTitle("YouTube Tab")
                .setIcon("tab")
-               .onClick(() => this.videoManager.displayVideo(this.settingsManager.settings.lastVideoId || 'default-id', 'tab'));
+               .onClick(() => videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'tab'));
          });
          menu.addItem((item) => {
             item.setTitle("YouTube Sidebar")
                .setIcon("layout-sidebar-right")
-               .onClick(() => this.videoManager.displayVideo(this.settingsManager.settings.lastVideoId || 'default-id', 'sidebar'));
+               .onClick(() => videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'sidebar'));
          });
          menu.addItem((item) => {
             item.setTitle("YouTube Overlay")
                .setIcon("layout-top")
-               .onClick(() => this.videoManager.displayVideo(this.settingsManager.settings.lastVideoId || 'default-id', 'overlay'));
+               .onClick(() => videoManager.displayVideo(settingsManager.settings.lastVideoId || 'default-id', 'overlay'));
          });
 
          const iconRect = ribbonIcon.getBoundingClientRect();
@@ -391,49 +445,24 @@ class YouTubeFlowPlugin extends Plugin {
       this.addSettingTab(new YouTubeFlowSettingTab(this.app, this));
 // Créer la décoration des boutons
       this.registerEditorExtension([
-         EditorView.decorations.of(view => {
-            const decorations = [];
-            const doc = view.state.doc;
-            
-            for (let pos = 0; pos < doc.length;) {
-               const line = doc.lineAt(pos);
-               const lineText = line.text;
-               
-               const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-               let match;
-               
-               while ((match = linkRegex.exec(lineText)) !== null) {
-                  const fullMatch = match[0];
-                  const url = match[2];
-                  const startPos = line.from + match.index;
-                  const endPos = startPos + fullMatch.length;
-                  
-                  const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/;
-                  const youtubeMatch = url.match(youtubeRegex);
-                  
-                  if (youtubeMatch) {
-                     const videoId = youtubeMatch[1];
-                     
-                     if (startPos >= 0 && endPos <= doc.length) {
-                        decorations.push(Decoration.widget({
-                           widget: new YouTubeWidget(videoId, this),
-                           side: 1
-                        }).range(endPos));
-                     }
-                  }
+         ViewPlugin.define(view => ({
+            decorations: createDecorations(view),
+            update(update) {
+               if (update.docChanged || update.viewportChanged) {
+                  this.decorations = createDecorations(update.view);
                }
-               
-               pos = line.to + 1;
             }
-            
-            return Decoration.set(decorations);
+         }), {
+            decorations: v => v.decorations
          })
       ]);
 
       this.registerStyles();
    }
+
    async onunload() {
-      await this.videoManager.closePreviousVideos();
+      const { videoManager } = Store.get();
+      await videoManager.closePreviousVideos();
    }
 
    registerStyles() {
@@ -468,7 +497,7 @@ class YouTubeFlowPlugin extends Plugin {
    }
 }
 
-function createDecorations(view, plugin) {
+function createDecorations(view) {
 // Identifier les liens YouTube et ajouter les décorations
    const decorations = [];
    const doc = view.state.doc;
@@ -502,7 +531,7 @@ function createDecorations(view, plugin) {
                }).range(startPos, endPos));
                
                decorations.push(Decoration.widget({
-                  widget: new YouTubeWidget(videoId, plugin),
+                  widget: new YouTubeWidget(videoId),
                   side: 1
                }).range(endPos));
             }
@@ -517,10 +546,9 @@ function createDecorations(view, plugin) {
 
 class YouTubeWidget extends WidgetType {
 // Créer le widget de décoration avec le gestionnaire d'événements click
-   constructor(videoId, plugin) {
+   constructor(videoId) {  // Plus besoin de plugin
       super();
       this.videoId = videoId;
-      this.plugin = plugin;
    }
    
    toDOM() {
@@ -544,12 +572,11 @@ class YouTubeWidget extends WidgetType {
       sparkle.addEventListener('click', (e) => {
          e.preventDefault();
          e.stopPropagation();
-         if (this.plugin?.videoManager) {
-            this.plugin.videoManager.displayVideo(
-               this.videoId,
-               this.plugin.settingsManager.settings.currentMode || 'sidebar'
-            );
-         }
+         const { videoManager, settingsManager } = Store.get();
+         videoManager.displayVideo(
+            this.videoId,
+            settingsManager.settings.currentMode || 'sidebar'
+         );
       });
       
       return sparkle;
@@ -565,12 +592,15 @@ class YouTubeWidget extends WidgetType {
 }
 
 class YouTubePlayer {
-   constructor(plugin) {
-      this.plugin = plugin;
+   constructor() {
+      const { settingsManager } = Store.get();
+      this.settingsManager = settingsManager;
+      
       this.player = null;
       this.currentVideoIndex = 0;
       this.videoList = [];
    }
+
    getVideoId(url) {
       console.log('Extraction de l\'ID vidéo pour:', url);
       const regex = /(?:youtube\.com\/watch\?v=|youtu.be\/)([^&\s]+)/;
@@ -579,154 +609,166 @@ class YouTubePlayer {
       console.log('ID vidéo extrait:', videoId);
       return videoId;
    }
+
    play() {
       if (this.player) this.player.playVideo();
    }
+
    pause() {
       if (this.player) this.player.pauseVideo();
    }
+
    stop() {
       if (this.player) {
          this.player.stopVideo();
          this.player.seekTo(0);
       }
    }
+
    seekForward() {
       if (this.player) {
          const currentTime = this.player.getCurrentTime();
          this.player.seekTo(currentTime + 10, true);
       }
    }
+
    seekBackward() {
       if (this.player) {
          const currentTime = this.player.getCurrentTime();
          this.player.seekTo(Math.max(0, currentTime - 10), true);
       }
    }
+
    nextVideo() {
       if (this.currentVideoIndex < this.videoList.length - 1) {
          this.currentVideoIndex++;
          if (this.player && this.videoList[this.currentVideoIndex]) {
-               this.player.loadVideoById(this.videoList[this.currentVideoIndex]);
+            this.player.loadVideoById(this.videoList[this.currentVideoIndex]);
          }
       }
    }
+
    previousVideo() {
       if (this.currentVideoIndex > 0) {
          this.currentVideoIndex--;
          if (this.player && this.videoList[this.currentVideoIndex]) {
-               this.player.loadVideoById(this.videoList[this.currentVideoIndex]);
+            this.player.loadVideoById(this.videoList[this.currentVideoIndex]);
          }
       }
    }
+
    setPlaybackSpeed(speed) {
-      
       if (this.player) this.player.setPlaybackRate(speed);
    }
 }
 class HotkeyManager {
-   constructor(plugin) {
-         this.plugin = plugin;
+   constructor() {
+      const { app, youtubeFlowPlugin, player } = Store.get();
+      this.app = app;
+      this.youtubeFlowPlugin = youtubeFlowPlugin;
+      this.player = player;
    }
+
    registerHotkeys() {
       // Raccourci pour ouvrir la vidéo en cours dans une modale
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'open-youtube-modal',
          name: 'Ouvrir la vidéo dans une modale',
          hotkeys: [{ modifiers: ['Alt'], key: 'y' }],
          callback: () => {
-               const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-               if (activeView) {
-                  const cursor = activeView.editor.getCursor();
-                  const line = activeView.editor.getLine(cursor.line);
-                  const urlMatch = line.match(/(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[^&\s]+)/);
-                  if (urlMatch) {
-                     const videoId = this.plugin.player.getVideoId(urlMatch[1]);
-                     if (videoId) {
-                           new YouTubeModal(this.plugin.app, videoId).open();
-                     }
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView) {
+               const cursor = activeView.editor.getCursor();
+               const line = activeView.editor.getLine(cursor.line);
+               const urlMatch = line.match(/(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[^&\s]+)/);
+               if (urlMatch) {
+                  const videoId = this.player.getVideoId(urlMatch[1]);
+                  if (videoId) {
+                     new YouTubeModal(this.app, videoId).open();
                   }
                }
+            }
          }
       });
-   }
-   registerHotkeys() {
-      this.plugin.addCommand({
+
+      this.youtubeFlowPlugin.addCommand({
          id: 'play-pause',
          name: 'Lecture/Pause',
          hotkeys: [{ modifiers: ['Shift'], key: ' ' }],
-         callback: () => this.plugin.player.player?.getPlayerState() === 1 
-               ? this.plugin.player.pause() 
-               : this.plugin.player.play()
+         callback: () => this.player.player?.getPlayerState() === 1 
+            ? this.player.pause() 
+            : this.player.play()
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'write-timestamp',
          name: 'Écrire le timestamp',
          hotkeys: [{ modifiers: ['Alt'], key: 't' }],
          callback: () => this.writeTimestamp()
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'next-video',
          name: 'Vidéo suivante',
          hotkeys: [{ modifiers: ['Ctrl'], key: 'ArrowRight' }],
-         callback: () => this.plugin.player.nextVideo()
+         callback: () => this.player.nextVideo()
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'previous-video',
          name: 'Vidéo précédente',
          hotkeys: [{ modifiers: ['Ctrl'], key: 'ArrowLeft' }],
-         callback: () => this.plugin.player.previousVideo()
+         callback: () => this.player.previousVideo()
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'normal-speed',
          name: 'Vitesse normale',
          hotkeys: [{ modifiers: ['Ctrl'], key: '1' }],
-         callback: () => this.plugin.player.setPlaybackSpeed(1.0)
+         callback: () => this.player.setPlaybackSpeed(1.0)
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'increase-speed',
          name: 'Augmenter la vitesse',
          hotkeys: [{ modifiers: ['Ctrl'], key: '2' }],
-         callback: () => this.plugin.player.setPlaybackSpeed(1.5)
+         callback: () => this.player.setPlaybackSpeed(1.5)
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'decrease-speed',
          name: 'Diminuer la vitesse',
          hotkeys: [{ modifiers: ['Ctrl'], key: '3' }],
-         callback: () => this.plugin.player.setPlaybackSpeed(0.75)
+         callback: () => this.player.setPlaybackSpeed(0.75)
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'seek-forward',
          name: 'Avancer de 10s',
          hotkeys: [{ modifiers: ['Shift'], key: 'ArrowRight' }],
-         callback: () => this.plugin.player.seekForward()
+         callback: () => this.player.seekForward()
       });
 
-      this.plugin.addCommand({
+      this.youtubeFlowPlugin.addCommand({
          id: 'seek-backward',
          name: 'Reculer de 10s',
          hotkeys: [{ modifiers: ['Shift'], key: 'ArrowLeft' }],
-         callback: () => this.plugin.player.seekBackward()
+         callback: () => this.player.seekBackward()
       });
    }
+
    writeTimestamp() {
-      if (!this.plugin.player.player) return;
-      const time = Math.floor(this.plugin.player.player.getCurrentTime());
+      if (!this.player.player) return;
+      const time = Math.floor(this.player.player.getCurrentTime());
       const timestamp = this.formatTimestamp(time);
       
-      const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (activeView) {
          const cursor = activeView.editor.getCursor();
          activeView.editor.replaceRange(`[${timestamp}]`, cursor);
       }
    }
+
    formatTimestamp(seconds) {
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = seconds % 60;
@@ -735,8 +777,11 @@ class HotkeyManager {
 }
 
 class PlaylistManager {
-   constructor(plugin) {
-      this.plugin = plugin;
+   constructor() {
+      const { app, settingsManager } = Store.get();
+      this.app = app;
+      this.settingsManager = settingsManager;
+      
       this.playlist = [];
       this.createPlaylistUI();
    }
@@ -793,14 +838,13 @@ class PlaylistManager {
       this.playlistContainer.appendChild(this.playlistList);
    }
 
-   // À appeler dans SplitView.open() après la création de l'iframe
    attachToContainer(container) {
       container.style.position = 'relative';
       container.appendChild(this.playlistContainer);
    }
 
    addVideo(videoId, title) {
-      // Vérifier si la vidéo existe déjà
+// Vérifier si la vidéo existe déjà
       if (!this.playlist.some(video => video.videoId === videoId)) {
          this.playlist.push({ 
             videoId, 
@@ -824,47 +868,46 @@ class PlaylistManager {
       this.savePlaylist();
    }
 
-   // Mise à jour de updatePlaylistUI pour inclure le bouton de suppression
+// Mise à jour de updatePlaylistUI pour inclure le bouton de suppression
    updatePlaylistUI() {
       this.playlistList.innerHTML = '';
       this.playlist.forEach((video, index) => {
          const item = document.createElement('div');
          item.className = 'youtube-flow-playlist-item';
          item.style.cssText = `
-               padding: 8px;
-               margin-bottom: 5px;
-               background: var(--background-primary);
-               border-radius: 4px;
-               cursor: pointer;
-               display: flex;
-               align-items: center;
-               gap: 8px;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: var(--background-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
          `;
 
-            const thumbnail = document.createElement('img');
-            thumbnail.src = `https://img.youtube.com/vi/${video.videoId}/default.jpg`;
-            thumbnail.style.width = '80px';
+         const thumbnail = document.createElement('img');
+         thumbnail.src = `https://img.youtube.com/vi/${video.videoId}/default.jpg`;
+         thumbnail.style.width = '80px';
 
-            const videoInfo = document.createElement('div');
-            videoInfo.textContent = video.title || `Vidéo ${index + 1}`;
+         const videoInfo = document.createElement('div');
+         videoInfo.textContent = video.title || `Vidéo ${index + 1}`;
 
-            item.appendChild(thumbnail);
-            item.appendChild(videoInfo);
+         item.appendChild(thumbnail);
+         item.appendChild(videoInfo);
 
-            // Ajouter un bouton de suppression
-            const removeBtn = document.createElement('button');
-            removeBtn.innerHTML = '❌';
-            removeBtn.style.marginLeft = 'auto';
-            removeBtn.onclick = (e) => {
-               e.stopPropagation();  // Empêcher le clic de propager à l'item
-               this.removeVideo(video.videoId);
-            };
+         const removeBtn = document.createElement('button');
+         removeBtn.innerHTML = '❌';
+         removeBtn.style.marginLeft = 'auto';
+         removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.removeVideo(video.videoId);
+         };
 
-            item.appendChild(removeBtn);
-            this.playlistList.appendChild(item);
+         item.appendChild(removeBtn);
+         this.playlistList.appendChild(item);
       });
 
-      // Ajouter un bouton pour vider la playlist
+// Ajouter un bouton pour vider la playlist
       if (this.playlist.length > 0) {
          const clearBtn = document.createElement('button');
          clearBtn.textContent = 'Vider la playlist';
@@ -873,17 +916,17 @@ class PlaylistManager {
       }
    }
 
-   // Méthodes pour la persistance
+// Méthodes pour la persistance
    async savePlaylist() {
       // TODO: Sauvegarder this.playlist dans les settings du plugin
-      // this.plugin.settingsManager.settings.playlist = this.playlist;
-      // await this.plugin.settingsManager.save();
+      this.settingsManager.settings.playlist = this.playlist;
+      await this.settingsManager.save();
    }
 
    async loadPlaylist() {
       // TODO: Charger la playlist depuis les settings du plugin
-      // if (this.plugin.settingsManager.settings.playlist) {
-      //     this.playlist = this.plugin.settingsManager.settings.playlist;
+      // if (this.settingsManager.settings.playlist) {
+      //     this.playlist = this.settingsManager.settings.playlist;
       //     this.updatePlaylistUI();
       // }
    }

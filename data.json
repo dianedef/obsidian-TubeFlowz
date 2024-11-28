@@ -1,9 +1,10 @@
 {
   "lastVideoId": "U8QNTdWJfT8",
-  "isVideoOpen": true,
+  "isVideoOpen": false,
   "playlist": [],
   "currentMode": "overlay",
   "displayMode": "sidebar",
   "youtubeLeafId": null,
-  "activeLeafId": "ff48743db803de4d"
+  "activeLeafId": "ff48743db803de4d",
+  "overlayLeafId": "ff48743db803de4d"
 }
