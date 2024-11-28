@@ -57,7 +57,8 @@ class SettingsManager {
          lastVideoId: 'aZyghlNOmiU',
          isVideoOpen: null,
          playlist: [],
-         currentMode: null
+         currentMode: null,
+         overlayHeight: 60
       };
    }
 
@@ -194,18 +195,13 @@ class VideoViewManager {
 // createOverlayView(videoId) : Créer la vue en overlay
    async createOverlayView(videoId) {
       const activeLeaf = this.app.workspace.activeLeaf;
-      let startY, startHeight;
-      let rafId = null;
-      let lastSaveTime = Date.now();
       if (!activeLeaf) return;
 
       const editorEl = activeLeaf.view.containerEl.querySelector('.cm-editor');
       if (!editorEl) return;
 
-      // Sauvegarder l'ID de la feuille active pour la restauration
       this.settingsManager.settings.overlayLeafId = activeLeaf.id;
       
-      // Utiliser la hauteur sauvegardée ou la valeur par défaut (60%)
       const overlayHeight = this.settingsManager.settings.overlayHeight || 60;
       
       editorEl.style.height = `${100 - overlayHeight}%`;
@@ -224,31 +220,16 @@ class VideoViewManager {
          display: flex;
          flex-direction: column;
          align-items: center;
+         will-change: transform;
+         transform: translateZ(0);
       `;
 
-      const closeButton = overlayContainer.createDiv('youtube-overlay-close');
-      closeButton.innerHTML = '✕';
-      
       const resizeHandle = overlayContainer.createDiv('youtube-overlay-resize-handle');
-      
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed/${videoId}`;
-      iframe.style.cssText = `
-         width: 100%;
-         height: 100%;
-         border: none;
-      `;
-      
-      overlayContainer.appendChild(iframe);
-      
-      closeButton.addEventListener('click', async () => {
-         overlayContainer.remove();
-         editorEl.style.height = '100%';
-         editorEl.style.top = '0';
-         this.settingsManager.settings.isVideoOpen = false;
-         await this.settingsManager.save();
-      });
 
+      let startY, startHeight;
+      let rafId = null;
+      let lastSaveTime = Date.now();
+      
       const updateSize = (newHeight) => {
          if (rafId) {
             cancelAnimationFrame(rafId);
@@ -260,8 +241,9 @@ class VideoViewManager {
             editorEl.style.height = `${100 - clampedHeight}%`;
             editorEl.style.top = `${clampedHeight}%`;
             
+            // Ne sauvegarder que si suffisamment de temps s'est écoulé
             const now = Date.now();
-            if (now - lastSaveTime >= 300) {
+            if (now - lastSaveTime >= 200) {
                this.settingsManager.settings.overlayHeight = clampedHeight;
                this.settingsManager.save();
                lastSaveTime = now;
@@ -277,41 +259,38 @@ class VideoViewManager {
          updateSize(newHeight);
       };
 
+      const handleMouseUp = () => {
+         document.removeEventListener('mousemove', handleDrag);
+         document.removeEventListener('mouseup', handleMouseUp);
+         document.body.style.cursor = '';
+         if (rafId) {
+            cancelAnimationFrame(rafId);
+         }
+      };
+
       resizeHandle.addEventListener('mousedown', (e) => {
          startY = e.clientY;
          startHeight = parseFloat(overlayContainer.style.height);
          document.body.style.cursor = 'ns-resize';
          
-         // Créer une couche transparente pour capturer les événements
-         const overlay = document.createElement('div');
-         overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 9999;
-            cursor: ns-resize;
-         `;
-         document.body.appendChild(overlay);
-         
-         const handleMouseUp = () => {
-            overlay.remove();
-            document.removeEventListener('mousemove', handleDrag);
-            document.removeEventListener('mouseup', handleMouseUp);
-            document.body.style.cursor = '';
-            
-            if (rafId) {
-               cancelAnimationFrame(rafId);
-            }
-         };
-         
          document.addEventListener('mousemove', handleDrag);
          document.addEventListener('mouseup', handleMouseUp);
          
          e.preventDefault();
-         e.stopPropagation();
       });
+
+      const closeButton = overlayContainer.createDiv('youtube-overlay-close');
+      closeButton.innerHTML = '✕';
+      
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed/${videoId}`;
+      iframe.style.cssText = `
+         width: 100%;
+         height: 100%;
+         border: none;
+      `;
+      
+      overlayContainer.appendChild(iframe);
       
       closeButton.addEventListener('click', async () => {
          overlayContainer.remove();

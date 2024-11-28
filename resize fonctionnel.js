@@ -57,7 +57,8 @@ class SettingsManager {
          lastVideoId: 'aZyghlNOmiU',
          isVideoOpen: null,
          playlist: [],
-         currentMode: null
+         currentMode: null,
+         overlayHeight: 60
       };
    }
 
@@ -194,18 +195,13 @@ class VideoViewManager {
 // createOverlayView(videoId) : Créer la vue en overlay
    async createOverlayView(videoId) {
       const activeLeaf = this.app.workspace.activeLeaf;
-      let startY, startHeight;
-      let rafId = null;
-      let lastSaveTime = Date.now();
       if (!activeLeaf) return;
 
       const editorEl = activeLeaf.view.containerEl.querySelector('.cm-editor');
       if (!editorEl) return;
 
-      // Sauvegarder l'ID de la feuille active pour la restauration
       this.settingsManager.settings.overlayLeafId = activeLeaf.id;
       
-      // Utiliser la hauteur sauvegardée ou la valeur par défaut (60%)
       const overlayHeight = this.settingsManager.settings.overlayHeight || 60;
       
       editorEl.style.height = `${100 - overlayHeight}%`;
@@ -224,44 +220,51 @@ class VideoViewManager {
          display: flex;
          flex-direction: column;
          align-items: center;
+         will-change: transform;
+         transform: translateZ(0);
       `;
 
-      const closeButton = overlayContainer.createDiv('youtube-overlay-close');
-      closeButton.innerHTML = '✕';
-      
       const resizeHandle = overlayContainer.createDiv('youtube-overlay-resize-handle');
-      
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed/${videoId}`;
-      iframe.style.cssText = `
-         width: 100%;
-         height: 100%;
-         border: none;
-      `;
-      
-      overlayContainer.appendChild(iframe);
-      
-      closeButton.addEventListener('click', async () => {
-         overlayContainer.remove();
-         editorEl.style.height = '100%';
-         editorEl.style.top = '0';
-         this.settingsManager.settings.isVideoOpen = false;
-         await this.settingsManager.save();
-      });
 
+      let startY, startHeight;
+      let rafId = null;
+      let lastSaveTime = Date.now();
+      
       const updateSize = (newHeight) => {
          if (rafId) {
             cancelAnimationFrame(rafId);
          }
          
          rafId = requestAnimationFrame(() => {
-            const clampedHeight = Math.min(Math.max(newHeight, 20), 90);
+            // Ajuster les limites min/max
+            const minHeight = 150; // hauteur minimale en pixels
+            const viewportHeight = window.innerHeight;
+            const minHeightPercent = (minHeight / viewportHeight) * 100;
+            const maxHeightPercent = 90;
+            
+            // Convertir le pourcentage en pixels pour la vérification
+            const newHeightPixels = (newHeight / 100) * viewportHeight;
+            
+            // Appliquer les contraintes en pixels puis reconvertir en pourcentage
+            const clampedHeight = newHeightPixels < minHeight 
+               ? minHeightPercent 
+               : Math.min(newHeight, maxHeightPercent);
+
             overlayContainer.style.height = `${clampedHeight}%`;
             editorEl.style.height = `${100 - clampedHeight}%`;
             editorEl.style.top = `${clampedHeight}%`;
             
+            // Ajouter une classe spéciale quand on atteint la hauteur minimale
+            if (clampedHeight <= minHeightPercent) {
+               overlayContainer.classList.add('youtube-overlay-min-height');
+               editorEl.classList.add('youtube-editor-max-height');
+            } else {
+               overlayContainer.classList.remove('youtube-overlay-min-height');
+               editorEl.classList.remove('youtube-editor-max-height');
+            }
+            
             const now = Date.now();
-            if (now - lastSaveTime >= 300) {
+            if (now - lastSaveTime >= 500) {
                this.settingsManager.settings.overlayHeight = clampedHeight;
                this.settingsManager.save();
                lastSaveTime = now;
@@ -277,41 +280,52 @@ class VideoViewManager {
          updateSize(newHeight);
       };
 
+      const handleMouseUp = () => {
+         document.removeEventListener('mousemove', handleDrag);
+         document.removeEventListener('mouseup', handleMouseUp);
+         document.body.style.cursor = '';
+         
+         // Remettre les styles à la fin du resize
+         editorEl.style.transition = '';
+         overlayContainer.style.transition = '';
+         
+         if (rafId) {
+            cancelAnimationFrame(rafId);
+         }
+      };
+
       resizeHandle.addEventListener('mousedown', (e) => {
          startY = e.clientY;
          startHeight = parseFloat(overlayContainer.style.height);
          document.body.style.cursor = 'ns-resize';
          
-         // Créer une couche transparente pour capturer les événements
-         const overlay = document.createElement('div');
-         overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 9999;
-            cursor: ns-resize;
-         `;
-         document.body.appendChild(overlay);
+         // Retirer temporairement les transitions et autres styles qui pourraient interférer
+         editorEl.style.transition = 'none';
+         overlayContainer.style.transition = 'none';
          
-         const handleMouseUp = () => {
-            overlay.remove();
-            document.removeEventListener('mousemove', handleDrag);
-            document.removeEventListener('mouseup', handleMouseUp);
-            document.body.style.cursor = '';
-            
-            if (rafId) {
-               cancelAnimationFrame(rafId);
-            }
-         };
+         // Retirer temporairement les contraintes de hauteur minimale
+         editorEl.style.minHeight = 'auto';
+         overlayContainer.classList.remove('youtube-overlay-min-height');
+         editorEl.classList.remove('youtube-editor-max-height');
          
          document.addEventListener('mousemove', handleDrag);
          document.addEventListener('mouseup', handleMouseUp);
          
          e.preventDefault();
-         e.stopPropagation();
       });
+
+      const closeButton = overlayContainer.createDiv('youtube-overlay-close');
+      closeButton.innerHTML = '✕';
+      
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed/${videoId}`;
+      iframe.style.cssText = `
+         width: 100%;
+         height: 100%;
+         border: none;
+      `;
+      
+      overlayContainer.appendChild(iframe);
       
       closeButton.addEventListener('click', async () => {
          overlayContainer.remove();
@@ -593,6 +607,20 @@ class YouTubeFlowPlugin extends Plugin {
          .youtube-overlay-resize-handle:active {
             background: var(--interactive-accent);
             opacity: 0.5;
+         }
+
+         .youtube-overlay-min-height {
+            min-height: 150px !important;
+            height: 150px !important;
+         }
+
+         .youtube-editor-max-height {
+            height: calc(100% - 150px) !important;
+            top: 150px !important;
+         }
+
+         .cm-editor {
+            min-height: 100px !important;
          }
       `;
    }
