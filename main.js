@@ -309,8 +309,6 @@ class VideoViewManager {
       editorEl.style.top = `${overlayHeight}%`;
 
       const overlayContainer = activeLeaf.view.containerEl.createDiv('youtube-overlay');
-      // Appliquer la même hauteur au container
-      overlayContainer.style.height = `${overlayHeight}%`;
       overlayContainer.style.cssText = `
          position: absolute;
          top: 0;
