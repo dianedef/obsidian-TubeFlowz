@@ -1,7 +1,10 @@
 # Build
 main.js
-*.js.map
+styles.css
 data.json
+*.es-*.js
+*.es.js
+video.*.js
 
 # Dependencies
 node_modules/
@@ -21,6 +24,9 @@ Thumbs.db
 .hot-update.*
 .cache/
 dist/
+*.tmp
+*.temp
+.cache/
 
 # Fichiers de développement
 .env

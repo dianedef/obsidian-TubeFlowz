@@ -5,5 +5,9 @@
 	"minAppVersion": "0.15.0",
 	"description": "Améliore l'expérience YouTube dans Obsidian avec des contrôles de lecture intégrés",
 	"author": "Shadow",
-	"isDesktopOnly": false
+	"isDesktopOnly": false,
+	"dependencies": {
+		"video.js": "^8.0.0",
+		"videojs-youtube": "^3.0.0"
+	}
 }
