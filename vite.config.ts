@@ -9,6 +9,8 @@ build: {
    fileName: 'main',
    formats: ['cjs']
    },
+   sourcemap: 'inline',
+   cssCodeSplit: false,
    rollupOptions: {
    external: ['obsidian', '@codemirror/view', '@codemirror/state', '@codemirror/language'],
    output: {
