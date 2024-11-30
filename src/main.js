@@ -5,46 +5,6 @@ import 'videojs-youtube';
 
 // ---------- STORE ET SETTINGS ----------
 
-class SettingsTab extends PluginSettingTab {
-   constructor(app, plugin) {
-      super(app, plugin);
-      const { Settings } = Store.get();
-      this.Settings = Settings;
-   }
-
-   display() {
-      const {containerEl} = this;
-      containerEl.empty();
-      
-// Créer le menu de sélection du mode d'affichage par défaut
-      new Setting(containerEl)
-         .setName('Mode d\'affichage par défaut')
-         .setDesc('Choisissez comment les vidéos s\'ouvriront par défaut')
-         .addDropdown(dropdown => dropdown
-            .addOption('tab', 'Onglet')
-            .addOption('sidebar', 'Barre latérale')
-            .addOption('overlay', 'Superposition')
-            .setValue(this.Settings.settings.currentMode)
-            .onChange(async (value) => {
-               this.Settings.settings.currentMode = value;
-               await this.Settings.save();
-            }));
-// Setting pour le mode de lecture
-      new Setting(containerEl)
-      .setName('Mode de lecture')
-      .setDesc('Choisir entre streaming ou téléchargement')
-      .addDropdown(dropdown => dropdown
-         .addOption('stream', 'Streaming')
-         .addOption('download', 'Téléchargement')
-         .setValue(this.Settings.settings.playbackMode || 'stream')
-         .onChange(async (value) => {
-            this.Settings.settings.playbackMode = value;
-            await this.Settings.save();
-         }));
-   }
-}
-
-
 class Settings {
    constructor(plugin) {
       this.youtubeFlowPlugin = plugin;
@@ -63,25 +23,23 @@ class Settings {
 
    async loadSettings() {
       try {
-         const savedData = await this.plugin.loadData();
+         const savedData = await this.youtubeFlowPlugin.loadData();
          if (savedData) {
-               // Fusion avec les valeurs par défaut pour assurer la compatibilité
-               this.data = {
-                  ...Settings.DEFAULT_SETTINGS,
-                  ...savedData
-               };
+            this.settings = {
+               ...this.settings,
+               ...savedData
+            };
          }
-         console.debug("Settings chargées:", this.data);
+         console.debug("Settings chargées:", this.settings);
       } catch (error) {
          console.error("Erreur lors du chargement des paramètres:", error);
-         this.data = structuredClone(Settings.DEFAULT_SETTINGS);
       }
    }
 
-   async saveSettings() {
+   async save() {
       try {
-         await this.plugin.saveData(this.data);
-         console.debug("Settings sauvegardées:", this.data);
+         await this.youtubeFlowPlugin.saveData(this.settings);
+         console.debug("Settings sauvegardées:", this.settings);
       } catch (error) {
          console.error("Erreur lors de la sauvegarde des paramètres:", error);
          throw error;
@@ -89,25 +47,25 @@ class Settings {
    }
 
    // Getters et setters pour un accès contrôlé aux paramètres
-   get lastVideoId() { return this.data.lastVideoId; }
+   get lastVideoId() { return this.settings.lastVideoId; }
    set lastVideoId(value) { 
-      this.data.lastVideoId = value;
-      this.saveSettings();
+      this.settings.lastVideoId = value;
+      this.save();
    }
 
-   get playlist() { return [...this.data.playlist]; }
+   get playlist() { return [...this.settings.playlist]; }
    set playlist(value) {
       if (!Array.isArray(value)) {
          throw new Error("La playlist doit être un tableau");
       }
-      this.data.playlist = value.slice(0, this.data.maxPlaylistSize);
-      this.saveSettings();
+      this.settings.playlist = value.slice(0, this.settings.maxPlaylistSize);
+      this.save();
    }
 
    // Méthode utilitaire pour réinitialiser les paramètres
    async resetToDefault() {
-      this.data = structuredClone(Settings.DEFAULT_SETTINGS);
-      await this.saveSettings();
+      this.settings = structuredClone(Settings.DEFAULT_SETTINGS);
+      await this.save();
    }
 }
 
@@ -166,16 +124,12 @@ class Store {
          return result || key;
       };
       
-      // Nos managers
-      this.Settings = null;
-      this.PlayerViewAndMode = null;
-      
       Store.instance = this;
    }
    
    static async init(plugin) {
       if (!Store.instance) {
-         new Store(plugin);
+         Store.instance = new Store(plugin);
       }
       
       const instance = Store.instance;
@@ -207,6 +161,44 @@ class Store {
    }
 }
 
+class SettingsTab extends PluginSettingTab {
+   constructor(app, plugin) {
+      super(app, plugin);
+      const { Settings } = Store.get();
+      this.Settings = Settings;
+   }
+
+   display() {
+      const {containerEl} = this;
+      containerEl.empty();
+      
+// Créer le menu de sélection du mode d'affichage par défaut
+      new Setting(containerEl)
+         .setName('Mode d\'affichage par défaut')
+         .setDesc('Choisissez comment les vidéos s\'ouvriront par défaut')
+         .addDropdown(dropdown => dropdown
+            .addOption('tab', 'Onglet')
+            .addOption('sidebar', 'Barre latérale')
+            .addOption('overlay', 'Superposition')
+            .setValue(this.Settings.settings.currentMode)
+            .onChange(async (value) => {
+               this.Settings.settings.currentMode = value;
+               await this.Settings.save();
+            }));
+// Setting pour le mode de lecture
+      new Setting(containerEl)
+      .setName('Mode de lecture')
+      .setDesc('Choisir entre streaming ou téléchargement')
+      .addDropdown(dropdown => dropdown
+         .addOption('stream', 'Streaming')
+         .addOption('download', 'Téléchargement')
+         .setValue(this.Settings.settings.playbackMode || 'stream')
+         .onChange(async (value) => {
+            this.Settings.settings.playbackMode = value;
+            await this.Settings.save();
+         }));
+   }
+}
 
 
 // ---------- VIEW ----------
@@ -229,18 +221,6 @@ class PlayerContainer extends ItemView {
       this.contentEl.addClass('mod-cm6');
       this.contentEl.style.background = 'var(--background-primary)';
       this.contentEl.empty();
-
-      // Initialiser une vue Markdown vide
-      const { app } = Store.get();
-      const activeFile = app.workspace.getActiveFile();
-      if (activeFile) {
-         app.vault.append(activeFile, '').catch(error => {
-            console.log("Erreur lors de l'initialisation de la vue Markdown:", error);
-         });
-      } else {
-         // Si pas de fichier actif, on crée quand même une vue vide
-         this.contentEl.createDiv('markdown-preview-view');
-      }
    }
 
    getViewType() {
@@ -248,8 +228,6 @@ class PlayerContainer extends ItemView {
    }
 
    getDisplayText() {
-      console.log("PlayerContainer.getDisplayText - this.t:", this.t);
-      console.log("PlayerContainer.getDisplayText - appel de this.t('player.title')");
       return this.t('player.title');
    }
 
@@ -268,70 +246,103 @@ class PlayerContainer extends ItemView {
 
    async onOpen() {
       const container = this.containerEl.children[1];
-      container.empty();
-      container.style.background = 'var(--background-primary)';
-      const videoId = this.leaf.getViewState().state.videoId;
+      if (!container) {
+         console.error("Conteneur non trouvé");
+         return;
+      }
 
-      // Configuration du conteneur principal
-      container.style.cssText = `
-         display: flex;
-         flex-direction: column;
-         height: 100%;
-         background: var(--background-primary);
-      `;
+      try {
+         container.empty();
+         container.style.background = 'var(--background-primary)';
+         const videoId = this.leaf.getViewState().state.videoId;
 
-      // Créer le conteneur pour le player et ses contrôles
-      const playerSection = document.createElement('div');
-      playerSection.style.cssText = `
-         width: 100%;
-         height: ${this.Settings.settings.viewHeight || 60}%;
-         min-height: 100px;
-         position: relative;
-         display: flex;
-         flex-direction: column;
-      `;
-      container.appendChild(playerSection);
+         // Configuration du conteneur principal
+         container.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: var(--background-primary);
+         `;
 
-      // Initialiser le player vidéo dans le playerSection
-      this.VideoPlayer = new VideoPlayer(this.Settings);
-      await this.VideoPlayer.initializePlayer(this.videoId, playerSection, this.timestamp);
+         // Créer le conteneur pour le player et ses contrôles
+         const playerSection = document.createElement('div');
+         playerSection.style.cssText = `
+            width: 100%;
+            height: ${this.Settings.settings.viewHeight || 60}%;
+            min-height: 100px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+         `;
+         container.appendChild(playerSection);
 
-      // Ajouter le resize handle à la fin du playerSection
-      const resizeHandle = document.createElement('div');
-      resizeHandle.className = 'resize-handle';
-      resizeHandle.style.cssText = `
-         position: absolute;
-         bottom: 0;
-         left: 0;
-         width: 100%;
-         height: 12px;
-         cursor: ns-resize;
-         z-index: 102;
-      `;
-      playerSection.appendChild(resizeHandle);
-
-      // Créer la section pour la note markdown
-      const markdownSection = document.createElement('div');
-      markdownSection.className = 'markdown-section';
-      markdownSection.style.cssText = `
-         flex: 1;
-         overflow-y: auto;
-         padding: 10px;
-      `;
-      container.appendChild(markdownSection);
-
-      // Gérer le resize
-      this.createResizer({
-         container: container,
-         targetElement: playerSection,
-         handle: resizeHandle,
-         mode: this.Settings.settings.currentMode,
-         onResize: (height) => {
-            playerSection.style.height = `${height}%`;
-            this.Settings.settings.viewHeight = height;
-            this.Settings.save();
+         try {
+            // Attendre que l'élément soit dans le DOM
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            
+            // Initialiser le player vidéo dans le playerSection
+            this.VideoPlayer = new VideoPlayer(this.Settings);
+            await this.VideoPlayer.initializePlayer(this.videoId, playerSection, this.timestamp);
+         } catch (error) {
+            console.error("Erreur lors de l'initialisation du player:", error);
+            // Utiliser le lecteur de secours
+            const fallbackPlayer = new VideoPlayer(this.Settings);
+            fallbackPlayer.createFallbackPlayer(this.videoId, playerSection, this.timestamp);
          }
-      });
+
+         // Ajouter le resize handle à la fin du playerSection
+         const resizeHandle = document.createElement('div');
+         resizeHandle.className = 'resize-handle';
+         resizeHandle.style.cssText = `
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 12px;
+            cursor: ns-resize;
+            z-index: 102;
+         `;
+         playerSection.appendChild(resizeHandle);
+
+         // Créer la section pour la note markdown
+         const markdownSection = document.createElement('div');
+         markdownSection.className = 'markdown-section';
+         markdownSection.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+         `;
+         container.appendChild(markdownSection);
+
+         // Gérer le resize
+         this.createResizer({
+            container: container,
+            targetElement: playerSection,
+            handle: resizeHandle,
+            mode: this.Settings.settings.currentMode,
+            onResize: (height) => {
+               playerSection.style.height = `${height}%`;
+               this.Settings.settings.viewHeight = height;
+               this.Settings.save();
+            }
+         });
+      } catch (error) {
+         console.error("Erreur lors de l'ouverture de la vue:", error);
+         // Créer un message d'erreur visuel
+         const errorContainer = document.createElement('div');
+         errorContainer.style.cssText = `
+            padding: 20px;
+            color: var(--text-error);
+            text-align: center;
+         `;
+         errorContainer.textContent = "Impossible de charger le lecteur vidéo. Utilisation du lecteur de secours.";
+         container.appendChild(errorContainer);
+         
+         // Utiliser le lecteur de secours
+         if (this.VideoPlayer) {
+            this.VideoPlayer.createFallbackPlayer(this.videoId, container, this.timestamp);
+         }
+      }
    }
 
    createControls(container) {
@@ -591,7 +602,7 @@ class PlayerViewAndMode {
       this.Settings.settings.isVideoOpen = true;
       this.Settings.settings.activeLeafId = this.activeLeafId;
       this.Settings.settings.isChangingMode = false;
-      await this.Settings.saveSettings();
+      await this.Settings.save();
    }
 
    async restoreLastSession() {
@@ -620,7 +631,7 @@ class PlayerViewAndMode {
       } else {
          // Réinitialiser l'état si les conditions ne sont pas remplies
          settings.isVideoOpen = false;
-         await this.Settings.saveSettings();
+         await this.Settings.save();
       }
    }
 
@@ -658,7 +669,7 @@ class PlayerViewAndMode {
          activeLeafId: this.activeLeafId
       });
       
-      await this.Settings.saveSettings();
+      await this.Settings.save();
    }
    
 // createSidebarView(videoId) : Créer la vue en sidebar
@@ -838,7 +849,7 @@ class PlayerViewAndMode {
          }
          this.settings.settings.isVideoOpen = false;
          this.settings.settings.overlayLeafId = null;  // Nettoyer l'ID
-         await this.settings.saveSettings();
+         await this.settings.save();
       };
 
       leaf.on('unload', cleanup);
@@ -847,24 +858,43 @@ class PlayerViewAndMode {
 // ----- VideoPlayer.js -----
 class VideoPlayer {
    constructor(Settings) {
-      console.log("Initialisation de VideoPlayer");
       this.Settings = Settings;
       this.player = null;
       this.playbackRateButton = null;
       this.isFullscreen = false;
       
-      console.log("Vérification de videojs:", {
-         windowVideojs: window.videojs,
-         importedVideojs: videojs
-      });
-      
-      this.addCustomStyles();
+      // On n'initialise pas VideoJS dans le constructeur
+      this.hasVideoJS = false;
+   }
+
+   async checkVideoJS() {
+      try {
+         // Attendre un peu pour s'assurer que VideoJS est bien chargé
+         await new Promise(resolve => setTimeout(resolve, 100));
+         
+         // Vérifier si VideoJS est disponible
+         const vjsInstance = window.videojs || videojs;
+         if (typeof vjsInstance === 'function') {
+            this.hasVideoJS = true;
+            return true;
+         }
+         
+         console.warn('VideoJS non disponible');
+         return false;
+      } catch (error) {
+         console.error('Erreur lors de la vérification de VideoJS:', error);
+         return false;
+      }
    }
 
    addCustomStyles() {
+      if (!this.hasVideoJS) {
+         console.warn('VideoJS non disponible, utilisation du lecteur de secours');
+         return;
+      }
+
       const style = document.createElement('style');
       style.textContent = `
-         /* Video container */
          .video-js {
             display: flex !important;
             flex-direction: column !important;
@@ -872,7 +902,6 @@ class VideoPlayer {
             height: 100% !important;
          }
 
-         /* Barre de contrôle */
          .vjs-control-bar {
             display: flex !important;
             flex-direction: row !important;
@@ -1006,7 +1035,7 @@ class VideoPlayer {
          .video-js > div:first-child {
             position: relative !important;
             width: 100% !important;
-            height: calc(100% - 40px) !important; /* Hauteur totale moins la barre de contrôle */
+            height: calc(100% - 40px) !important;
             display: flex !important;
             flex-direction: column !important;
          }
@@ -1059,15 +1088,16 @@ class VideoPlayer {
          }
       `;
       document.head.appendChild(style);
-      // S'assurer que videojs est chargé
-      if (!window.videojs) {
-         console.error('VideoJS non disponible');
-         throw new Error('VideoJS non disponible');
-      }
    }
 
    async initializePlayer(videoId, container, timestamp = 0) {
       try {
+         // Vérifier si videojs est disponible
+         if (typeof videojs !== 'function') {
+            console.warn("VideoJS non disponible, utilisation du lecteur de secours");
+            return this.createFallbackPlayer(videoId, container, timestamp);
+         }
+
          // Conteneur principal
          const mainContainer = document.createElement('div');
          mainContainer.id = 'youtube-flow-player';
@@ -1079,6 +1109,7 @@ class VideoPlayer {
             display: flex;
             flex-direction: column;
          `;
+         container.appendChild(mainContainer);
 
          // Wrapper pour la vidéo et ses contrôles
          const playerWrapper = document.createElement('div');
@@ -1095,11 +1126,24 @@ class VideoPlayer {
          // Élément vidéo avec autoplay
          const video = document.createElement('video-js');
          video.className = 'video-js vjs-obsidian-theme';
-         video.setAttribute('autoplay', '');  // Ajouter l'attribut autoplay
+         video.setAttribute('autoplay', '');
          playerWrapper.appendChild(video);
 
+         // Attendre que le DOM soit mis à jour
+         await new Promise(resolve => {
+            requestAnimationFrame(() => {
+               setTimeout(resolve, 100);
+            });
+         });
+
+         // S'assurer que l'élément est toujours dans le DOM
+         if (!document.contains(video)) {
+            console.warn("L'élément vidéo n'est plus dans le DOM, utilisation du lecteur de secours");
+            return this.createFallbackPlayer(videoId, container, timestamp);
+         }
+
          // Configuration du player
-         this.player = window.videojs(video, {
+         this.player = videojs(video, {
             // Configuration technique
             techOrder: ['youtube'],
             sources: [{
@@ -1112,28 +1156,7 @@ class VideoPlayer {
             fluid: false,
             preload: 'auto',
             playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16],
-            autoplay: true,  // Activer l'autoplay
-            
-            // Configuration de la langue
-            language: 'fr',  // Utiliser le français
-            languages: {
-               fr: {
-                  "Play": "Lecture",
-                  "Pause": "Pause",
-                  "Mute": "Couper le son",
-                  "Unmute": "Activer le son",
-                  "Current Time": "Temps actuel",
-                  "Duration": "Durée",
-                  "Remaining Time": "Temps restant",
-                  "Picture-in-Picture": "Image dans l'image",
-                  "Exit Picture-in-Picture": "Quitter l'image dans l'image"
-               }
-            },
-            
-            // Désactiver les éléments inutiles
-            errorDisplay: false,
-            textTrackDisplay: false,
-            textTrackSettings: false,
+            autoplay: true,
             
             // Configuration YouTube spécifique
             youtube: {
@@ -1144,145 +1167,28 @@ class VideoPlayer {
                controls: 0,
                ytControls: 0,
                preload: 'auto'
-            },
-            
-            // Barre de contrôle
-            controlBar: {
-               tooltips: false,
-               children: [
-                  'playToggle',
-                  'volumePanel',
-                  'currentTimeDisplay',
-                  'timeDivider',
-                  'durationDisplay',
-                  {
-                     name: 'progressControl',
-                     children: {
-                        seekBar: {
-                           children: [
-                              'playProgressBar',
-                              'mouseTimeDisplay'
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     name: 'pictureInPictureToggle',
-                     controlText: 'Image dans l\'image',  // Traduire le texte du bouton PIP
-                     className: 'vjs-pip-button'
-                  }
-               ]
-            },
-            
-            // Configuration de la barre de progression
-            progressControl: {
-               seekBar: true
-            },
-            enableSmoothSeeking: true,
-            
-            // Actions utilisateur
-            userActions: {
-               hotkeys: true
-            },
-            startTime: timestamp,
-            autoplay: false,
-            
-            // Configuration du plein écran
-            fullscreen: {
-               options: {
-                  navigationUI: 'hide'
+            }
+         });
+
+         // Attendre que le player soit prêt
+         await new Promise((resolve, reject) => {
+            this.player.ready(() => {
+               if (timestamp > 0) {
+                  this.player.currentTime(timestamp);
                }
-            },
-            
-            // Barre de contrôle
-            controlBar: {
-               // ... existing code ...
-            }
-         });
-
-         this.player.ready(async () => {
-            console.log(`Setting timestamp to ${timestamp}s`);
-            if (timestamp > 0) {
-               this.player.currentTime(timestamp);
-            }
-            
-            // Tenter de lancer la lecture
-            try {
-               await this.player.play();
-            } catch (error) {
-               console.log("Autoplay error:", error);
-               // En cas d'erreur, essayer en mode muet
-               this.player.muted(true);
-               try {
-                  await this.player.play();
-               } catch (error) {
-                  console.log("Autoplay error even with mute:", error);
-               }
-            }
-         });
-
-   // Ajouter notre bouton de vitesse personnalisé
-         this.playbackRateButton = this.player.controlBar.addChild('button', {
-            className: 'vjs-playback-rate-button'
-         });
-
-   // Configurer le bouton
-         const buttonEl = this.playbackRateButton.el();
-         buttonEl.innerHTML = `🔄 ${this.player.playbackRate()}x`;
-         buttonEl.style.cssText = `
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            min-width: 60px !important;
-            padding: 0 8px !important;
-            font-size: 13px !important;
-            cursor: pointer !important;
-            background: var(--background-secondary) !important;
-            border: none !important;
-            border-radius: 3px !important;
-            margin: 0 4px !important;
-            height: 32px !important;
-            transition: background 0.2s ease !important;
-         `;
-
-   // Gérer le hover pour afficher le menu
-         buttonEl.addEventListener('mouseenter', (e) => {
-            const menu = new Menu();
-            const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
-            const currentRate = this.player.playbackRate();
-            
-            rates.forEach(rate => {
-               menu.addItem(item => 
-                  item
-                     .setTitle(`${rate}x`)
-                     .setChecked(currentRate === rate)
-                     .onClick(() => {
-                        this.player.playbackRate(rate);
-                        this.updatePlaybackRateButton(rate);
-                     })
-               );
+               resolve();
             });
-
-// Calculer la position exacte du menu
-            const rect = buttonEl.getBoundingClientRect();
-            const menuWidth = 100; // Largeur approximative du menu
-            menu.showAtPosition({
-               x: rect.left + (rect.width - menuWidth) / 2, // Centrer le menu
-               y: rect.bottom
-            });
+            
+            // Timeout de sécurité
+            setTimeout(() => {
+               reject(new Error("Timeout lors de l'initialisation du player"));
+            }, 5000);
          });
 
-// Écouter les changements de vitesse
-         this.player.on('ratechange', () => {
-            const newRate = this.player.playbackRate();
-            this.updatePlaybackRateButton(newRate);
-         });
-
-         container.appendChild(mainContainer);
          return this.player;
       } catch (error) {
          console.error("Erreur lors de l'initialisation du player vidéo:", error);
-         this.createFallbackPlayer(videoId, container, timestamp);
+         return this.createFallbackPlayer(videoId, container, timestamp);
       }
    }
 
@@ -1296,13 +1202,33 @@ class VideoPlayer {
    }
 
    createFallbackPlayer(videoId, container, timestamp = 0) {
+      console.log("Utilisation du lecteur de secours pour", videoId);
       container.innerHTML = '';
+      
+      // Créer le conteneur du lecteur
+      const playerContainer = document.createElement('div');
+      playerContainer.style.cssText = `
+         width: 100%;
+         height: 100%;
+         display: flex;
+         flex-direction: column;
+         background: var(--background-primary);
+      `;
+      
+      // Créer l'iframe YouTube
       const iframe = document.createElement('iframe');
       iframe.src = `https://www.youtube.com/embed/${videoId}${timestamp ? `?start=${timestamp}` : ''}`;
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.border = 'none';
-      container.appendChild(iframe);
+      iframe.style.cssText = `
+         width: 100%;
+         height: 100%;
+         border: none;
+         flex: 1;
+      `;
+      
+      playerContainer.appendChild(iframe);
+      container.appendChild(playerContainer);
+      
+      return playerContainer;
    }
 
    async playerControl() {
@@ -1340,13 +1266,11 @@ class VideoPlayer {
             console.error("Erreur lors de la sortie du plein écran:", error);
          });
       } catch (error) {
-         console.error("Erreur lors de la sortie du plein écran:", error);
+         console.error("Erreur lors de l'initialisation du player:", error);
+         return this.createFallbackPlayer(videoId, container, timestamp);
       }
    }
-
-   isFullscreen() {
-      return this.player ? this.player.isFullscreen() : false;
-   }
+   // ... rest of the code ...
 }
 // ------ décoration des urls ------
 function createDecorations(view) {
@@ -1888,7 +1812,7 @@ class Transcript {
 console.log("Début du chargement de translations.js");
 
 // Traductions générales de l'application
-export const translations = {
+const translations = {
    fr: {
       settings: {
          displayMode: {
@@ -2125,7 +2049,7 @@ class Playlists {
    async savePlaylist() {
       // TODO: Sauvegarder this.playlist dans les settings du plugin
       this.settings.settings.playlist = this.playlist;
-      await this.settings.saveSettings();
+      await this.settings.save();
    }
 
    async loadPlaylist() {
@@ -2225,7 +2149,7 @@ export default class YouTubeFlowPlugin extends Plugin {
                      if (!isNaN(height)) {
                         Settings.settings.viewHeight = height;
                         Settings.settings.overlayHeight = height;
-                        await Settings.saveSettings();
+                        await Settings.save();
                      }
                   }
                   // Forcer la fermeture des vues précédentes avant de changer de mode
@@ -2249,7 +2173,7 @@ export default class YouTubeFlowPlugin extends Plugin {
                      if (!isNaN(height)) {
                         Settings.settings.viewHeight = height;
                         Settings.settings.overlayHeight = height;
-                        await Settings.saveSettings();
+                        await Settings.save();
                      }
                   }
                   await PlayerViewAndMode.closePreviousVideos();
@@ -2271,7 +2195,7 @@ export default class YouTubeFlowPlugin extends Plugin {
                      if (!isNaN(height)) {
                         Settings.settings.viewHeight = height;
                         Settings.settings.overlayHeight = height;
-                        await Settings.saveSettings();
+                        await Settings.save();
                      }
                   }
                   await PlayerViewAndMode.closePreviousVideos();
