@@ -17,7 +17,8 @@ class Settings {
          currentMode: null,
          viewHeight: 60,
          playbackMode: 'stream',
-         favoriteSpeed: 2.0
+         favoriteSpeed: 2.0,
+         isMuted: false  // Ajout du mode muet
       };
    }
 
@@ -66,6 +67,13 @@ class Settings {
    async resetToDefault() {
       this.settings = structuredClone(Settings.DEFAULT_SETTINGS);
       await this.save();
+   }
+
+   // Ajoutons un getter et setter pour isMuted
+   get isMuted() { return this.settings.isMuted; }
+   set isMuted(value) {
+      this.settings.isMuted = value;
+      this.save();
    }
 }
 
@@ -1175,30 +1183,14 @@ class VideoPlayer {
             
             // Barre de contrôle
             controlBar: {
-               tooltips: false,
-               tooltips: false,
                children: [
                   'playToggle',
                   'volumePanel',
                   'currentTimeDisplay',
                   'timeDivider',
                   'durationDisplay',
-                  {
-                     name: 'progressControl',
-                     children: {
-                        seekBar: {
-                           children: [
-                              'playProgressBar',
-                              'mouseTimeDisplay'
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     name: 'pictureInPictureToggle',
-                     controlText: 'Image dans l\'image',  // Traduire le texte du bouton PIP
-                     className: 'vjs-pip-button'
-                  },
+                  'progressControl',  // Simplifié
+                  'pictureInPictureToggle',
                   'fullscreenToggle'
                ]
             },
@@ -1223,6 +1215,9 @@ class VideoPlayer {
                }
             },
             
+            // Appliquer le mode muet depuis les settings
+            muted: this.Settings.isMuted,
+            
          });
 
          this.player.ready(async () => {
@@ -1231,17 +1226,24 @@ class VideoPlayer {
                this.player.currentTime(timestamp);
             }
             
+            // Écouter les changements de mode muet
+            this.player.on('volumechange', () => {
+               this.Settings.isMuted = this.player.muted();
+            });
+            
             // Tenter de lancer la lecture
             try {
                await this.player.play();
             } catch (error) {
                console.log("Autoplay error:", error);
-               // En cas d'erreur, essayer en mode muet
-               this.player.muted(true);
-               try {
-                  await this.player.play();
-               } catch (error) {
-                  console.log("Autoplay error even with mute:", error);
+               if (!this.Settings.isMuted) {
+                  // En cas d'erreur, essayer en mode muet
+                  this.player.muted(true);
+                  try {
+                     await this.player.play();
+                  } catch (error) {
+                     console.log("Autoplay error even with mute:", error);
+                  }
                }
             }
          });
@@ -2519,6 +2521,154 @@ export default class YouTubeFlowPlugin extends Plugin {
             opacity: 1 !important;
             visibility: visible;
             transform: none;
+         }
+
+         /* Styles pour la barre de progression */
+         .video-js .vjs-progress-control {
+            position: absolute;
+            top: -4px;
+            width: 100%;
+            height: 4px;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.1);
+         }
+
+         /* Le conteneur de la barre */
+         .video-js .vjs-progress-holder {
+            pointer-events: auto;
+            height: 100%;
+            position: relative;
+            background: transparent;
+            cursor: pointer;
+         }
+
+         /* La barre de progression elle-même */
+         .video-js .vjs-play-progress {
+            background: var(--interactive-accent);
+            height: 100%;
+            position: absolute;
+         }
+
+         /* La barre de chargement */
+         .video-js .vjs-load-progress {
+            background: rgba(255, 255, 255, 0.2);
+            height: 100%;
+         }
+
+         /* Le tooltip de temps */
+         .video-js .vjs-time-tooltip {
+            background: var(--background-secondary);
+            border: 1px solid var(--background-modifier-border);
+            color: var(--text-normal);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            transform: translateX(-50%);
+            bottom: 14px;
+         }
+
+         /* Animation au survol */
+         .video-js .vjs-progress-control:hover {
+            height: 8px;
+            top: -8px;
+            transition: all 0.2s ease;
+         }
+
+         /* Le curseur de la barre */
+         .video-js .vjs-mouse-display {
+            background: var(--text-normal);
+            width: 1px;
+            height: 100%;
+         }
+
+         /* Zone de hover */
+         .video-js .vjs-progress-holder .vjs-play-progress:before,
+         .video-js .vjs-progress-holder .vjs-time-tooltip {
+            z-index: 1;
+         }
+
+         .video-js .vjs-progress-holder:hover {
+            background: rgba(255, 255, 255, 0.1);
+         }
+
+         /* Indicateur de position */
+         .video-js .vjs-play-progress:after {
+            content: '';
+            position: absolute;
+            right: -4px;
+            top: -2px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--interactive-accent);
+         }
+
+         /* Styles pour la barre de progression */
+         .video-js .vjs-progress-control {
+            position: absolute;
+            top: -4px;
+            width: 100%;
+            height: 4px;
+            pointer-events: none;
+         }
+
+         /* Le conteneur de la barre */
+         .video-js .vjs-progress-holder {
+            pointer-events: auto;
+            height: 100%;
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+         }
+
+         /* La barre de progression elle-même */
+         .video-js .vjs-play-progress {
+            background: var(--interactive-accent);
+            height: 100%;
+            position: absolute;
+            left: 0;  /* Forcer le départ à gauche */
+         }
+
+         /* Masquer la barre de progression dupliquée */
+         .video-js .vjs-progress-control.vjs-control {
+            display: none;
+         }
+
+         /* Masquer l'affichage du temps redondant */
+         .video-js .vjs-remaining-time {
+            display: none;
+         }
+
+         /* Masquer la seconde barre de progression */
+         .video-js > .vjs-progress-control {
+            display: none;
+         }
+
+         /* Styles pour la barre de progression */
+         .video-js .vjs-progress-control {
+            position: absolute;
+            top: -8px;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+         }
+
+         .video-js .vjs-progress-holder {
+            height: 100%;
+         }
+
+         .video-js .vjs-play-progress {
+            background-color: var(--interactive-accent);
+         }
+
+         .video-js .vjs-load-progress {
+            background: rgba(255, 255, 255, 0.3);
+         }
+
+         /* Masquer le temps restant qui est redondant */
+         .video-js .vjs-remaining-time {
+            display: none;
          }
       `;
    }
