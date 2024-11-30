@@ -277,9 +277,6 @@ class PlayerContainer extends ItemView {
          container.appendChild(playerSection);
 
          try {
-            // Attendre que l'élément soit dans le DOM
-            await new Promise(resolve => requestAnimationFrame(resolve));
-            
             // Initialiser le player vidéo dans le playerSection
             this.VideoPlayer = new VideoPlayer(this.Settings);
             await this.VideoPlayer.initializePlayer(this.videoId, playerSection, this.timestamp);
@@ -1109,7 +1106,6 @@ class VideoPlayer {
             display: flex;
             flex-direction: column;
          `;
-         container.appendChild(mainContainer);
 
          // Wrapper pour la vidéo et ses contrôles
          const playerWrapper = document.createElement('div');
@@ -1123,91 +1119,11 @@ class VideoPlayer {
          `;
          mainContainer.appendChild(playerWrapper);
 
-         // Créer le conteneur vidéo
-         const videoContainer = document.createElement('div');
-         videoContainer.style.cssText = `
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-         `;
-         playerWrapper.appendChild(videoContainer);
-
          // Élément vidéo avec autoplay
          const video = document.createElement('video-js');
          video.className = 'video-js vjs-obsidian-theme';
          video.setAttribute('autoplay', '');
-         videoContainer.appendChild(video);
-
-         // Créer la barre de contrôle horizontale
-         const controlBar = document.createElement('div');
-         controlBar.className = 'youtube-flow-control-bar';
-         controlBar.style.cssText = `
-            height: 40px;
-            width: 100%;
-            background: var(--background-secondary);
-            border-top: 1px solid var(--background-modifier-border);
-            display: flex;
-            align-items: center;
-            padding: 0 10px;
-            position: relative;
-         `;
-         playerWrapper.appendChild(controlBar);
-
-         // Ajouter les contrôles de base
-         const playbackRateButton = document.createElement('button');
-         playbackRateButton.className = 'youtube-flow-playback-rate';
-         playbackRateButton.innerHTML = '🔄 1x';
-         playbackRateButton.style.cssText = `
-            background: none;
-            border: none;
-            padding: 5px 10px;
-            cursor: pointer;
-            color: var(--text-normal);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-         `;
-         controlBar.appendChild(playbackRateButton);
-
-         // Gérer le menu de vitesse
-         playbackRateButton.addEventListener('mouseenter', (e) => {
-            const menu = new Menu();
-            const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
-            const currentRate = this.player ? this.player.playbackRate() : 1;
-            
-            rates.forEach(rate => {
-               menu.addItem(item => 
-                  item
-                     .setTitle(`${rate}x`)
-                     .setChecked(currentRate === rate)
-                     .onClick(() => {
-                        if (this.player) {
-                           this.player.playbackRate(rate);
-                           playbackRateButton.innerHTML = `🔄 ${rate}x`;
-                        }
-                     })
-               );
-            });
-
-            const rect = playbackRateButton.getBoundingClientRect();
-            menu.showAtPosition({
-               x: rect.left,
-               y: rect.bottom
-            });
-         });
-
-         // Attendre que le DOM soit mis à jour
-         await new Promise(resolve => {
-            requestAnimationFrame(() => {
-               setTimeout(resolve, 100);
-            });
-         });
-
-         // S'assurer que l'élément est toujours dans le DOM
-         if (!document.contains(video)) {
-            console.warn("L'élément vidéo n'est plus dans le DOM, utilisation du lecteur de secours");
-            return this.createFallbackPlayer(videoId, container, timestamp);
-         }
+         playerWrapper.appendChild(video);
 
          // Configuration du player
          this.player = videojs(video, {
@@ -1223,7 +1139,28 @@ class VideoPlayer {
             fluid: false,
             preload: 'auto',
             playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16],
-            autoplay: true,
+            autoplay: true,  // Activer l'autoplay
+            
+            // Configuration de la langue
+            language: 'fr',  // Utiliser le français
+            languages: {
+               fr: {
+                  "Play": "Lecture",
+                  "Pause": "Pause",
+                  "Mute": "Couper le son",
+                  "Unmute": "Activer le son",
+                  "Current Time": "Temps actuel",
+                  "Duration": "Durée",
+                  "Remaining Time": "Temps restant",
+                  "Picture-in-Picture": "Image dans l'image",
+                  "Exit Picture-in-Picture": "Quitter l'image dans l'image"
+               }
+            },
+            
+            // Désactiver les éléments inutiles
+            errorDisplay: false,
+            textTrackDisplay: false,
+            textTrackSettings: false,
             
             // Configuration YouTube spécifique
             youtube: {
@@ -1234,30 +1171,139 @@ class VideoPlayer {
                controls: 0,
                ytControls: 0,
                preload: 'auto'
+            },
+            
+            // Barre de contrôle
+            controlBar: {
+               tooltips: false,
+               tooltips: false,
+               children: [
+                  'playToggle',
+                  'volumePanel',
+                  'currentTimeDisplay',
+                  'timeDivider',
+                  'durationDisplay',
+                  {
+                     name: 'progressControl',
+                     children: {
+                        seekBar: {
+                           children: [
+                              'playProgressBar',
+                              'mouseTimeDisplay'
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     name: 'pictureInPictureToggle',
+                     controlText: 'Image dans l\'image',  // Traduire le texte du bouton PIP
+                     className: 'vjs-pip-button'
+                  },
+                  'fullscreenToggle'
+               ]
+            },
+            
+            // Configuration de la barre de progression
+            progressControl: {
+               seekBar: true
+            },
+            enableSmoothSeeking: true,
+            
+            // Actions utilisateur
+            userActions: {
+               hotkeys: true
+            },
+            startTime: timestamp,
+            autoplay: false,
+            
+            // Configuration du plein écran
+            fullscreen: {
+               options: {
+                  navigationUI: 'hide'
+               }
+            },
+            
+         });
+
+         this.player.ready(async () => {
+            console.log(`Setting timestamp to ${timestamp}s`);
+            if (timestamp > 0) {
+               this.player.currentTime(timestamp);
+            }
+            
+            // Tenter de lancer la lecture
+            try {
+               await this.player.play();
+            } catch (error) {
+               console.log("Autoplay error:", error);
+               // En cas d'erreur, essayer en mode muet
+               this.player.muted(true);
+               try {
+                  await this.player.play();
+               } catch (error) {
+                  console.log("Autoplay error even with mute:", error);
+               }
             }
          });
 
-         // Attendre que le player soit prêt
-         await new Promise((resolve, reject) => {
-            this.player.ready(() => {
-               if (timestamp > 0) {
-                  this.player.currentTime(timestamp);
-               }
-               resolve();
-            });
+   // Ajouter notre bouton de vitesse personnalisé
+         this.playbackRateButton = this.player.controlBar.addChild('button', {
+            className: 'vjs-playback-rate-button'
+         });
+
+   // Configurer le bouton
+         const buttonEl = this.playbackRateButton.el();
+         buttonEl.innerHTML = `🔄 ${this.player.playbackRate()}x`;
+         buttonEl.style.cssText = `
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-width: 60px !important;
+            padding: 0 8px !important;
+            font-size: 13px !important;
+            cursor: pointer !important;
+            background: var(--background-secondary) !important;
+            border: none !important;
+            border-radius: 3px !important;
+            margin: 0 4px !important;
+            height: 32px !important;
+            transition: background 0.2s ease !important;
+         `;
+
+   // Gérer le hover pour afficher le menu
+         buttonEl.addEventListener('mouseenter', (e) => {
+            const menu = new Menu();
+            const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
+            const currentRate = this.player.playbackRate();
             
-            // Timeout de sécurité
-            setTimeout(() => {
-               reject(new Error("Timeout lors de l'initialisation du player"));
-            }, 5000);
+            rates.forEach(rate => {
+               menu.addItem(item => 
+                  item
+                     .setTitle(`${rate}x`)
+                     .setChecked(currentRate === rate)
+                     .onClick(() => {
+                        this.player.playbackRate(rate);
+                        this.updatePlaybackRateButton(rate);
+                     })
+               );
+            });
+
+// Calculer la position exacte du menu
+            const rect = buttonEl.getBoundingClientRect();
+            const menuWidth = 100; // Largeur approximative du menu
+            menu.showAtPosition({
+               x: rect.left + (rect.width - menuWidth) / 2, // Centrer le menu
+               y: rect.bottom
+            });
          });
 
-         // Mettre à jour le bouton de vitesse quand le player change de vitesse
+// Écouter les changements de vitesse
          this.player.on('ratechange', () => {
-            const rate = this.player.playbackRate();
-            playbackRateButton.innerHTML = `🔄 ${rate}x`;
+            const newRate = this.player.playbackRate();
+            this.updatePlaybackRateButton(newRate);
          });
 
+         container.appendChild(mainContainer);
          return this.player;
       } catch (error) {
          console.error("Erreur lors de l'initialisation du player vidéo:", error);
@@ -2418,31 +2464,61 @@ export default class YouTubeFlowPlugin extends Plugin {
             opacity: 0.8;
          }
 
-         .youtube-flow-control-bar {
-            height: 40px;
+         /* Forcer le positionnement de la barre de contrôle */
+         .video-js .vjs-control-bar {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;  /* Distribuer l'espace entre les éléments */
+            padding: 0 10px;  /* Ajouter du padding horizontal */
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px !important;
             background: var(--background-secondary);
-            border-top: 1px solid var(--background-modifier-border);
-            display: flex;
-            align-items: center;
-            padding: 0 10px;
-            position: relative;
-            z-index: 101;
+            z-index: 2;
+            gap: 10px;  /* Espacement entre les éléments */
          }
 
-         .youtube-flow-playback-rate {
-            background: none;
-            border: none;
-            padding: 5px 10px;
-            cursor: pointer;
-            color: var(--text-normal);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: opacity 0.2s ease;
+         /* Grouper les contrôles de gauche */
+         .video-js .vjs-control-bar > :first-child {
+            margin-right: auto;
          }
 
-         .youtube-flow-playback-rate:hover {
-            opacity: 0.8;
+         /* Grouper les contrôles de droite */
+         .video-js .vjs-control-bar > :last-child {
+            margin-left: auto;
+         }
+
+         /* Ajuster l'espacement des contrôles */
+         .video-js .vjs-control {
+            pointer-events: auto !important;
+            z-index: 3 !important;
+            margin: 0 2px;
+            flex: 0 0 auto;  /* Empêcher les boutons de s'étirer */
+         }
+
+         /* Ajuster la position de la barre de progression */
+         .video-js .vjs-progress-control {
+            position: absolute !important;
+            top: -4px;
+            width: 100%;
+            height: 4px;  /* Hauteur fixe */
+            pointer-events: none;  /* Désactiver les événements sur le conteneur */
+         }
+
+         /* Activer les événements uniquement sur la barre elle-même */
+         .video-js .vjs-progress-holder {
+            pointer-events: auto;
+               height: 100%;
+         }
+
+         /* Forcer l'affichage permanent */
+         .video-js.vjs-user-inactive .vjs-control-bar {
+            opacity: 1 !important;
+            visibility: visible;
+            transform: none;
          }
       `;
    }
