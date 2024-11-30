@@ -14,6 +14,7 @@ build: {
    rollupOptions: {
    external: ['obsidian', '@codemirror/view', '@codemirror/state', '@codemirror/language'],
    output: {
+      entryFileNames: 'main.js',
       format: 'cjs',
       exports: 'default',
       globals: {
