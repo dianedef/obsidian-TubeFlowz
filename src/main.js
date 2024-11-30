@@ -1123,11 +1123,78 @@ class VideoPlayer {
          `;
          mainContainer.appendChild(playerWrapper);
 
+         // Créer le conteneur vidéo
+         const videoContainer = document.createElement('div');
+         videoContainer.style.cssText = `
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+         `;
+         playerWrapper.appendChild(videoContainer);
+
          // Élément vidéo avec autoplay
          const video = document.createElement('video-js');
          video.className = 'video-js vjs-obsidian-theme';
          video.setAttribute('autoplay', '');
-         playerWrapper.appendChild(video);
+         videoContainer.appendChild(video);
+
+         // Créer la barre de contrôle horizontale
+         const controlBar = document.createElement('div');
+         controlBar.className = 'youtube-flow-control-bar';
+         controlBar.style.cssText = `
+            height: 40px;
+            width: 100%;
+            background: var(--background-secondary);
+            border-top: 1px solid var(--background-modifier-border);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            position: relative;
+         `;
+         playerWrapper.appendChild(controlBar);
+
+         // Ajouter les contrôles de base
+         const playbackRateButton = document.createElement('button');
+         playbackRateButton.className = 'youtube-flow-playback-rate';
+         playbackRateButton.innerHTML = '🔄 1x';
+         playbackRateButton.style.cssText = `
+            background: none;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            color: var(--text-normal);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+         `;
+         controlBar.appendChild(playbackRateButton);
+
+         // Gérer le menu de vitesse
+         playbackRateButton.addEventListener('mouseenter', (e) => {
+            const menu = new Menu();
+            const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
+            const currentRate = this.player ? this.player.playbackRate() : 1;
+            
+            rates.forEach(rate => {
+               menu.addItem(item => 
+                  item
+                     .setTitle(`${rate}x`)
+                     .setChecked(currentRate === rate)
+                     .onClick(() => {
+                        if (this.player) {
+                           this.player.playbackRate(rate);
+                           playbackRateButton.innerHTML = `🔄 ${rate}x`;
+                        }
+                     })
+               );
+            });
+
+            const rect = playbackRateButton.getBoundingClientRect();
+            menu.showAtPosition({
+               x: rect.left,
+               y: rect.bottom
+            });
+         });
 
          // Attendre que le DOM soit mis à jour
          await new Promise(resolve => {
@@ -1183,6 +1250,12 @@ class VideoPlayer {
             setTimeout(() => {
                reject(new Error("Timeout lors de l'initialisation du player"));
             }, 5000);
+         });
+
+         // Mettre à jour le bouton de vitesse quand le player change de vitesse
+         this.player.on('ratechange', () => {
+            const rate = this.player.playbackRate();
+            playbackRateButton.innerHTML = `🔄 ${rate}x`;
          });
 
          return this.player;
@@ -2342,6 +2415,33 @@ export default class YouTubeFlowPlugin extends Plugin {
          }
 
          .youtube-view-close:hover {
+            opacity: 0.8;
+         }
+
+         .youtube-flow-control-bar {
+            height: 40px;
+            background: var(--background-secondary);
+            border-top: 1px solid var(--background-modifier-border);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            position: relative;
+            z-index: 101;
+         }
+
+         .youtube-flow-playback-rate {
+            background: none;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            color: var(--text-normal);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: opacity 0.2s ease;
+         }
+
+         .youtube-flow-playback-rate:hover {
             opacity: 0.8;
          }
       `;
