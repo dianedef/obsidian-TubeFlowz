@@ -1,39 +1,8 @@
 # Build
-main.js
+/main.js
 styles.css
 data.json
-*.es-*.js
-*.es.js
 video.*.js
 
 # Dependencies
 node_modules/
-
-# IDE
-.idea/
-.vscode/
-*.iml
-
-# OS
-.DS_Store
-desktop.ini
-Thumbs.db
-
-# Logs et fichiers temporaires
-*.log
-.hot-update.*
-.cache/
-dist/
-*.tmp
-*.temp
-.cache/
-
-# Fichiers de développement
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Fichiers spécifiques à Obsidian
-.obsidian/
