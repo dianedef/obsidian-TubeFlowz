@@ -18,7 +18,8 @@ class Settings {
          viewHeight: 60,
          playbackMode: 'stream',
          favoriteSpeed: 2.0,
-         isMuted: false  // Ajout du mode muet
+         isMuted: false,  // Ajout du mode muet
+         showYoutubeRecommendations: false  // Nouvelle option
       };
    }
 
@@ -73,6 +74,13 @@ class Settings {
    get isMuted() { return this.settings.isMuted; }
    set isMuted(value) {
       this.settings.isMuted = value;
+      this.save();
+   }
+
+   // Ajoutons un getter/setter
+   get showYoutubeRecommendations() { return this.settings.showYoutubeRecommendations; }
+   set showYoutubeRecommendations(value) {
+      this.settings.showYoutubeRecommendations = value;
       this.save();
    }
 }
@@ -205,6 +213,16 @@ class SettingsTab extends PluginSettingTab {
             this.Settings.settings.playbackMode = value;
             await this.Settings.save();
          }));
+
+      new Setting(containerEl)
+         .setName('Recommandations YouTube')
+         .setDesc('Afficher les recommandations YouTube à la fin des vidéos')
+         .addToggle(toggle => toggle
+            .setValue(this.Settings.showYoutubeRecommendations)
+            .onChange(async (value) => {
+               this.Settings.showYoutubeRecommendations = value;
+               await this.Settings.save();
+            }));
    }
 }
 
@@ -1172,13 +1190,22 @@ class VideoPlayer {
             
             // Configuration YouTube spécifique
             youtube: {
-               iv_load_policy: 3,
-               modestbranding: 1,
-               cc_load_policy: 0,
-               rel: 0,
-               controls: 0,
+               iv_load_policy: 3,            // Désactive les annotations
+               modestbranding: 1,            // Réduit le branding YouTube
+               cc_load_policy: 0,            // Désactive les sous-titres par défaut
+               rel: this.Settings.showYoutubeRecommendations ? 1 : 0,
+               controls: 0,                  // Désactive les contrôles natifs
                ytControls: 0,
-               preload: 'auto'
+               preload: 'auto',
+               showinfo: 0,                  // Masque les infos de la vidéo
+               fs: 0,                        // Désactive le bouton plein écran natif
+               playsinline: 1,               // Force la lecture dans le player
+               disablekb: 1,                 // Désactive les raccourcis clavier YouTube
+               enablejsapi: 1,               // Active l'API JavaScript
+               origin: window.location.origin, // Définit l'origine pour l'API
+               endscreen: this.Settings.showYoutubeRecommendations ? 1 : 0,
+               norel: this.Settings.showYoutubeRecommendations ? 0 : 1,
+               showRelatedVideos: this.Settings.showYoutubeRecommendations
             },
             
             // Barre de contrôle
@@ -2669,6 +2696,46 @@ export default class YouTubeFlowPlugin extends Plugin {
          /* Masquer le temps restant qui est redondant */
          .video-js .vjs-remaining-time {
             display: none;
+         }
+
+         /* Styles pour la barre de contrôle */
+         .video-js .vjs-control-bar {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 16px;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--background-secondary);
+            z-index: 2;
+         }
+
+         /* Grouper les contrôles de gauche */
+         .video-js .vjs-control-bar > .vjs-play-control,
+         .video-js .vjs-control-bar > .vjs-volume-panel {
+            margin-right: auto;
+         }
+
+         /* Grouper les contrôles du centre (temps) */
+         .video-js .vjs-time-control {
+            display: flex;
+            align-items: center;
+         }
+
+         /* Grouper les contrôles de droite */
+         .video-js .vjs-control-bar > .vjs-picture-in-picture-control,
+         .video-js .vjs-control-bar > .vjs-fullscreen-control,
+         .video-js .vjs-control-bar > .vjs-playback-rate-button {
+            margin-left: auto;
+         }
+
+         /* Ajuster l'espacement entre les boutons */
+         .video-js .vjs-control {
+            margin: 0 4px;
          }
       `;
    }
