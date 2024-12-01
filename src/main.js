@@ -1620,16 +1620,16 @@ class PlayerResizeHandler {
    }
 }
 class Hotkeys {
-   constructor() {
-      const { app, youtubeFlowPlugin, Player } = Store.get();
-      this.app = app;
-      this.youtubeFlowPlugin = youtubeFlowPlugin;
-      this.Player = Player;
+   constructor(plugin) {
+      this.plugin = plugin;
+      this.app = plugin.app;
+      const { VideoPlayer } = Store.get();
+      this.VideoPlayer = VideoPlayer;
    }
 
    registerHotkeys() {
       // Raccourci pour ouvrir la vidéo en cours dans une modale
-      this.youtubeFlowPlugin.addCommand({
+      this.plugin.addCommand({
          id: 'open-youtube-modal',
          name: 'Ouvrir la vidéo dans une modale',
          hotkeys: [{ modifiers: ['Alt'], key: 'y' }],
@@ -1640,7 +1640,7 @@ class Hotkeys {
                const line = activeView.editor.getLine(cursor.line);
                const urlMatch = line.match(/(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[^&\s]+)/);
                if (urlMatch) {
-                  const videoId = this.player.getVideoId(urlMatch[1]);
+                  const videoId = this.VideoPlayer.getVideoId(urlMatch[1]);
                   if (videoId) {
                      new YouTubeModal(this.app, videoId).open();
                   }
@@ -1649,55 +1649,92 @@ class Hotkeys {
          }
       });
 
-      this.youtubeFlowPlugin.addCommand({
+      // Contrôles de lecture
+      this.plugin.addCommand({
          id: 'play-pause',
          name: 'Lecture/Pause',
-         hotkeys: [{ modifiers: ['Shift'], key: ' ' }],
-         callback: () => this.player.player?.getPlayerState() === 1 
-            ? this.player.pause() 
-            : this.player.play()
+         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'Space' }],
+         callback: () => {
+            if (!this.VideoPlayer.player) return;
+            
+            if (this.VideoPlayer.player.paused()) {
+               this.VideoPlayer.player.play();
+            } else {
+               this.VideoPlayer.player.pause();
+            }
+         }
       });
 
-      this.youtubeFlowPlugin.addCommand({
+      this.plugin.addCommand({
          id: 'write-timestamp',
          name: 'Écrire le timestamp',
          hotkeys: [{ modifiers: ['Alt'], key: 't' }],
-         callback: () => this.writeTimestamp()
+         callback: () => {
+            if (!this.VideoPlayer.player) return;
+            
+            const time = Math.floor(this.VideoPlayer.player.currentTime());
+            const timestamp = this.VideoPlayer.formatTimestamp(time);
+            
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView) {
+               const cursor = activeView.editor.getCursor();
+               activeView.editor.replaceRange(`[${timestamp}]`, cursor);
+            }
+         }
       });
 
-      this.youtubeFlowPlugin.addCommand({
-         id: 'next-video',
-         name: 'Vidéo suivante',
-         hotkeys: [{ modifiers: ['Ctrl'], key: 'ArrowRight' }],
-         callback: () => this.player.nextVideo()
+      // Navigation temporelle
+      this.plugin.addCommand({
+         id: 'seek-forward',
+         name: 'Avancer de 10s',
+         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowRight' }],
+         callback: () => {
+            if (!this.VideoPlayer.player) return;
+            
+            const currentTime = this.VideoPlayer.player.currentTime();
+            this.VideoPlayer.player.currentTime(currentTime + 10);
+         }
       });
 
-      this.youtubeFlowPlugin.addCommand({
-         id: 'previous-video',
-         name: 'Vidéo précédente',
-         hotkeys: [{ modifiers: ['Ctrl'], key: 'ArrowLeft' }],
-         callback: () => this.player.previousVideo()
+      this.plugin.addCommand({
+         id: 'seek-backward',
+         name: 'Reculer de 10s',
+         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowLeft' }],
+         callback: () => {
+            if (!this.VideoPlayer.player) return;
+            
+            const currentTime = this.VideoPlayer.player.currentTime();
+            this.VideoPlayer.player.currentTime(Math.max(0, currentTime - 10));
+         }
       });
 
-      this.youtubeFlowPlugin.addCommand({
-         id: 'normal-speed',
-         name: 'Vitesse normale',
-         hotkeys: [{ modifiers: ['Ctrl'], key: '1' }],
-         callback: () => this.player.setPlaybackSpeed(1.0)
-      });
-
-      this.youtubeFlowPlugin.addCommand({
+      // Contrôles de vitesse
+      this.plugin.addCommand({
          id: 'speed-increase',
          name: 'Augmenter la vitesse',
-         hotkeys: [{ key: '+' }], // Comme l'extension Chrome
-         callback: () => this.player.increaseSpeed()
+         hotkeys: [{ modifiers: ['Mod'], key: 'Plus' }],
+         callback: () => {
+            if (!this.VideoPlayer.player) return;
+            
+            const currentRate = this.VideoPlayer.player.playbackRate();
+            const newRate = Math.min(16, currentRate + 0.25);
+            this.VideoPlayer.player.playbackRate(newRate);
+            this.VideoPlayer.updatePlaybackRateButton(newRate);
+         }
       });
 
-      this.youtubeFlowPlugin.addCommand({
+      this.plugin.addCommand({
          id: 'speed-decrease',
          name: 'Diminuer la vitesse',
-         hotkeys: [{ key: '-' }], // Comme l'extension Chrome
-         callback: () => this.player.decreaseSpeed()
+         hotkeys: [{ modifiers: ['Mod'], key: 'Minus' }],
+         callback: () => {
+            if (!this.VideoPlayer.player) return;
+            
+            const currentRate = this.VideoPlayer.player.playbackRate();
+            const newRate = Math.max(0.25, currentRate - 0.25);
+            this.VideoPlayer.player.playbackRate(newRate);
+            this.VideoPlayer.updatePlaybackRateButton(newRate);
+         }
       });
 
       // Raccourcis préréglés
@@ -1706,63 +1743,25 @@ class Hotkeys {
          this.youtubeFlowPlugin.addCommand({
             id: `speed-${speed}x`,
             name: `Vitesse ${speed}x`,
-            hotkeys: [{ modifiers: ['Ctrl'], key: `${index + 1}` }],
-            callback: () => this.player.setPlaybackSpeed(speed)
+            hotkeys: [{ modifiers: ['Mod', 'Alt'], key }], // Ajout de Alt pour éviter les conflits
+            callback: () => this.Player.setPlaybackSpeed(speed)
          });
       });
 
+      // Navigation temporelle
       this.youtubeFlowPlugin.addCommand({
          id: 'seek-forward',
          name: 'Avancer de 10s',
-         hotkeys: [{ modifiers: ['Shift'], key: 'ArrowRight' }],
-         callback: () => this.player.seekForward()
+         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowRight' }], // Utilisation de Mod+Shift
+         callback: () => this.Player.seekForward()
       });
 
       this.youtubeFlowPlugin.addCommand({
          id: 'seek-backward',
          name: 'Reculer de 10s',
-         hotkeys: [{ modifiers: ['Shift'], key: 'ArrowLeft' }],
-         callback: () => this.player.seekBackward()
+         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowLeft' }], // Utilisation de Mod+Shift
+         callback: () => this.Player.seekBackward()
       });
-
-      this.youtubeFlowPlugin.addCommand({
-         id: 'speed-3x',
-         name: 'Vitesse 3x',
-         hotkeys: [{ modifiers: ['Ctrl'], key: '4' }],
-         callback: () => this.player.setPlaybackSpeed(3.0)
-      });
-
-      this.youtubeFlowPlugin.addCommand({
-         id: 'speed-4x',
-         name: 'Vitesse 4x',
-         hotkeys: [{ modifiers: ['Ctrl'], key: '5' }],
-         callback: () => this.player.setPlaybackSpeed(4.0)
-      });
-
-      this.youtubeFlowPlugin.addCommand({
-         id: 'speed-5x',
-         name: 'Vitesse 5x',
-         hotkeys: [{ modifiers: ['Ctrl'], key: '6' }],
-         callback: () => this.player.setPlaybackSpeed(5.0)
-      });
-   }
-
-   writeTimestamp() {
-      if (!this.player.player) return;
-      const time = Math.floor(this.player.player.getCurrentTime());
-      const timestamp = this.formatTimestamp(time);
-      
-      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (activeView) {
-         const cursor = activeView.editor.getCursor();
-         activeView.editor.replaceRange(`[${timestamp}]`, cursor);
-      }
-   }
-
-   formatTimestamp(seconds) {
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
    }
 }
 
@@ -2223,6 +2222,10 @@ export default class YouTubeFlowPlugin extends Plugin {
       const { Settings, PlayerViewAndMode } = Store.get();
       this.PlayerViewAndMode = PlayerViewAndMode;
 
+      // Initialiser les hotkeys en premier en passant l'instance du plugin
+      this.hotkeys = new Hotkeys(this);
+      this.hotkeys.registerHotkeys();
+
       this.app.workspace.onLayoutReady(() => {
          console.log("Layout prêt, initialisation des écouteurs...");
          
@@ -2645,6 +2648,7 @@ export default class YouTubeFlowPlugin extends Plugin {
             height: 100%;
             position: relative;
             background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
          }
 
          /* La barre de progression elle-même */
