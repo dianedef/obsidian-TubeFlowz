@@ -1189,6 +1189,7 @@ class VideoPlayer {
             flex-direction: column;
             position: relative;
             overflow: hidden;
+            margin-bottom: 100px; // Ajouter de l'espace pour les recommandations
          `;
          mainContainer.appendChild(playerWrapper);
 
@@ -2666,3 +2667,57 @@ export default class YouTubeFlowPlugin extends Plugin {
       `;
    }
 }
+
+// Ajouter les styles CSS nécessaires
+const style = document.createElement('style');
+style.textContent = `
+   .youtube-flow-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+   }
+
+   .player-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 100px;
+   }
+
+   .video-js {
+      width: 100%;
+      height: 100%;
+   }
+
+   .vjs-youtube {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+   }
+
+   /* Style pour la zone des recommandations */
+   .vjs-youtube iframe {
+      padding-bottom: 100px !important;
+   }
+
+   /* Style pour la barre de contrôle */
+   .vjs-control-bar {
+      z-index: 3 !important;
+      background: var(--background-secondary) !important;
+   }
+
+   /* Style pour le mode plein écran */
+   .vjs-fullscreen .player-wrapper {
+      margin-bottom: 0;
+   }
+   .vjs-fullscreen .vjs-youtube iframe {
+      padding-bottom: 0 !important;
+   }
+`;
+document.head.appendChild(style);
