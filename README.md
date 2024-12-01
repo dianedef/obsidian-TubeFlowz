@@ -54,6 +54,13 @@ A powerful Obsidian plugin that transforms YouTube videos into rich Markdown not
 - Robust error handling
 - Secure API communication
 
+## Terms of Use
+This plugin is protected by copyright. Use is subject to the following conditions:
+- Personal use only via the Obsidian Community Plugin Store
+- Modification and redistribution prohibited
+- Commercial use prohibited without explicit agreement
+
+---
 
 # ObsiTubeFlowz - YouTube for Obsidian
 
@@ -103,4 +110,9 @@ Un plugin puissant pour Obsidian qui transforme vos vidéos YouTube en notes Mar
 3. Une note structurée est générée avec tous les éléments
 4. Retrouvez vos notes dans le dossier configuré
 
+## Conditions d'utilisation
+Ce plugin est protégé par le droit d'auteur. L'utilisation est soumise aux conditions suivantes :
+- Usage personnel uniquement via le Community Plugin Store d'Obsidian
+- Modification et redistribution interdites
+- Utilisation commerciale interdite sans accord explicite
 ---

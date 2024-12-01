@@ -1,1 +1,41 @@
-{"name":"obsitube-flowz","version":"1.0.0","description":"Améliore l'expérience YouTube dans Obsidian avec des contrôles de lecture intégrés","main":"main.js","scripts":{"dev":"vite build --watch","build":"vite build","version":"node version-bump.mjs && git add manifest.json versions.json"},"keywords":["obsidian","plugin","youtube"],"author":"Shadow","license":"MIT","dependencies":{"@codemirror/language":"^6.0.0","@codemirror/state":"^6.0.0","@codemirror/view":"^6.0.0","@videojs/http-streaming":"^3.16.1","obsidian":"latest","video.js":"^8.20.0","videojs-youtube":"^3.0.1","youtube-transcript":"^1.0.6","yt-dlp-wrap":"^2.3.12"},"devDependencies":{"vite":"^4.4.9"}}
+{
+   "name": "tubeflowz-obsidian",
+   "version": "1.0.0",
+   "description": "Enhance the YouTube experience in Obsidian with built-in playback controls",
+   "main": "main.js",
+   "scripts": {
+      "dev": "vite build --watch",
+      "build": "vite build",
+      "version": "node version-bump.mjs && git add manifest.json versions.json",
+      "test": "vitest",
+      "test:ui": "vitest --ui",
+      "test:coverage": "vitest run --coverage"
+   },
+   "keywords": [
+      "obsidian",
+      "plugin",
+      "youtube"
+   ],
+   "author": "Diane Winflowz",
+   "license": "UNLICENSED",
+   "dependencies": {
+      "@codemirror/language": "^6.0.0",
+      "@codemirror/state": "^6.0.0",
+      "@codemirror/view": "^6.0.0",
+      "@videojs/http-streaming": "^3.16.1",
+      "obsidian": "latest",
+      "video.js": "^8.20.0",
+      "videojs-youtube": "^3.0.1",
+      "youtube-transcript": "^1.0.6",
+      "yt-dlp-wrap": "^2.3.12"
+   },
+   "devDependencies": {
+      "@testing-library/dom": "^10.4.0",
+      "@types/node": "^22.10.1",
+      "@types/video.js": "^7.3.58",
+      "@vitest/ui": "^2.1.6",
+      "jsdom": "^25.0.1",
+      "vite": "^4.4.9",
+      "vitest": "^2.1.6"
+   }
+}

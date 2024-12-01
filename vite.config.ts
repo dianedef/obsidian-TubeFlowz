@@ -1,10 +1,14 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
    build: {
       lib: {
-         entry: resolve(__dirname, 'src/main.js'),
+         entry: resolve(__dirname, 'src/main.ts'),
          name: 'ObsiTubeFlowz',
          fileName: 'main',
          formats: ['cjs']
@@ -16,14 +20,19 @@ export default defineConfig({
             'obsidian', 
             '@codemirror/view', 
             '@codemirror/state', 
-            '@codemirror/language'
+            '@codemirror/language',
+            'events',
+            'child_process',
+            'fs',
+            'https',
+            'os',
+            'stream'
          ],
          output: {
             entryFileNames: 'main.js',
             format: 'cjs',
             exports: 'default',
             globals: {
-               'video.js': 'videojs',
                'obsidian': 'obsidian',
                '@codemirror/view': 'CodeMirror.view',
                '@codemirror/state': 'CodeMirror.state',
@@ -35,11 +44,13 @@ export default defineConfig({
       emptyOutDir: false
    },
    optimizeDeps: {
-      include: ['video.js', 'videojs-youtube']
+      include: ['video.js', 'videojs-youtube'],
+      exclude: ['yt-dlp-wrap']
    },
    resolve: {
       alias: {
          'video.js': 'video.js/dist/video.js'
-      }
+      },
+      extensions: ['.ts', '.js']
    }
 }); 
