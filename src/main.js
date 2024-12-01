@@ -900,20 +900,17 @@ class VideoPlayer {
       // Récupérer la langue de l'interface d'Obsidian avec fallback sur EN
       this.currentLanguage = this.getObsidianLanguage();
    }
-
+// getObsidianLanguage() : Récupérer la langue de l'interface d'Obsidian avec fallback sur EN
    getObsidianLanguage() {
       // Récupérer la langue depuis l'attribut lang de l'élément HTML
       const htmlLang = document.documentElement.lang;
       // Retourner 'fr' si c'est français, sinon 'en'
       return htmlLang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
    }
-
+// checkVideoJS() : Vérifier si VideoJS est disponible
    async checkVideoJS() {
       try {
-         // Attendre un peu pour s'assurer que VideoJS est bien chargé
          await new Promise(resolve => setTimeout(resolve, 100));
-         
-         // Vérifier si VideoJS est disponible
          const vjsInstance = window.videojs || videojs;
          if (typeof vjsInstance === 'function') {
             this.hasVideoJS = true;
@@ -927,7 +924,7 @@ class VideoPlayer {
          return false;
       }
    }
-
+// addCustomStyles() : Ajouter les styles personnalisés
    addCustomStyles() {
       if (!this.hasVideoJS) {
          console.warn('VideoJS non disponible, utilisation du lecteur de secours');
@@ -1144,36 +1141,36 @@ class VideoPlayer {
    async initializePlayer(videoId, container, timestamp = 0) {
       try {
          console.log("Initialisation du player avec videoId:", videoId);
-         // Vérifier si videojs est disponible
+// Vérifier si videojs est disponible
          if (typeof videojs !== 'function') {
             console.warn("VideoJS non disponible, utilisation du lecteur de secours");
             return this.createFallbackPlayer(videoId, container, timestamp);
          }
 
-         // Conteneur principal
+// Conteneur principal
          const mainContainer = document.createElement('div');
          mainContainer.id = 'youtube-flow-player';
          mainContainer.className = 'youtube-flow-container';
 
-         // Wrapper pour la vidéo et ses contrôles
+// Wrapper pour la vidéo et ses contrôles
          const playerWrapper = document.createElement('div');
          playerWrapper.className = 'player-wrapper';
          mainContainer.appendChild(playerWrapper);
 
-         // Élément vidéo avec autoplay
+// Élément vidéo avec autoplay
          const video = document.createElement('video-js');
          video.className = 'video-js vjs-obsidian-theme';
          video.setAttribute('autoplay', '');
          playerWrapper.appendChild(video);
 
-         // Ajouter d'abord le conteneur au DOM
+// Ajouter d'abord le conteneur au DOM
          container.appendChild(mainContainer);
 
-         // Attendre que le conteneur soit bien dans le DOM
+// Attendre que le conteneur soit bien dans le DOM
          await new Promise(resolve => setTimeout(resolve, 100));
 
          console.log("Création du player VideoJS");
-         // Configuration du player
+// Configuration du player
          this.player = videojs(video, {
             techOrder: ['youtube'],
             sources: [{
@@ -1181,17 +1178,23 @@ class VideoPlayer {
                src: `https://www.youtube.com/watch?v=${videoId}`
             }],
             
-            // Définir l'ordre des composants
+
+// Désactiver les composants non désirés
+            liveTracker: false,
+            liveui: false,
+            
+// Définir l'ordre des composants
             children: [
-               'MediaLoader',
-               'ControlBar'
+               'MediaLoader'
             ],
             
-            // Configuration de la barre de contrôle
+// Configuration de la barre de contrôle
             controlBar: {
                children: [
                   'playToggle',
                   'volumePanel',
+                  'skipBackward',
+                  'skipForward',
                   'currentTimeDisplay',
                   'timeDivider',
                   'durationDisplay',
@@ -1201,7 +1204,7 @@ class VideoPlayer {
                ]
             },
             
-            // Configuration de la langue
+// Configuration de la langue
             language: this.currentLanguage,
             languages: {
                en: {
@@ -1234,7 +1237,7 @@ class VideoPlayer {
                }
             },
             
-            // Configuration YouTube spécifique
+// Configuration YouTube spécifique
             youtube: {
                iv_load_policy: 3,
                modestbranding: 1,
@@ -1250,34 +1253,34 @@ class VideoPlayer {
                origin: window.location.origin,
             },
             
-            // Configuration de la barre de progression
+// Configuration de la barre de progression
             progressControl: {
                seekBar: true
             },
             enableSmoothSeeking: true,
             
-            // Actions utilisateur
+// Actions utilisateur
             userActions: {
                hotkeys: true
             },
             startTime: timestamp,
             autoplay: false,
             
-            // Configuration du plein écran
+// Configuration du plein écran
             fullscreen: {
                options: {
                   navigationUI: 'hide'
                }
             },
             
-            // Appliquer le mode muet depuis les settings
+// Appliquer le mode muet depuis les settings
             muted: this.Settings.isMuted,
             
          });
 
          console.log("Player créé:", this.player);
 
-         // Attendre que le player soit prêt
+// Attendre que le player soit prêt
          await new Promise((resolve) => {
             this.player.ready(async () => {
                console.log("Player prêt");
@@ -1332,7 +1335,7 @@ class VideoPlayer {
             });
          });
 
-         // Mettre à jour le player dans le Store
+// Mettre à jour le player dans le Store
          Store.setVideoPlayer(this);
          console.log("Player mis à jour dans le Store");
 
@@ -2364,55 +2367,33 @@ export default class YouTubeFlowPlugin extends Plugin {
 
          /* VideoJS - Structure de base */
          .video-js {
-            width: 100%;
-            height: 100%;
             display: flex !important;
             flex-direction: column !important;
+            width: 100% !important;
+            height: 100% !important;
          }
 
-         /* Conteneur principal de la vidéo */
+         /* Conteneur principal de l'iframe */
          .video-js > div:first-child {
-            order: 2 !important;
             flex: 1 !important;
             position: relative !important;
             min-height: 0 !important;
          }
 
-         /* Container YouTube spécifique */
-         .vjs-youtube {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-         }
-
          /* L'iframe elle-même */
-         .vjs-youtube iframe {
+         .vjs-tech {
             width: 100% !important;
             height: 100% !important;
-            padding-bottom: 0 !important; /* Supprime le padding qui créait l'espace */
+            position: relative !important;
          }
 
-         /* VideoJS - Barre de contrôle */
-         .video-js .vjs-control-bar {
-            order: 1 !important;
+         /* Barre de contrôle */
+         .vjs-control-bar {
             height: 60px !important;
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 16px;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--background-secondary);
-            z-index: 3;
-            gap: 10px;
-            opacity: 1 !important;
-            visibility: visible;
-            transform: none;
+            background: var(--background-secondary) !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 10px !important;
          }
 
          /* VideoJS - Contrôles */
