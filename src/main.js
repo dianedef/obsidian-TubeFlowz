@@ -83,6 +83,17 @@ class Settings {
       this.settings.showYoutubeRecommendations = value;
       this.save();
    }
+
+   // Ajout du getter/setter pour preferredSpeed
+   get favoriteSpeed() { return this.settings.favoriteSpeed; }
+   set favoriteSpeed(value) {
+      const speed = parseFloat(value);
+      if (isNaN(speed) || speed < 0.25 || speed > 16) {
+         throw new Error("La vitesse doit être comprise entre 0.25 et 16");
+      }
+      this.settings.favoriteSpeed = speed;
+      this.save();
+   }
 }
 
 class Store {
@@ -97,6 +108,9 @@ class Store {
       // Services Obsidian
       this.app = plugin.app;
       this.plugin = plugin;
+      
+      // Instance du VideoPlayer
+      this.VideoPlayer = null;
       
       // Traductions en dur dans le Store pour le fichier unique
       this.translations = {
@@ -157,6 +171,10 @@ class Store {
       instance.PlayerViewAndMode = new PlayerViewAndMode();
       await instance.PlayerViewAndMode.init();
       
+      // Initialiser le VideoPlayer
+      instance.VideoPlayer = new VideoPlayer(instance.Settings);
+      console.log("VideoPlayer initialisé dans le Store");
+      
       return instance;
    }
 
@@ -165,11 +183,19 @@ class Store {
          return {
             Settings: null,
             PlayerViewAndMode: null,
-            Player: null,
+            VideoPlayer: null,
             t: (key) => key
          };
       }
       return Store.instance;
+   }
+
+   // Méthode pour mettre à jour le VideoPlayer
+   static setVideoPlayer(player) {
+      if (Store.instance) {
+         console.log("Mise à jour du VideoPlayer dans le Store:", player);
+         Store.instance.VideoPlayer = player;
+      }
    }
 
    static destroy() {
@@ -188,7 +214,7 @@ class SettingsTab extends PluginSettingTab {
       const {containerEl} = this;
       containerEl.empty();
       
-// Créer le menu de sélection du mode d'affichage par défaut
+      // Créer le menu de sélection du mode d'affichage par défaut
       new Setting(containerEl)
          .setName('Mode d\'affichage par défaut')
          .setDesc('Choisissez comment les vidéos s\'ouvriront par défaut')
@@ -201,18 +227,37 @@ class SettingsTab extends PluginSettingTab {
                this.Settings.settings.currentMode = value;
                await this.Settings.save();
             }));
-// Setting pour le mode de lecture
+
+      // Setting pour le mode de lecture
       new Setting(containerEl)
-      .setName('Mode de lecture')
-      .setDesc('Choisir entre streaming ou téléchargement')
-      .addDropdown(dropdown => dropdown
-         .addOption('stream', 'Streaming')
-         .addOption('download', 'Téléchargement')
-         .setValue(this.Settings.settings.playbackMode || 'stream')
-         .onChange(async (value) => {
-            this.Settings.settings.playbackMode = value;
-            await this.Settings.save();
-         }));
+         .setName('Mode de lecture')
+         .setDesc('Choisir entre streaming ou téléchargement')
+         .addDropdown(dropdown => dropdown
+            .addOption('stream', 'Streaming')
+            .addOption('download', 'Téléchargement')
+            .setValue(this.Settings.settings.playbackMode || 'stream')
+            .onChange(async (value) => {
+               this.Settings.settings.playbackMode = value;
+               await this.Settings.save();
+            }));
+
+      // Setting pour la vitesse favorite
+      new Setting(containerEl)
+         .setName('Vitesse de lecture favorite')
+         .setDesc('Définir la vitesse qui sera utilisée avec le raccourci Ctrl+4')
+         .addDropdown(dropdown => {
+            // Ajouter les options de vitesse courantes
+            const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 8, 10, 16];
+            speeds.forEach(speed => {
+               dropdown.addOption(speed.toString(), `${speed}x`);
+            });
+            return dropdown
+               .setValue((this.Settings.settings.favoriteSpeed || 2).toString())
+               .onChange(async (value) => {
+                  this.Settings.settings.favoriteSpeed = parseFloat(value);
+                  await this.Settings.save();
+               });
+         });
 
       new Setting(containerEl)
          .setName('Recommandations YouTube')
@@ -881,6 +926,7 @@ class PlayerViewAndMode {
 // ----- VideoPlayer.js -----
 class VideoPlayer {
    constructor(Settings) {
+      console.log("Construction de VideoPlayer");
       this.Settings = Settings;
       this.player = null;
       this.playbackRateButton = null;
@@ -1115,6 +1161,7 @@ class VideoPlayer {
 
    async initializePlayer(videoId, container, timestamp = 0) {
       try {
+         console.log("Initialisation du player avec videoId:", videoId);
          // Vérifier si videojs est disponible
          if (typeof videojs !== 'function') {
             console.warn("VideoJS non disponible, utilisation du lecteur de secours");
@@ -1151,6 +1198,13 @@ class VideoPlayer {
          video.setAttribute('autoplay', '');
          playerWrapper.appendChild(video);
 
+         // Ajouter d'abord le conteneur au DOM
+         container.appendChild(mainContainer);
+
+         // Attendre que le conteneur soit bien dans le DOM
+         await new Promise(resolve => setTimeout(resolve, 100));
+
+         console.log("Création du player VideoJS");
          // Configuration du player
          this.player = videojs(video, {
             // Configuration technique
@@ -1165,10 +1219,10 @@ class VideoPlayer {
             fluid: false,
             preload: 'auto',
             playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16],
-            autoplay: true,  // Activer l'autoplay
+            autoplay: true,
             
             // Configuration de la langue
-            language: 'fr',  // Utiliser le français
+            language: 'fr',
             languages: {
                fr: {
                   "Play": "Lecture",
@@ -1183,26 +1237,21 @@ class VideoPlayer {
                }
             },
             
-            // Désactiver les éléments inutiles
-            errorDisplay: false,
-            textTrackDisplay: false,
-            textTrackSettings: false,
-            
             // Configuration YouTube spécifique
             youtube: {
-               iv_load_policy: 3,            // Désactive les annotations
-               modestbranding: 1,            // Réduit le branding YouTube
-               cc_load_policy: 0,            // Désactive les sous-titres par défaut
+               iv_load_policy: 3,
+               modestbranding: 1,
+               cc_load_policy: 0,
                rel: this.Settings.showYoutubeRecommendations ? 1 : 0,
-               controls: 0,                  // Désactive les contrôles natifs
+               controls: 0,
                ytControls: 0,
                preload: 'auto',
-               showinfo: 0,                  // Masque les infos de la vidéo
-               fs: 0,                        // Désactive le bouton plein écran natif
-               playsinline: 1,               // Force la lecture dans le player
-               disablekb: 1,                 // Désactive les raccourcis clavier YouTube
-               enablejsapi: 1,               // Active l'API JavaScript
-               origin: window.location.origin, // Définit l'origine pour l'API
+               showinfo: 0,
+               fs: 0,
+               playsinline: 1,
+               disablekb: 1,
+               enablejsapi: 1,
+               origin: window.location.origin,
                endscreen: this.Settings.showYoutubeRecommendations ? 1 : 0,
                norel: this.Settings.showYoutubeRecommendations ? 0 : 1,
                showRelatedVideos: this.Settings.showYoutubeRecommendations
@@ -1216,7 +1265,7 @@ class VideoPlayer {
                   'currentTimeDisplay',
                   'timeDivider',
                   'durationDisplay',
-                  'progressControl',  // Simplifié
+                  'progressControl',
                   'pictureInPictureToggle',
                   'fullscreenToggle'
                ]
@@ -1247,92 +1296,83 @@ class VideoPlayer {
             
          });
 
-         this.player.ready(async () => {
-            console.log(`Setting timestamp to ${timestamp}s`);
-            if (timestamp > 0) {
-               this.player.currentTime(timestamp);
-            }
-            
-            // Écouter les changements de mode muet
-            this.player.on('volumechange', () => {
-               this.Settings.isMuted = this.player.muted();
-            });
-            
-            // Tenter de lancer la lecture
-            try {
-               await this.player.play();
-            } catch (error) {
-               console.log("Autoplay error:", error);
-               if (!this.Settings.isMuted) {
-                  // En cas d'erreur, essayer en mode muet
-                  this.player.muted(true);
-                  try {
-                     await this.player.play();
-                  } catch (error) {
-                     console.log("Autoplay error even with mute:", error);
-                  }
+         console.log("Player créé:", this.player);
+
+         // Attendre que le player soit prêt
+         await new Promise((resolve) => {
+            this.player.ready(async () => {
+               console.log("Player prêt");
+               
+               // Ajouter notre bouton de vitesse personnalisé
+               this.playbackRateButton = this.player.controlBar.addChild('button', {
+                  className: 'vjs-playback-rate-button'
+               });
+
+               // Configurer le bouton
+               const buttonEl = this.playbackRateButton.el();
+               buttonEl.innerHTML = `🔄 ${this.player.playbackRate()}x`;
+               buttonEl.style.cssText = `
+                  display: flex !important;
+                  align-items: center !important;
+                  justify-content: center !important;
+                  min-width: 60px !important;
+                  padding: 0 8px !important;
+                  font-size: 13px !important;
+                  cursor: pointer !important;
+                  background: var(--background-secondary) !important;
+                  border: none !important;
+                  border-radius: 3px !important;
+                  margin: 0 4px !important;
+                  height: 32px !important;
+                  transition: background 0.2s ease !important;
+               `;
+
+               // Gérer le hover pour afficher le menu
+               buttonEl.addEventListener('mouseenter', (e) => {
+                  const menu = new Menu();
+                  const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
+                  const currentRate = this.player.playbackRate();
+                  
+                  rates.forEach(rate => {
+                     menu.addItem(item => 
+                        item
+                           .setTitle(`${rate}x`)
+                           .setChecked(currentRate === rate)
+                           .onClick(() => {
+                              this.player.playbackRate(rate);
+                              this.updatePlaybackRateButton(rate);
+                           })
+                     );
+                  });
+
+                  // Calculer la position exacte du menu
+                  const rect = buttonEl.getBoundingClientRect();
+                  const menuWidth = 100; // Largeur approximative du menu
+                  menu.showAtPosition({
+                     x: rect.left + (rect.width - menuWidth) / 2,
+                     y: rect.bottom
+                  });
+               });
+
+               // Écouter les changements de vitesse
+               this.player.on('ratechange', () => {
+                  const newRate = this.player.playbackRate();
+                  this.updatePlaybackRateButton(newRate);
+               });
+
+               if (timestamp > 0) {
+                  console.log(`Setting timestamp to ${timestamp}s`);
+                  this.player.currentTime(timestamp);
                }
-            }
-         });
 
-   // Ajouter notre bouton de vitesse personnalisé
-         this.playbackRateButton = this.player.controlBar.addChild('button', {
-            className: 'vjs-playback-rate-button'
-         });
-
-   // Configurer le bouton
-         const buttonEl = this.playbackRateButton.el();
-         buttonEl.innerHTML = `🔄 ${this.player.playbackRate()}x`;
-         buttonEl.style.cssText = `
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            min-width: 60px !important;
-            padding: 0 8px !important;
-            font-size: 13px !important;
-            cursor: pointer !important;
-            background: var(--background-secondary) !important;
-            border: none !important;
-            border-radius: 3px !important;
-            margin: 0 4px !important;
-            height: 32px !important;
-            transition: background 0.2s ease !important;
-         `;
-
-   // Gérer le hover pour afficher le menu
-         buttonEl.addEventListener('mouseenter', (e) => {
-            const menu = new Menu();
-            const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
-            const currentRate = this.player.playbackRate();
-            
-            rates.forEach(rate => {
-               menu.addItem(item => 
-                  item
-                     .setTitle(`${rate}x`)
-                     .setChecked(currentRate === rate)
-                     .onClick(() => {
-                        this.player.playbackRate(rate);
-                        this.updatePlaybackRateButton(rate);
-                     })
-               );
-            });
-
-// Calculer la position exacte du menu
-            const rect = buttonEl.getBoundingClientRect();
-            const menuWidth = 100; // Largeur approximative du menu
-            menu.showAtPosition({
-               x: rect.left + (rect.width - menuWidth) / 2, // Centrer le menu
-               y: rect.bottom
+               resolve();
             });
          });
 
-// Écouter les changements de vitesse
-         this.player.on('ratechange', () => {
-            const newRate = this.player.playbackRate();
-            this.updatePlaybackRateButton(newRate);
-         });
+         // Mettre à jour le player dans le Store
+         Store.setVideoPlayer(this);
+         console.log("Player mis à jour dans le Store");
 
-         container.appendChild(mainContainer);
          return this.player;
       } catch (error) {
          console.error("Erreur lors de l'initialisation du player vidéo:", error);
@@ -1507,261 +1547,136 @@ class DecorationForUrl extends WidgetType {
       return sparkle;
    }
 }
-// ------ redimensionnement du Player ------
-class PlayerResizeHandler {
-   constructor() {
-      const { Settings } = Store.get();
-      this.Settings = Settings;
-   }
 
-   createResizer(options) {
-      const {
-         container,
-         targetElement,
-         onResize,
-         mode,
-         minHeight = 20,
-         maxHeight = 90
-      } = options;
-
-      const handle = document.createElement('div');
-      handle.className = 'resize-handle';
-      targetElement.appendChild(handle);
-
-      let startY = 0;
-      let startHeight = 0;
-      let rafId = null;
-      let lastSaveTime = Date.now();
-
-      const updateSize = (newHeight) => {
-         if (rafId) cancelAnimationFrame(rafId);
-         
-         rafId = requestAnimationFrame(() => {
-            const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
-            
-            if (mode === 'overlay') {
-               // Pour l'overlay, mise à jour directe
-               targetElement.style.height = `${clampedHeight}%`;
-               const editorEl = targetElement.closest('.workspace-leaf').querySelector('.cm-editor');
-               if (editorEl) {
-                  editorEl.style.height = `${100 - clampedHeight}%`;
-                  editorEl.style.top = `${clampedHeight}%`;
-               }
-            } else {
-               // Pour tab/sidebar, mise à jour directe
-               targetElement.style.height = `${clampedHeight}%`;
-               
-               // Mettre à jour l'iframe pour qu'elle suive immédiatement
-               const iframe = targetElement.querySelector('iframe');
-               if (iframe) {
-                  iframe.style.height = '100%';
-               }
-            }
-            
-            // Appeler le callback onResize
-            onResize(clampedHeight);
-            
-            // Sauvegarder la hauteur globalement
-            const now = Date.now();
-            if (now - lastSaveTime >= 300) {
-               this.Settings.settings.viewHeight = clampedHeight;
-               this.Settings.settings.overlayHeight = clampedHeight;
-               this.Settings.save();
-               lastSaveTime = now;
-            }
-            
-            rafId = null;
-         });
-      };
-
-      handle.addEventListener('mousedown', (e) => {
-         startY = e.clientY;
-         startHeight = parseFloat(targetElement.style.height);
-         document.body.style.cursor = 'ns-resize';
-         
-         const overlay = document.createElement('div');
-         overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 9999;
-            cursor: ns-resize;
-         `;
-         document.body.appendChild(overlay);
-         
-         const handleMouseMove = (e) => {
-            const deltaY = e.clientY - startY;
-            const containerHeight = container.getBoundingClientRect().height;
-            const newHeight = startHeight + (deltaY / containerHeight * 100);
-            updateSize(newHeight);
-         };
-         
-         const handleMouseUp = () => {
-            overlay.remove();
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-            document.body.style.cursor = '';
-            
-            if (rafId) {
-               cancelAnimationFrame(rafId);
-            }
-         };
-         
-         document.addEventListener('mousemove', handleMouseMove);
-         document.addEventListener('mouseup', handleMouseUp);
-         
-         e.preventDefault();
-         e.stopPropagation();
-      });
-
-      return handle;
-   }
-}
 class Hotkeys {
    constructor(plugin) {
+      console.log("Initialisation des Hotkeys");
       this.plugin = plugin;
       this.app = plugin.app;
-      const { VideoPlayer } = Store.get();
-      this.VideoPlayer = VideoPlayer;
    }
 
    registerHotkeys() {
-      // Raccourci pour ouvrir la vidéo en cours dans une modale
-      this.plugin.addCommand({
-         id: 'open-youtube-modal',
-         name: 'Ouvrir la vidéo dans une modale',
-         hotkeys: [{ modifiers: ['Alt'], key: 'y' }],
-         callback: () => {
-            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (activeView) {
-               const cursor = activeView.editor.getCursor();
-               const line = activeView.editor.getLine(cursor.line);
-               const urlMatch = line.match(/(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[^&\s]+)/);
-               if (urlMatch) {
-                  const videoId = this.VideoPlayer.getVideoId(urlMatch[1]);
-                  if (videoId) {
-                     new YouTubeModal(this.app, videoId).open();
+      console.log("Début de l'enregistrement des raccourcis clavier");
+
+      try {
+         // Contrôles de lecture
+         this.plugin.addCommand({
+               id: 'youtube-play-pause',
+               name: 'YouTube - Lecture/Pause',
+               hotkeys: [{ modifiers: ['Shift'], key: 'Space' }],
+               callback: () => {
+                  console.log("Raccourci play/pause activé");
+                  const { VideoPlayer } = Store.get();
+                  console.log("VideoPlayer récupéré du Store:", VideoPlayer);
+                  
+                  if (!VideoPlayer?.player) {
+                     console.log("Pas de player disponible");
+                     return;
+                  }
+                  
+                  if (VideoPlayer.player.paused()) {
+                     console.log("Lancement de la lecture");
+                     VideoPlayer.player.play();
+                  } else {
+                     console.log("Mise en pause");
+                     VideoPlayer.player.pause();
                   }
                }
-            }
-         }
-      });
-
-      // Contrôles de lecture
-      this.plugin.addCommand({
-         id: 'play-pause',
-         name: 'Lecture/Pause',
-         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'Space' }],
-         callback: () => {
-            if (!this.VideoPlayer.player) return;
-            
-            if (this.VideoPlayer.player.paused()) {
-               this.VideoPlayer.player.play();
-            } else {
-               this.VideoPlayer.player.pause();
-            }
-         }
-      });
-
-      this.plugin.addCommand({
-         id: 'write-timestamp',
-         name: 'Écrire le timestamp',
-         hotkeys: [{ modifiers: ['Alt'], key: 't' }],
-         callback: () => {
-            if (!this.VideoPlayer.player) return;
-            
-            const time = Math.floor(this.VideoPlayer.player.currentTime());
-            const timestamp = this.VideoPlayer.formatTimestamp(time);
-            
-            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (activeView) {
-               const cursor = activeView.editor.getCursor();
-               activeView.editor.replaceRange(`[${timestamp}]`, cursor);
-            }
-         }
-      });
-
-      // Navigation temporelle
-      this.plugin.addCommand({
-         id: 'seek-forward',
-         name: 'Avancer de 10s',
-         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowRight' }],
-         callback: () => {
-            if (!this.VideoPlayer.player) return;
-            
-            const currentTime = this.VideoPlayer.player.currentTime();
-            this.VideoPlayer.player.currentTime(currentTime + 10);
-         }
-      });
-
-      this.plugin.addCommand({
-         id: 'seek-backward',
-         name: 'Reculer de 10s',
-         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowLeft' }],
-         callback: () => {
-            if (!this.VideoPlayer.player) return;
-            
-            const currentTime = this.VideoPlayer.player.currentTime();
-            this.VideoPlayer.player.currentTime(Math.max(0, currentTime - 10));
-         }
-      });
-
-      // Contrôles de vitesse
-      this.plugin.addCommand({
-         id: 'speed-increase',
-         name: 'Augmenter la vitesse',
-         hotkeys: [{ modifiers: ['Mod'], key: 'Plus' }],
-         callback: () => {
-            if (!this.VideoPlayer.player) return;
-            
-            const currentRate = this.VideoPlayer.player.playbackRate();
-            const newRate = Math.min(16, currentRate + 0.25);
-            this.VideoPlayer.player.playbackRate(newRate);
-            this.VideoPlayer.updatePlaybackRateButton(newRate);
-         }
-      });
-
-      this.plugin.addCommand({
-         id: 'speed-decrease',
-         name: 'Diminuer la vitesse',
-         hotkeys: [{ modifiers: ['Mod'], key: 'Minus' }],
-         callback: () => {
-            if (!this.VideoPlayer.player) return;
-            
-            const currentRate = this.VideoPlayer.player.playbackRate();
-            const newRate = Math.max(0.25, currentRate - 0.25);
-            this.VideoPlayer.player.playbackRate(newRate);
-            this.VideoPlayer.updatePlaybackRateButton(newRate);
-         }
-      });
-
-      // Raccourcis préréglés
-      const speedPresets = [1, 2, 3, 4, 5, 8, 10, 16];
-      speedPresets.forEach((speed, index) => {
-         this.youtubeFlowPlugin.addCommand({
-            id: `speed-${speed}x`,
-            name: `Vitesse ${speed}x`,
-            hotkeys: [{ modifiers: ['Mod', 'Alt'], key }], // Ajout de Alt pour éviter les conflits
-            callback: () => this.Player.setPlaybackSpeed(speed)
          });
-      });
 
-      // Navigation temporelle
-      this.youtubeFlowPlugin.addCommand({
-         id: 'seek-forward',
-         name: 'Avancer de 10s',
-         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowRight' }], // Utilisation de Mod+Shift
-         callback: () => this.Player.seekForward()
-      });
+         // Contrôles de vitesse
+         this.plugin.addCommand({
+               id: 'youtube-speed-increase',
+               name: 'YouTube - Augmenter la vitesse',
+               hotkeys: [{ modifiers: ['Mod'], key: '3' }],
+               callback: () => {
+                  console.log("Raccourci augmentation vitesse activé");
+                  const { VideoPlayer } = Store.get();
+                  console.log("VideoPlayer récupéré du Store:", VideoPlayer);
+                  
+                  if (!VideoPlayer?.player) {
+                     console.log("Pas de player disponible");
+                     return;
+                  }
+                  
+                  const currentRate = VideoPlayer.player.playbackRate();
+                  console.log("Vitesse actuelle:", currentRate);
+                  const newRate = Math.min(16, currentRate + 0.25);
+                  console.log("Nouvelle vitesse:", newRate);
+                  VideoPlayer.player.playbackRate(newRate);
+                  VideoPlayer.updatePlaybackRateButton(newRate);
+               }
+         });
 
-      this.youtubeFlowPlugin.addCommand({
-         id: 'seek-backward',
-         name: 'Reculer de 10s',
-         hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'ArrowLeft' }], // Utilisation de Mod+Shift
-         callback: () => this.Player.seekBackward()
-      });
+         this.plugin.addCommand({
+               id: 'youtube-speed-decrease',
+               name: 'YouTube - Diminuer la vitesse',
+               hotkeys: [{ modifiers: ['Mod'], key: '1' }],
+               callback: () => {
+                  console.log("Raccourci diminution vitesse activé");
+                  const { VideoPlayer } = Store.get();
+                  console.log("VideoPlayer récupéré du Store:", VideoPlayer);
+                  
+                  if (!VideoPlayer?.player) {
+                     console.log("Pas de player disponible");
+                     return;
+                  }
+                  
+                  const currentRate = VideoPlayer.player.playbackRate();
+                  console.log("Vitesse actuelle:", currentRate);
+                  const newRate = Math.max(0.25, currentRate - 0.25);
+                  console.log("Nouvelle vitesse:", newRate);
+                  VideoPlayer.player.playbackRate(newRate);
+                  VideoPlayer.updatePlaybackRateButton(newRate);
+               }
+         });
+
+         // Vitesse normale (x1)
+         this.plugin.addCommand({
+               id: 'youtube-speed-normal',
+               name: 'YouTube - Vitesse normale (x1)',
+               hotkeys: [{ modifiers: ['Mod'], key: '2' }],
+               callback: () => {
+                  console.log("Raccourci vitesse normale activé");
+                  const { VideoPlayer } = Store.get();
+                  console.log("VideoPlayer récupéré du Store:", VideoPlayer);
+                  
+                  if (!VideoPlayer?.player) {
+                     console.log("Pas de player disponible");
+                     return;
+                  }
+                  
+                  VideoPlayer.player.playbackRate(1);
+                  VideoPlayer.updatePlaybackRateButton(1);
+               }
+         });
+
+         // Vitesse favorite
+         this.plugin.addCommand({
+               id: 'youtube-speed-favorite',
+               name: 'YouTube - Vitesse favorite',
+               hotkeys: [{ modifiers: ['Mod'], key: '4' }],
+               callback: () => {
+                  console.log("Raccourci vitesse favorite activé");
+                  const { VideoPlayer, Settings } = Store.get();
+                  console.log("VideoPlayer récupéré du Store:", VideoPlayer);
+                  
+                  if (!VideoPlayer?.player) {
+                     console.log("Pas de player disponible");
+                     return;
+                  }
+                  
+                  const favoriteSpeed = Settings.settings.favoriteSpeed || 2;
+                  console.log("Vitesse favorite:", favoriteSpeed);
+                  VideoPlayer.player.playbackRate(favoriteSpeed);
+                  VideoPlayer.updatePlaybackRateButton(favoriteSpeed);
+               }
+         });
+
+         console.log("Enregistrement des raccourcis clavier terminé avec succès");
+      } catch (error) {
+         console.error("Erreur lors de l'enregistrement des raccourcis:", error);
+      }
    }
 }
 
@@ -1864,7 +1779,6 @@ class MediaAndSource {
    async setupLocalVideo(path) {
          const { app } = Store.get();
          const url = await app.vault.adapter.getResourcePath(path);
-         await this.shakaPlayer.load(url);
    }
 
    async loadVideoDownload(videoId, yt) {
@@ -2218,14 +2132,22 @@ class Playlists {
 
 export default class YouTubeFlowPlugin extends Plugin {
    async onload() {
+      console.log("Chargement du plugin YouTubeFlow");
+      
+      // Initialiser le Store en premier
       await Store.init(this);
       const { Settings, PlayerViewAndMode } = Store.get();
       this.PlayerViewAndMode = PlayerViewAndMode;
 
-      // Initialiser les hotkeys en premier en passant l'instance du plugin
+      // Initialiser les hotkeys en passant l'instance du plugin
+      console.log("Initialisation des hotkeys...");
       this.hotkeys = new Hotkeys(this);
+      
+      // Enregistrer les commandes avec Obsidian
+      console.log("Enregistrement des raccourcis clavier...");
       this.hotkeys.registerHotkeys();
-
+      
+      // Attendre que le layout soit prêt
       this.app.workspace.onLayoutReady(() => {
          console.log("Layout prêt, initialisation des écouteurs...");
          
