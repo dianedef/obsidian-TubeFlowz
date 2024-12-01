@@ -4,7 +4,6 @@ import videojs from 'video.js';
 import 'videojs-youtube';
 
 // ---------- STORE ET SETTINGS ----------
-
 class Settings {
    constructor(plugin) {
       this.youtubeFlowPlugin = plugin;
@@ -112,36 +111,28 @@ class Store {
       // Instance du VideoPlayer
       this.VideoPlayer = null;
       
-      // Traductions en dur dans le Store pour le fichier unique
+      // Traductions
       this.translations = {
          fr: {
             player: {
                title: 'Lecteur YouTube',
                close: 'Fermer'
             }
-            // ... autres traductions
          },
          en: {
             player: {
                title: 'YouTube Player',
                close: 'Close'
             }
-            // ... autres traductions
          }
       };
       
-      // Forcer la langue française pour le test
-      const locale = 'fr';
-      console.log("Langue forcée:", locale);
+      // Détecter la langue d'Obsidian
+      const locale = document.documentElement.lang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+      console.log("Langue détectée:", locale);
       
-      // Vérifier si la langue est supportée
-      if (this.translations[locale]) {
-         console.log("Langue supportée, utilisation de:", locale);
-         this.i18n = this.translations[locale];
-      } else {
-         console.log("Langue non supportée, fallback sur l'anglais");
-         this.i18n = this.translations.en;
-      }
+      // Utiliser la langue détectée
+      this.i18n = this.translations[locale] || this.translations.en;
       
       // Définir la méthode de traduction
       this.t = (key) => {
@@ -326,16 +317,6 @@ class PlayerContainer extends ItemView {
          container.empty();
          container.style.background = 'var(--background-primary)';
          const videoId = this.leaf.getViewState().state.videoId;
-
-         // Configuration du conteneur principal
-         container.style.cssText = `
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            background: var(--background-primary);
-         `;
-
-         // Créer le conteneur pour le player et ses contrôles
          const playerSection = document.createElement('div');
          playerSection.style.cssText = `
             width: 100%;
@@ -375,11 +356,7 @@ class PlayerContainer extends ItemView {
          // Créer la section pour la note markdown
          const markdownSection = document.createElement('div');
          markdownSection.className = 'markdown-section';
-         markdownSection.style.cssText = `
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-         `;
+
          container.appendChild(markdownSection);
 
          // Gérer le resize
@@ -875,25 +852,10 @@ class PlayerViewAndMode {
          }
       });
 
-      const controlsContainer = overlayContainer.createDiv('youtube-view-controls');
-      controlsContainer.style.cssText = `
-         position: absolute;
-         top: 10px;
-         right: 10px;
-         z-index: 101;
-         display: flex;
-         gap: 5px;
-      `;
-
       controlsContainer.appendChild(closeButton);
 
       const iframe = document.createElement('iframe');
       iframe.src = `https://www.youtube.com/embed/${videoId}`;
-      iframe.style.cssText = `
-         width: 100%;
-         height: 100%;
-         border: none;
-      `;
       
       overlayContainer.appendChild(iframe);
       
@@ -902,9 +864,9 @@ class PlayerViewAndMode {
          await PlayerViewAndMode.closePreviousVideos();
       });
 
-      this.settings.settings.lastVideoId = videoId;
-      this.settings.settings.isVideoOpen = true;
-      this.settings.settings.currentMode = 'overlay';
+      this.Settings.settings.lastVideoId = videoId;
+      this.Settings.settings.isVideoOpen = true;
+      this.Settings.settings.currentMode = 'overlay';
 
       this.registerOverlayCleanup(activeLeaf, overlayContainer, editorEl);
    }
@@ -915,9 +877,9 @@ class PlayerViewAndMode {
             editorEl.style.height = '100%';
             editorEl.style.top = '0';
          }
-         this.settings.settings.isVideoOpen = false;
-         this.settings.settings.overlayLeafId = null;  // Nettoyer l'ID
-         await this.settings.save();
+         this.Settings.settings.isVideoOpen = false;
+         this.Settings.settings.overlayLeafId = null;  // Nettoyer l'ID
+         await this.Settings.save();
       };
 
       leaf.on('unload', cleanup);
@@ -934,6 +896,16 @@ class VideoPlayer {
       
       // On n'initialise pas VideoJS dans le constructeur
       this.hasVideoJS = false;
+      
+      // Récupérer la langue de l'interface d'Obsidian avec fallback sur EN
+      this.currentLanguage = this.getObsidianLanguage();
+   }
+
+   getObsidianLanguage() {
+      // Récupérer la langue depuis l'attribut lang de l'élément HTML
+      const htmlLang = document.documentElement.lang;
+      // Retourner 'fr' si c'est français, sinon 'en'
+      return htmlLang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
    }
 
    async checkVideoJS() {
@@ -971,17 +943,27 @@ class VideoPlayer {
             height: 100% !important;
          }
 
-         .vjs-control-bar {
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            width: 100% !important;
-            padding: 0 10px !important;
-            background: var(--background-secondary) !important;
+         /* Conteneur principal de l'iframe */
+         .video-js > div:first-child {
+            flex: 1 !important;
             position: relative !important;
+            min-height: 0 !important;
+         }
+
+         /* L'iframe elle-même */
+         .vjs-tech {
+            width: 100% !important;
+            height: 100% !important;
+            position: relative !important;
+         }
+
+         /* Barre de contrôle */
+         .vjs-control-bar {
             height: 60px !important;
-            flex-shrink: 0 !important;
+            background: var(--background-secondary) !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 10px !important;
          }
 
          /* Contrôles individuels */
@@ -1172,25 +1154,10 @@ class VideoPlayer {
          const mainContainer = document.createElement('div');
          mainContainer.id = 'youtube-flow-player';
          mainContainer.className = 'youtube-flow-container';
-         mainContainer.style.cssText = `
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-         `;
 
          // Wrapper pour la vidéo et ses contrôles
          const playerWrapper = document.createElement('div');
          playerWrapper.className = 'player-wrapper';
-         playerWrapper.style.cssText = `
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow: hidden;
-            margin-bottom: 100px; // Ajouter de l'espace pour les recommandations
-         `;
          mainContainer.appendChild(playerWrapper);
 
          // Élément vidéo avec autoplay
@@ -1208,31 +1175,19 @@ class VideoPlayer {
          console.log("Création du player VideoJS");
          // Configuration du player
          this.player = videojs(video, {
-            // Configuration technique
             techOrder: ['youtube'],
             sources: [{
                type: 'video/youtube',
                src: `https://www.youtube.com/watch?v=${videoId}`
             }],
             
-            // Désactiver tous les composants non désirés
-            textTrackDisplay: false,
-            textTrackSettings: false,
-            poster: false,
-            bigPlayButton: false,
-            loadingSpinner: false,
-            modalDialog: false,        // Désactive "This is a modal window"
-            errorDisplay: false,       // Désactive les messages d'erreur
-            posterImage: false,        // Désactive explicitement le composant PosterImage
+            // Définir l'ordre des composants
+            children: [
+               'MediaLoader',
+               'ControlBar'
+            ],
             
-            // Options générales du player
-            controls: true,
-            fluid: false,
-            preload: 'auto',
-            playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16],
-            autoplay: true,
-            
-            // Barre de contrôle
+            // Configuration de la barre de contrôle
             controlBar: {
                children: [
                   'playToggle',
@@ -1247,8 +1202,22 @@ class VideoPlayer {
             },
             
             // Configuration de la langue
-            language: 'fr',
+            language: this.currentLanguage,
             languages: {
+               en: {
+                  "Play": "Play",
+                  "Pause": "Pause",
+                  "Mute": "Mute",
+                  "Unmute": "Unmute",
+                  "Current Time": "Current Time",
+                  "Duration": "Duration",
+                  "Remaining Time": "Remaining Time",
+                  "Fullscreen": "Fullscreen",
+                  "Non-Fullscreen": "Non-Fullscreen",
+                  "Picture-in-Picture": "Picture-in-Picture",
+                  "Exit Picture-in-Picture": "Exit Picture-in-Picture",
+                  "Close": "Close"
+               },
                fr: {
                   "Play": "Lecture",
                   "Pause": "Pause",
@@ -1257,8 +1226,11 @@ class VideoPlayer {
                   "Current Time": "Temps actuel",
                   "Duration": "Durée",
                   "Remaining Time": "Temps restant",
+                  "Fullscreen": "Plein écran",
+                  "Non-Fullscreen": "Quitter le plein écran",
                   "Picture-in-Picture": "Image dans l'image",
-                  "Exit Picture-in-Picture": "Quitter l'image dans l'image"
+                  "Exit Picture-in-Picture": "Quitter l'image dans l'image",
+                  "Close": "Fermer"
                }
             },
             
@@ -1266,7 +1238,7 @@ class VideoPlayer {
             youtube: {
                iv_load_policy: 3,
                modestbranding: 1,
-               rel: this.Settings.showYoutubeRecommendations ? 1 : 0,
+               rel: this.Settings.settings.showYoutubeRecommendations ? 1 : 0,
                controls: 0,
                ytControls: 0,
                preload: 'auto',
@@ -1276,11 +1248,6 @@ class VideoPlayer {
                disablekb: 1,
                enablejsapi: 1,
                origin: window.location.origin,
-               endscreen: this.Settings.showYoutubeRecommendations ? 1 : 0,
-               norel: this.Settings.showYoutubeRecommendations ? 0 : 1,
-               showRelatedVideos: this.Settings.showYoutubeRecommendations,
-               imageQuality: false,
-               thumbnail: false  
             },
             
             // Configuration de la barre de progression
@@ -1322,22 +1289,6 @@ class VideoPlayer {
 
                // Configurer le bouton
                const buttonEl = this.playbackRateButton.el();
-               buttonEl.innerHTML = `🔄 ${this.player.playbackRate()}x`;
-               buttonEl.style.cssText = `
-                  display: flex !important;
-                  align-items: center !important;
-                  justify-content: center !important;
-                  min-width: 60px !important;
-                  padding: 0 8px !important;
-                  font-size: 13px !important;
-                  cursor: pointer !important;
-                  background: var(--background-secondary) !important;
-                  border: none !important;
-                  border-radius: 3px !important;
-                  margin: 0 4px !important;
-                  height: 32px !important;
-                  transition: background 0.2s ease !important;
-               `;
 
                // Gérer le hover pour afficher le menu
                buttonEl.addEventListener('mouseenter', (e) => {
@@ -1404,36 +1355,13 @@ class VideoPlayer {
    createFallbackPlayer(videoId, container, timestamp = 0) {
       console.log("Utilisation du lecteur de secours pour", videoId);
       container.innerHTML = '';
-      
-      // Créer le conteneur du lecteur
       const playerContainer = document.createElement('div');
-      playerContainer.style.cssText = `
-         width: 100%;
-         height: 100%;
-         display: flex;
-         flex-direction: column;
-         background: var(--background-primary);
-      `;
-      
-      // Créer l'iframe YouTube
       const iframe = document.createElement('iframe');
       iframe.src = `https://www.youtube.com/embed/${videoId}${timestamp ? `?start=${timestamp}` : ''}`;
-      iframe.style.cssText = `
-         width: 100%;
-         height: 100%;
-         border: none;
-         flex: 1;
-      `;
-      
       playerContainer.appendChild(iframe);
       container.appendChild(playerContainer);
-      
       return playerContainer;
    }
-
-   async playerControl() {
-   }
-
    formatTimestamp(seconds) {
       const hours = Math.floor(seconds / 3600);
       const minutes = Math.floor((seconds % 3600) / 60);
@@ -1448,7 +1376,6 @@ class VideoPlayer {
    // Méthodes de gestion du plein écran
    requestFullscreen() {
       if (!this.player) return;
-      
       try {
          this.player.requestFullscreen().catch(error => {
             console.error("Erreur lors du passage en plein écran:", error);
@@ -1470,7 +1397,6 @@ class VideoPlayer {
          return this.createFallbackPlayer(videoId, container, timestamp);
       }
    }
-   // ... rest of the code ...
 }
 // ------ décoration des urls ------
 function createDecorations(view) {
@@ -2446,11 +2372,10 @@ export default class YouTubeFlowPlugin extends Plugin {
 
          /* Conteneur principal de la vidéo */
          .video-js > div:first-child {
+            order: 2 !important;
+            flex: 1 !important;
             position: relative !important;
-            width: 100% !important;
-            flex: 1 !important;  /* Remplace height: calc(100% - 60px) */
-            display: flex !important;
-            flex-direction: column !important;
+            min-height: 0 !important;
          }
 
          /* Container YouTube spécifique */
@@ -2471,7 +2396,8 @@ export default class YouTubeFlowPlugin extends Plugin {
 
          /* VideoJS - Barre de contrôle */
          .video-js .vjs-control-bar {
-            flex: 0 0 60px !important; /* Force une hauteur fixe */
+            order: 1 !important;
+            height: 60px !important;
             display: flex;
             flex-direction: row;
             align-items: center;
@@ -2481,7 +2407,6 @@ export default class YouTubeFlowPlugin extends Plugin {
             bottom: 0;
             left: 0;
             right: 0;
-            height: 60px;
             background: var(--background-secondary);
             z-index: 3;
             gap: 10px;
