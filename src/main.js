@@ -1104,7 +1104,7 @@ class VideoPlayer {
          .video-js > div:first-child {
             position: relative !important;
             width: 100% !important;
-            height: calc(100% - 40px) !important;
+            flex: 1 !important;  /* Remplace height: calc(100% - 60px) */
             display: flex !important;
             flex-direction: column !important;
          }
@@ -1215,12 +1215,36 @@ class VideoPlayer {
                src: `https://www.youtube.com/watch?v=${videoId}`
             }],
             
+            // Désactiver tous les composants non désirés
+            textTrackDisplay: false,
+            textTrackSettings: false,
+            poster: false,
+            bigPlayButton: false,
+            loadingSpinner: false,
+            modalDialog: false,        // Désactive "This is a modal window"
+            errorDisplay: false,       // Désactive les messages d'erreur
+            posterImage: false,        // Désactive explicitement le composant PosterImage
+            
             // Options générales du player
             controls: true,
             fluid: false,
             preload: 'auto',
             playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16],
             autoplay: true,
+            
+            // Barre de contrôle
+            controlBar: {
+               children: [
+                  'playToggle',
+                  'volumePanel',
+                  'currentTimeDisplay',
+                  'timeDivider',
+                  'durationDisplay',
+                  'progressControl',
+                  'pictureInPictureToggle',
+                  'fullscreenToggle'
+               ]
+            },
             
             // Configuration de la langue
             language: 'fr',
@@ -1242,7 +1266,6 @@ class VideoPlayer {
             youtube: {
                iv_load_policy: 3,
                modestbranding: 1,
-               cc_load_policy: 0,
                rel: this.Settings.showYoutubeRecommendations ? 1 : 0,
                controls: 0,
                ytControls: 0,
@@ -1255,21 +1278,9 @@ class VideoPlayer {
                origin: window.location.origin,
                endscreen: this.Settings.showYoutubeRecommendations ? 1 : 0,
                norel: this.Settings.showYoutubeRecommendations ? 0 : 1,
-               showRelatedVideos: this.Settings.showYoutubeRecommendations
-            },
-            
-            // Barre de contrôle
-            controlBar: {
-               children: [
-                  'playToggle',
-                  'volumePanel',
-                  'currentTimeDisplay',
-                  'timeDivider',
-                  'durationDisplay',
-                  'progressControl',
-                  'pictureInPictureToggle',
-                  'fullscreenToggle'
-               ]
+               showRelatedVideos: this.Settings.showYoutubeRecommendations,
+               imageQuality: false,
+               thumbnail: false  
             },
             
             // Configuration de la barre de progression
@@ -2345,6 +2356,27 @@ export default class YouTubeFlowPlugin extends Plugin {
 
    registerStyles() {
       document.head.appendChild(document.createElement('style')).textContent = `
+         /* Structure de base */
+         .youtube-flow-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+         }
+
+         .player-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 100px;
+            height: 100%;
+            min-height: 100%;
+         }
+
+         /* Overlay */
          .youtube-overlay {
             position: absolute;
             top: 0;
@@ -2355,6 +2387,7 @@ export default class YouTubeFlowPlugin extends Plugin {
             z-index: 100;
          }
 
+         /* Contrôles */
          .youtube-view-controls {
             position: absolute;
             top: 10px;
@@ -2368,12 +2401,20 @@ export default class YouTubeFlowPlugin extends Plugin {
             opacity: 0.8;
          }
 
-         .youtube-view-close {
+         .youtube-view-close,
+         .youtube-overlay-close {
             cursor: pointer;
             padding: 5px;
             border-radius: 3px;
+            background: var(--background-secondary);
          }
 
+         .youtube-view-close:hover,
+         .youtube-overlay-close:hover {
+            opacity: 0.8;
+         }
+
+         /* Poignée de redimensionnement */
          .resize-handle {
             position: absolute;
             bottom: -6px;
@@ -2395,98 +2436,95 @@ export default class YouTubeFlowPlugin extends Plugin {
             opacity: 0.5;
          }
 
-         .loading-overlay {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-         }
-         
-         .loading-overlay.ready {
-            opacity: 1;
-         }
-
-         .youtube-overlay-close {
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 3px;
-            background: var(--background-secondary);
+         /* VideoJS - Structure de base */
+         .video-js {
+            width: 100%;
+            height: 100%;
+            display: flex !important;
+            flex-direction: column !important;
          }
 
-         .youtube-overlay-close:hover {
-            opacity: 0.8;
+         /* Conteneur principal de la vidéo */
+         .video-js > div:first-child {
+            position: relative !important;
+            width: 100% !important;
+            flex: 1 !important;  /* Remplace height: calc(100% - 60px) */
+            display: flex !important;
+            flex-direction: column !important;
          }
 
-         .youtube-view-close:hover {
-            opacity: 0.8;
+         /* Container YouTube spécifique */
+         .vjs-youtube {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
          }
 
-         /* Forcer le positionnement de la barre de contrôle */
+         /* L'iframe elle-même */
+         .vjs-youtube iframe {
+            width: 100% !important;
+            height: 100% !important;
+            padding-bottom: 0 !important; /* Supprime le padding qui créait l'espace */
+         }
+
+         /* VideoJS - Barre de contrôle */
          .video-js .vjs-control-bar {
+            flex: 0 0 60px !important; /* Force une hauteur fixe */
             display: flex;
             flex-direction: row;
             align-items: center;
-            justify-content: space-between;  /* Distribuer l'espace entre les éléments */
-            padding: 0 10px;  /* Ajouter du padding horizontal */
+            justify-content: space-between;
+            padding: 0 16px;
             position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
-            height: 60px !important;
+            height: 60px;
             background: var(--background-secondary);
-            z-index: 2;
-            gap: 10px;  /* Espacement entre les éléments */
-         }
-
-         /* Grouper les contrôles de gauche */
-         .video-js .vjs-control-bar > :first-child {
-            margin-right: auto;
-         }
-
-         /* Grouper les contrôles de droite */
-         .video-js .vjs-control-bar > :last-child {
-            margin-left: auto;
-         }
-
-         /* Ajuster l'espacement des contrôles */
-         .video-js .vjs-control {
-            pointer-events: auto !important;
-            z-index: 3 !important;
-            margin: 0 2px;
-            flex: 0 0 auto;  /* Empêcher les boutons de s'étirer */
-         }
-
-         /* Ajuster la position de la barre de progression */
-         .video-js .vjs-progress-control {
-            position: absolute !important;
-            top: -4px;
-            width: 100%;
-            height: 4px;  /* Hauteur fixe */
-            pointer-events: none;  /* Désactiver les événements sur le conteneur */
-         }
-
-         /* Activer les événements uniquement sur la barre elle-même */
-         .video-js .vjs-progress-holder {
-            pointer-events: auto;
-               height: 100%;
-         }
-
-         /* Forcer l'affichage permanent */
-         .video-js.vjs-user-inactive .vjs-control-bar {
+            z-index: 3;
+            gap: 10px;
             opacity: 1 !important;
             visibility: visible;
             transform: none;
          }
 
-         /* Styles pour la barre de progression */
-         .video-js .vjs-progress-control {
-            position: absolute;
-            top: -4px;
-            width: 100%;
-            height: 4px;
-            pointer-events: none;
-            background: rgba(255, 255, 255, 0.1);
+         /* VideoJS - Contrôles */
+         .video-js .vjs-control {
+            pointer-events: auto;
+            z-index: 3;
+            margin: 0 4px;
+            flex: 0 0 auto;
          }
 
-         /* Le conteneur de la barre */
+         /* VideoJS - Groupes de contrôles */
+         .video-js .vjs-control-bar > .vjs-play-control,
+         .video-js .vjs-control-bar > .vjs-volume-panel {
+            margin-right: auto;
+         }
+
+         .video-js .vjs-time-control {
+            display: flex;
+            align-items: center;
+         }
+
+         .video-js .vjs-control-bar > .vjs-picture-in-picture-control,
+         .video-js .vjs-control-bar > .vjs-fullscreen-control,
+         .video-js .vjs-control-bar > .vjs-playback-rate-button {
+            margin-left: auto;
+         }
+
+         /* VideoJS - Barre de progression */
+         .video-js .vjs-progress-control {
+            position: absolute;
+            top: -8px;
+            width: 100%;
+            height: 8px;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.2);
+         }
+
          .video-js .vjs-progress-holder {
             pointer-events: auto;
             height: 100%;
@@ -2495,20 +2533,19 @@ export default class YouTubeFlowPlugin extends Plugin {
             cursor: pointer;
          }
 
-         /* La barre de progression elle-même */
          .video-js .vjs-play-progress {
             background: var(--interactive-accent);
             height: 100%;
             position: absolute;
+            left: 0;
          }
 
-         /* La barre de chargement */
          .video-js .vjs-load-progress {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.3);
             height: 100%;
          }
 
-         /* Le tooltip de temps */
+         /* VideoJS - Tooltip de temps */
          .video-js .vjs-time-tooltip {
             background: var(--background-secondary);
             border: 1px solid var(--background-modifier-border);
@@ -2518,33 +2555,21 @@ export default class YouTubeFlowPlugin extends Plugin {
             font-size: 12px;
             transform: translateX(-50%);
             bottom: 14px;
-         }
-
-         /* Animation au survol */
-         .video-js .vjs-progress-control:hover {
-            height: 8px;
-            top: -8px;
-            transition: all 0.2s ease;
-         }
-
-         /* Le curseur de la barre */
-         .video-js .vjs-mouse-display {
-            background: var(--text-normal);
-            width: 1px;
-            height: 100%;
-         }
-
-         /* Zone de hover */
-         .video-js .vjs-progress-holder .vjs-play-progress:before,
-         .video-js .vjs-progress-holder .vjs-time-tooltip {
             z-index: 1;
+         }
+
+         /* VideoJS - Animations et états */
+         .video-js .vjs-progress-control:hover {
+            height: 12px;
+            top: -12px;
+            transition: all 0.2s ease;
          }
 
          .video-js .vjs-progress-holder:hover {
             background: rgba(255, 255, 255, 0.1);
          }
 
-         /* Indicateur de position */
+         /* VideoJS - Indicateur de position */
          .video-js .vjs-play-progress:after {
             content: '';
             position: absolute;
@@ -2556,168 +2581,27 @@ export default class YouTubeFlowPlugin extends Plugin {
             background: var(--interactive-accent);
          }
 
-         /* Styles pour la barre de progression */
-         .video-js .vjs-progress-control {
-            position: absolute;
-            top: -4px;
-            width: 100%;
-            height: 4px;
-            pointer-events: none;
+         /* VideoJS - Mode plein écran */
+         .vjs-fullscreen .player-wrapper {
+            margin-bottom: 0;
          }
 
-         /* Le conteneur de la barre */
-         .video-js .vjs-progress-holder {
-            pointer-events: auto;
-            height: 100%;
-            position: relative;
-            background: rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-         }
-
-         /* La barre de progression elle-même */
-         .video-js .vjs-play-progress {
-            background: var(--interactive-accent);
-            height: 100%;
-            position: absolute;
-            left: 0;  /* Forcer le départ à gauche */
-         }
-
-         /* Masquer la barre de progression dupliquée */
-         .video-js .vjs-progress-control.vjs-control {
-            display: none;
-         }
-
-         /* Masquer l'affichage du temps redondant */
-         .video-js .vjs-remaining-time {
-            display: none;
-         }
-
-         /* Masquer la seconde barre de progression */
+         /* Masquer les éléments redondants */
+         .video-js .vjs-remaining-time,
+         .video-js .vjs-progress-control.vjs-control,
          .video-js > .vjs-progress-control {
             display: none;
          }
 
-         /* Styles pour la barre de progression */
-         .video-js .vjs-progress-control {
-            position: absolute;
-            top: -8px;
-            left: 0;
-            right: 0;
-            width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.2);
+         /* Loading overlay */
+         .loading-overlay {
+            opacity: 0;
+            transition: opacity 0.3s ease;
          }
-
-         .video-js .vjs-progress-holder {
-            height: 100%;
-         }
-
-         .video-js .vjs-play-progress {
-            background-color: var(--interactive-accent);
-         }
-
-         .video-js .vjs-load-progress {
-            background: rgba(255, 255, 255, 0.3);
-         }
-
-         /* Masquer le temps restant qui est redondant */
-         .video-js .vjs-remaining-time {
-            display: none;
-         }
-
-         /* Styles pour la barre de contrôle */
-         .video-js .vjs-control-bar {
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 16px;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 60px;
-            background: var(--background-secondary);
-            z-index: 2;
-         }
-
-         /* Grouper les contrôles de gauche */
-         .video-js .vjs-control-bar > .vjs-play-control,
-         .video-js .vjs-control-bar > .vjs-volume-panel {
-            margin-right: auto;
-         }
-
-         /* Grouper les contrôles du centre (temps) */
-         .video-js .vjs-time-control {
-            display: flex;
-            align-items: center;
-         }
-
-         /* Grouper les contrôles de droite */
-         .video-js .vjs-control-bar > .vjs-picture-in-picture-control,
-         .video-js .vjs-control-bar > .vjs-fullscreen-control,
-         .video-js .vjs-control-bar > .vjs-playback-rate-button {
-            margin-left: auto;
-         }
-
-         /* Ajuster l'espacement entre les boutons */
-         .video-js .vjs-control {
-            margin: 0 4px;
+         
+         .loading-overlay.ready {
+            opacity: 1;
          }
       `;
    }
 }
-
-// Ajouter les styles CSS nécessaires
-const style = document.createElement('style');
-style.textContent = `
-   .youtube-flow-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-   }
-
-   .player-wrapper {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      overflow: hidden;
-      margin-bottom: 100px;
-   }
-
-   .video-js {
-      width: 100%;
-      height: 100%;
-   }
-
-   .vjs-youtube {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-   }
-
-   /* Style pour la zone des recommandations */
-   .vjs-youtube iframe {
-      padding-bottom: 100px !important;
-   }
-
-   /* Style pour la barre de contrôle */
-   .vjs-control-bar {
-      z-index: 3 !important;
-      background: var(--background-secondary) !important;
-   }
-
-   /* Style pour le mode plein écran */
-   .vjs-fullscreen .player-wrapper {
-      margin-bottom: 0;
-   }
-   .vjs-fullscreen .vjs-youtube iframe {
-      padding-bottom: 0 !important;
-   }
-`;
-document.head.appendChild(style);
