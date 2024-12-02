@@ -1,20 +1,20 @@
 import videojs from 'video.js';
 import type Player from 'video.js/dist/types/player';
-import { VideoJsPlayerOptions } from 'video.js';
 import type { default as VideoJs } from 'video.js';
 import 'videojs-youtube';
 import { App, Plugin, Menu } from 'obsidian';
-import { Store } from './store';
-import { Settings, PluginSettings } from './settings';
+import { PluginSettings } from '../services/settings/types';
+import { SettingsService } from '../services/settings/SettingsService';
+import { Settings } from '../services/settings/types';
 
 type VideoJsPlayer = ReturnType<typeof videojs>;
 type VideoJsPlayerOptions = Parameters<typeof videojs>[1];
 type VideoJsPlayerEvents = VideoJsPlayer;
 
-export class VideoPlayer {
+export default class VideoPlayer {
    private static instance: VideoPlayer | null = null;
    Player: VideoJsPlayer | null = null;
-   Settings: Settings;
+   private Settings: SettingsService;
    hasVideoJS: boolean = false;
    currentLanguage: string;
    container: HTMLElement | null = null;
@@ -24,11 +24,8 @@ export class VideoPlayer {
    startY: number = 0;
    startHeight: number = 0;
 
-   private constructor(Settings: Settings) {
+   private constructor(Settings: SettingsService) {
       this.Settings = Settings;
-      this.currentLanguage = document.documentElement.lang || 'en';
-      this.hasVideoJS = typeof window.videojs !== 'undefined';
-      this.addCustomStyles();
    }
 
 // getObsidianLanguage() : Récupérer la langue de l'interface d'Obsidian avec fallback sur EN
@@ -52,7 +49,7 @@ export class VideoPlayer {
          return false;
       }
    }
-   static getInstance(Settings: Settings): VideoPlayer {
+   static getInstance(Settings: SettingsService): VideoPlayer {
       if (!VideoPlayer.instance) {
          VideoPlayer.instance = new VideoPlayer(Settings);
       }
@@ -883,3 +880,8 @@ export class VideoPlayer {
       }
    }
 }
+
+
+
+
+

@@ -1,54 +1,49 @@
 import { App, ItemView, Plugin, WorkspaceLeaf, Menu, Notice } from 'obsidian';
 import { ViewPlugin } from '@codemirror/view';
-import { Store } from './store';
-import { Settings } from './settings';
-import { PlayerViewAndMode } from './playerViewAndMode';
-import { VideoPlayer } from './videoPlayer';
+import { SettingsService } from './services/settings/SettingsService';
+import { SettingsTab } from './services/settings/SettingsTab';
+import { PlayerViewAndMode } from './views/ViewAndMode';
+import VideoPlayer from './views/VideoPlayer';
 import { VideoMode } from './types';
-import { Hotkeys } from './hotkeys';
+import { Hotkeys } from './services/hotkeys/HotkeysService';
 import { extractVideoId, cleanVideoId, getHeight, saveHeight } from './utils';
-import { SettingsTab } from './settings';
-import { createDecorations } from './decorations';
-import { registerStyles } from './registerStyles';
-
-
+import { createDecorations } from './services/DecorationsService';
+import { registerStyles } from './services/RegisterStylesService';
+import { TranslationsService, TranslationKey } from './services/translations/TranslationsService';
 
 interface IPlayerContainer {
    plugin: Plugin;
-   Settings: Settings;
-   PlayerViewAndMode: PlayerViewAndMode;
-   t: (key: string) => string;
+   settings: SettingsService;
+   playerViewAndMode: PlayerViewAndMode;
+   translationService: TranslationsService;
    videoId: string | null;
    timestamp: number;
    activeLeafId: string | null;
-   VideoPlayer: VideoPlayer | null;
+   videoPlayer: VideoPlayer | null;
 }
+
 class PlayerContainer extends ItemView implements IPlayerContainer {
    plugin: Plugin;
-   Settings: Settings;
-   PlayerViewAndMode: PlayerViewAndMode;
-   t: (key: string) => string;
+   settings: SettingsService;
+   playerViewAndMode: PlayerViewAndMode;
+   translationService: TranslationsService;
    videoId: string | null = null;
    timestamp: number = 0;
    activeLeafId: string | null = null;
-   VideoPlayer: VideoPlayer | null = null;
+   videoPlayer: VideoPlayer | null = null;
    isInitialized: boolean = false;
    resizeHandle: HTMLElement;
 
-   constructor(leaf: WorkspaceLeaf, activeLeafId: string | null, plugin: Plugin) {
+   constructor(leaf: WorkspaceLeaf, activeLeafId: string | null, plugin: Plugin, settings: SettingsService, playerViewAndMode: PlayerViewAndMode) {
       super(leaf);
-      const store = Store.get();
-      if (!store.Settings || !store.PlayerViewAndMode || !store.t) {
-         throw new Error("Store not properly initialized");
-      }
       
       this.plugin = plugin;
-      this.Settings = store.Settings;
-      this.PlayerViewAndMode = store.PlayerViewAndMode;
-      this.t = store.t;
+      this.settings = settings;
+      this.playerViewAndMode = playerViewAndMode;
+      this.translationService = new TranslationsService();
       
-      this.videoId = this.Settings.lastVideoId;
-      this.timestamp = this.Settings.lastTimestamp || 0;
+      this.videoId = this.settings.lastVideoId;
+      this.timestamp = this.settings.lastTimestamp || 0;
       this.activeLeafId = activeLeafId;
       
       // Initialiser comme une note Markdown vide
@@ -58,11 +53,15 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
       this.contentEl.empty();
 
       // Utiliser le singleton VideoPlayer
-      this.VideoPlayer = VideoPlayer.getInstance(this.Settings);
+      this.videoPlayer = VideoPlayer.getInstance(this.settings);
 
       // Créer la poignée de redimensionnement une seule fois
       this.resizeHandle = document.createElement('div');
       this.resizeHandle.className = 'youtube-resize-handle';
+   }
+
+   t(key: TranslationKey): string {
+      return this.translationService.translate(key);
    }
 
    getViewType() {
@@ -83,8 +82,8 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
       
       // Vérifier si state existe et contient les propriétés nécessaires
       if (state?.state?.videoId) {
-         this.Settings.lastVideoId = state.state.videoId;
-         this.Settings.lastTimestamp = state.state.timestamp || 0;
+         this.settings.lastVideoId = state.state.videoId;
+         this.settings.lastTimestamp = state.state.timestamp || 0;
          
          // Mettre à jour l'état local pour la vue actuelle
          this.videoId = state.state.videoId;
@@ -97,7 +96,7 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
       const playerSection = document.createElement('div');
       playerSection.style.cssText = `
          width: 100%;
-         height: ${getHeight(this.Settings.currentMode)}%;
+         height: ${getHeight(this.settings.currentMode)}%;
          min-height: 100px;
          position: relative;
          display: flex;
@@ -106,8 +105,8 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
       
       try {
          // Initialiser le VideoPlayer si nécessaire
-         if (!this.VideoPlayer) {
-            this.VideoPlayer = VideoPlayer.getInstance(this.Settings);
+         if (!this.videoPlayer) {
+            this.videoPlayer = VideoPlayer.getInstance(this.settings);
          }
 
          container.empty();
@@ -124,8 +123,8 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
          container.appendChild(playerSection);
 
          try {
-            if (this.VideoPlayer && videoId) {
-               await this.VideoPlayer.initializePlayer(videoId, playerSection, timestamp);
+            if (this.videoPlayer && videoId) {
+               await this.videoPlayer.initializePlayer(videoId, playerSection, timestamp);
                this.isInitialized = true;
             }
          } catch (error) {
@@ -140,8 +139,8 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
             errorContainer.textContent = this.t('error.playerInit');
             playerSection.appendChild(errorContainer);
             
-            if (this.VideoPlayer) {
-               this.VideoPlayer.createFallbackPlayer(this.videoId || '', playerSection, this.timestamp);
+            if (this.videoPlayer) {
+               this.videoPlayer.createFallbackPlayer(this.videoId || '', playerSection, this.timestamp);
             }
          }
 
@@ -170,10 +169,10 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
                container: container,
                targetElement: playerSection,
                handle: this.resizeHandle,
-               mode: this.Settings.currentMode,
+               mode: this.settings.currentMode,
                onResize: async (height: number) => {
                   playerSection.style.height = `${height}%`;
-                  await saveHeight(height, this.Settings.currentMode);
+                  await saveHeight(height, this.settings.currentMode);
                }
          });
       } catch (error) {
@@ -188,8 +187,8 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
          errorContainer.textContent = this.t('error.playerInit');
          playerSection.appendChild(errorContainer);
          
-         if (this.VideoPlayer) {
-               this.VideoPlayer.createFallbackPlayer(this.videoId || '', playerSection, this.timestamp);
+         if (this.videoPlayer) {
+               this.videoPlayer.createFallbackPlayer(this.videoId || '', playerSection, this.timestamp);
          }
          this.isInitialized = false;
       }
@@ -231,10 +230,10 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
    }
 
    createVideoContainer() {
-      const mode = this.Settings.currentMode;
+      const mode = this.settings.currentMode;
       const defaultHeight = mode === 'overlay' 
-         ? this.Settings.overlayHeight 
-         : this.Settings.viewHeight;
+         ? this.settings.overlayHeight 
+         : this.settings.viewHeight;
 
       const videoContainer = document.createElement('div');
       videoContainer.style.cssText = `
@@ -251,7 +250,7 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
          container: this.containerEl,
          targetElement: videoContainer,
          handle: this.resizeHandle,
-         mode: this.Settings.currentMode || 'sidebar' as VideoMode,
+         mode: this.settings.currentMode || 'sidebar' as VideoMode,
          onResize: (height: number) => {
                videoContainer.style.height = `${height}%`;
          }
@@ -261,24 +260,24 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
    }
 
    async onClose() {
-      if (this.VideoPlayer) {
+      if (this.videoPlayer) {
          try {
-            if (this.VideoPlayer.Player && typeof this.VideoPlayer.Player.dispose === 'function') {
-               const playerElement = this.VideoPlayer.Player?.el();
+            if (this.videoPlayer.Player && typeof this.videoPlayer.Player.dispose === 'function') {
+               const playerElement = this.videoPlayer.Player?.el();
                if (playerElement?.parentNode) {
-                  this.VideoPlayer.Player.dispose();
+                  this.videoPlayer.Player.dispose();
                }
             }
 
             const leaves = this.app?.workspace.getLeavesOfType('youtube-player') || [];
-            if (leaves.length <= 1 && this.Settings?.isChangingMode === false) {
-               if (this.Settings) {
-                  this.Settings.isVideoOpen = false;
+            if (leaves.length <= 1 && this.settings?.isChangingMode === false) {
+               if (this.settings) {
+                  this.settings.isVideoOpen = false;
                }
                VideoPlayer.destroyInstance();
             }
             
-            this.VideoPlayer = null;
+            this.videoPlayer = null;
             this.isInitialized = false;
             
          } catch (error) {
@@ -400,7 +399,9 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
 }
 
 export default class TubeFlows extends Plugin {
-   private store!: Store;
+   private settings!: SettingsService;
+   private playerViewAndMode!: PlayerViewAndMode;
+   private translationService!: TranslationsService;
    hotkeys!: Hotkeys;
 
    constructor(app: App, manifest: any) {
@@ -410,34 +411,41 @@ export default class TubeFlows extends Plugin {
 
    async onload() {
       console.log("Chargement du plugin YouTubeFlow");
-// Store.init
-      this.store = await Store.init(this);
+
+      // Initialisation des services
+      this.settings = new SettingsService(this);
+      await this.settings.loadSettings();
+      this.playerViewAndMode = new PlayerViewAndMode(this.app, this.settings);
+      this.translationService = new TranslationsService();
       
-// registerHotkeys
+      // registerHotkeys
       this.hotkeys.registerHotkeys();
 
-// registerView
+      // registerView
       this.registerView(
          'youtube-player',
-         (leaf) => new PlayerContainer(leaf, this.store?.Settings?.activeLeafId ?? null, this)
+         (leaf) => new PlayerContainer(
+            leaf, 
+            this.settings?.activeLeafId ?? null, 
+            this,
+            this.settings,
+            this.playerViewAndMode
+         )
       );
+
       this.app.workspace.onLayoutReady(() => {
-         // Ne PAS restaurer automatiquement, laisser Obsidian le faire
-         // La restauration se fera via setState de PlayerContainer
          this.registerEvent(
             this.app.workspace.on('layout-change', () => {
-               // Si aucune vue YouTube n'est ouverte mais qu'on devrait en avoir une
                const hasYouTubeView = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
-               if (!hasYouTubeView && this.store.Settings.isVideoOpen) {
-                  // Réinitialiser l'état
-                  this.store.Settings.isVideoOpen = false;
-                  this.store.Settings.save();
+               if (!hasYouTubeView && this.settings.isVideoOpen) {
+                  this.settings.isVideoOpen = false;
+                  this.settings.save();
                }
             })
          );
       });
 
-// Ajouter un seul bouton dans la sidebar qui ouvre un menu
+      // Ajouter un seul bouton dans la sidebar qui ouvre un menu
       const ribbonIcon = this.addRibbonIcon('video', 'YouTube Flow', (evt) => {});
       ribbonIcon.addEventListener('mouseenter', (evt) => {
          const menu = new Menu();
@@ -450,15 +458,15 @@ export default class TubeFlows extends Plugin {
                   if (overlay) {
                      const height = parseFloat((overlay as HTMLElement).style.height);
                      if (!isNaN(height)) {
-                        this.store.Settings.viewHeight = height;
-                        this.store.Settings.overlayHeight = height;
-                        await this.store.Settings.save();
+                        this.settings.viewHeight = height;
+                        this.settings.overlayHeight = height;
+                        await this.settings.save();
                      }
                   }
-                  await this.store.PlayerViewAndMode.closePreviousVideos();
-                  this.store.PlayerViewAndMode.activeLeafId = null;
-                  await this.store.PlayerViewAndMode.displayVideo({
-                     videoId: this.store.Settings.lastVideoId,
+                  await this.playerViewAndMode.closePreviousVideos();
+                  this.playerViewAndMode.activeLeafId = null;
+                  await this.playerViewAndMode.displayVideo({
+                     videoId: this.settings.lastVideoId,
                      mode: 'tab',
                      timestamp: 0,
                      fromUserClick: true
@@ -470,20 +478,19 @@ export default class TubeFlows extends Plugin {
             item.setTitle("YouTube Sidebar")
                .setIcon("layout-sidebar-right")
                .onClick(async () => {
-                  // Sauvegarder la taille actuelle avant de changer de mode
                   const overlay = document.querySelector('.youtube-overlay');
                   if (overlay) {
                      const height = parseFloat((overlay as HTMLElement).style.height);
                      if (!isNaN(height)) {
-                        this.store.Settings.viewHeight = height;
-                        this.store.Settings.overlayHeight = height;
-                        await this.store.Settings.save();
+                        this.settings.viewHeight = height;
+                        this.settings.overlayHeight = height;
+                        await this.settings.save();
                      }
                   }
-                  await this.store.PlayerViewAndMode.closePreviousVideos();
-                  this.store.PlayerViewAndMode.activeLeafId = null;
-                  await this.store.PlayerViewAndMode.displayVideo({
-                     videoId: this.store.Settings.lastVideoId,
+                  await this.playerViewAndMode.closePreviousVideos();
+                  this.playerViewAndMode.activeLeafId = null;
+                  await this.playerViewAndMode.displayVideo({
+                     videoId: this.settings.lastVideoId,
                      mode: 'sidebar',
                      timestamp: 0,
                      fromUserClick: true
@@ -495,20 +502,19 @@ export default class TubeFlows extends Plugin {
             item.setTitle("YouTube Overlay")
                .setIcon("layout-top")
                .onClick(async () => {
-                  // Sauvegarder la taille actuelle avant de changer de mode
                   const videoContainer = document.querySelector('.youtube-player div[style*="height"]');
                   if (videoContainer) {
                      const height = parseFloat((videoContainer as HTMLElement).style.height);
                      if (!isNaN(height)) {
-                        this.store.Settings.viewHeight = height;
-                        this.store.Settings.overlayHeight = height;
-                        await this.store.Settings.save();
+                        this.settings.viewHeight = height;
+                        this.settings.overlayHeight = height;
+                        await this.settings.save();
                      }
                   }
-                  await this.store.PlayerViewAndMode.closePreviousVideos();
-                  this.store.PlayerViewAndMode.activeLeafId = null;
-                  await this.store.PlayerViewAndMode.displayVideo({
-                     videoId: this.store.Settings.lastVideoId,
+                  await this.playerViewAndMode.closePreviousVideos();
+                  this.playerViewAndMode.activeLeafId = null;
+                  await this.playerViewAndMode.displayVideo({
+                     videoId: this.settings.lastVideoId,
                      mode: 'overlay',
                      timestamp: 0,
                      fromUserClick: true
@@ -544,27 +550,28 @@ export default class TubeFlows extends Plugin {
             menuDom.addEventListener('mouseleave', handleMouseLeave);
          }
       });
-// SettingsTab
-      this.addSettingTab(new SettingsTab(this.app, this));
-// Créer la "décoration" des liens YouTube dans les fichiers Markdown
+
+      // SettingsTab
+      this.addSettingTab(new SettingsTab(this.app, this, this.settings));
+
+      // Créer la "décoration" des liens YouTube dans les fichiers Markdown
       this.registerEditorExtension([
          ViewPlugin.define(view => ({
-            decorations: createDecorations(view),
+            decorations: createDecorations(view, this.settings),
             update(update) {
                if (update.docChanged || update.viewportChanged) {
-                  this.decorations = createDecorations(update.view);
+                  this.decorations = createDecorations(update.view, this.settings);
                }
             }
          }), {
             decorations: v => v.decorations
          })
       ]);
-
       
-// registerStyles
+      // registerStyles
       registerStyles();
 
-// addCommands
+      // addCommands
       this.addCommand({
          id: 'open-youtube-sidebar',
          name: 'Ouvrir dans la barre latérale',
@@ -592,6 +599,7 @@ export default class TubeFlows extends Plugin {
          }
       });
    }
+
    // handleYouTubeLink
    async handleYouTubeLink(url: string, videoMode: VideoMode = 'sidebar') {
       const videoId = extractVideoId(url);
@@ -600,40 +608,33 @@ export default class TubeFlows extends Plugin {
          return;
       }
       const cleanedId = cleanVideoId(videoId);
-      if (this.store.Settings && this.store.PlayerViewAndMode) {
-         await this.store.PlayerViewAndMode.displayVideo({
-            videoId: cleanedId || this.store.Settings.lastVideoId,  // Utilise le getter qui gère la valeur par défaut
+      if (this.settings && this.playerViewAndMode) {
+         await this.playerViewAndMode.displayVideo({
+            videoId: cleanedId || this.settings.lastVideoId,
             mode: videoMode,
             timestamp: 0,
          });
       }
    }
-// onunload
+
    async onunload() {
       try {
-         const { PlayerViewAndMode } = Store.get();
-         
          // S'assurer que toutes les vues sont fermées avant la désactivation
-         if (PlayerViewAndMode) {
+         if (this.playerViewAndMode) {
             // Désactiver les écouteurs d'événements
             this.app.workspace.off('leaf-closed', this.handleLeafClosed);
             
             // Fermer proprement les vues
-            await PlayerViewAndMode.closePreviousVideos();
+            await this.playerViewAndMode.closePreviousVideos();
          }
-
-         // Nettoyer le Store en dernier
-         Store.destroy();
       } catch (error) {
          console.warn("Erreur lors du déchargement:", error);
       }
    }
 
-// handleLeafClosed
    private handleLeafClosed = () => {
-      const { PlayerViewAndMode } = Store.get();
-      if (PlayerViewAndMode) {
-         PlayerViewAndMode.closePreviousVideos();
+      if (this.playerViewAndMode) {
+         this.playerViewAndMode.closePreviousVideos();
       }
    }
 }

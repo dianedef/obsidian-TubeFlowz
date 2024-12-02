@@ -32,7 +32,7 @@ export function extractVideoId(url: string): string | null {
 }
 
 import { VideoMode } from './types';
-import { Store } from './store';
+import { Store } from '../archive/store';
 
 /**
  * Sauvegarde la hauteur pour un mode donné

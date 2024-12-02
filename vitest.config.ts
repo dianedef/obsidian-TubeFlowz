@@ -1,20 +1,39 @@
 import { defineConfig } from 'vitest/config';
-import { resolve } from 'path';
 
 export default defineConfig({
-   test: {
-      globals: true,
-      environment: 'jsdom',
-      include: ['tests/**/*.{test,spec}.{js,ts}'],
-      setupFiles: ['./tests/setup.ts'],
-      deps: {
-         inline: ['obsidian']
-      }
-   },
-   resolve: {
-      alias: {
-         '@': resolve(__dirname, './src'),
-         'obsidian': resolve(__dirname, './node_modules/obsidian/obsidian.d.ts')
-      }
-   }
+    test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: [
+            './src/tests/setup.ts',
+            './src/tests/testSetup.ts'
+        ],
+        include: [
+            'src/tests/**/*.test.ts',
+            'src/tests/**/*.spec.ts'
+        ],
+        exclude: [
+            '**/node_modules/**',
+            '**/dist/**'
+        ],
+        coverage: {
+            reporter: ['text', 'json', 'html'],
+            exclude: [
+                'node_modules/',
+                'src/tests/setup.ts',
+                'src/tests/testSetup.ts',
+            ],
+        },
+        deps: {
+            inline: [
+                'video.js',
+                'videojs-youtube'
+            ]
+        },
+        testTimeout: 10000,
+        hookTimeout: 10000,
+        clearMocks: true,
+        restoreMocks: true,
+        mockReset: true
+    },
 }); 

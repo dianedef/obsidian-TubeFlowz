@@ -37,3 +37,15 @@ export const translations: { [lang: string]: Translations } = {
       'error.fallback': 'Utilisation du lecteur de secours'
    }
 }; 
+
+export class TranslationsService {
+   private currentLang: string;
+
+   constructor() {
+      this.currentLang = document.documentElement.lang || 'en';
+   }
+
+   translate(key: TranslationKey): string {
+      return translations[this.currentLang]?.[key] || translations['en'][key] || key;
+   }
+} 

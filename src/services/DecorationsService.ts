@@ -1,10 +1,10 @@
 import { EditorView } from '@codemirror/view';
 import { Decoration, WidgetType } from '@codemirror/view';
-import { Store } from './store';
-import { VideoMode } from './types';
-import { extractVideoId, cleanVideoId } from './utils';
+import { VideoMode } from '../types';
+import { extractVideoId, cleanVideoId, type CleanVideoId } from '../utils';
+import { SettingsService } from './settings/SettingsService';
 
-export function createDecorations(view: EditorView) {
+export function createDecorations(view: EditorView, settings: SettingsService) {
    const decorations = [];
    const doc = view.state.doc;
    
@@ -33,7 +33,7 @@ export function createDecorations(view: EditorView) {
             }).range(startPos, endPos));
             
             decorations.push(Decoration.widget({
-               widget: new DecorationForUrl(cleanedId),
+               widget: new DecorationForUrl(cleanedId, settings),
                side: 1
             }).range(endPos));
          }
@@ -46,12 +46,14 @@ export function createDecorations(view: EditorView) {
 }
 
 export class DecorationForUrl extends WidgetType {
-   private videoId: string;
+   private videoId: CleanVideoId;
    private timestamp: number = 0;
+   private settings: SettingsService;
 
-   constructor(videoId: string) {
+   constructor(videoId: CleanVideoId, settings: SettingsService) {
       super();
       this.videoId = videoId;
+      this.settings = settings;
    }
       
    toDOM(): HTMLElement {
@@ -75,14 +77,13 @@ export class DecorationForUrl extends WidgetType {
       sparkle.addEventListener('click', async (e: MouseEvent) => {
          e.preventDefault();
          e.stopPropagation();
-         const store = Store.get();
-         if (!store.PlayerViewAndMode || !store.Settings) {
-            console.error("Store non initialisé");
+         if (!this.settings.playerViewAndMode) {
+            console.error("PlayerViewAndMode non initialisé");
             return;
          }
-         await store.PlayerViewAndMode.displayVideo({
+         await this.settings.playerViewAndMode.displayVideo({
             videoId: this.videoId,
-            mode: store.Settings.currentMode || 'sidebar' as VideoMode,
+            mode: this.settings.currentMode || 'sidebar' as VideoMode,
             timestamp: this.timestamp,
             fromUserClick: true
          });
