@@ -2,6 +2,7 @@ import { EditorView } from '@codemirror/view';
 import { Decoration, WidgetType } from '@codemirror/view';
 import { Store } from './store';
 import { VideoMode } from './types';
+import { extractVideoId, cleanVideoId } from './utils';
 
 export function createDecorations(view: EditorView) {
    const decorations = [];
@@ -20,26 +21,21 @@ export function createDecorations(view: EditorView) {
          const startPos = line.from + match.index;
          const endPos = startPos + fullMatch.length;
          
-         const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/;
-         const youtubeMatch = url.match(youtubeRegex);
-         
-         if (youtubeMatch) {
-            const videoId = youtubeMatch[1];
+         const videoId = extractVideoId(url);
+         if (videoId) {
+            const cleanedId = cleanVideoId(videoId);
+            decorations.push(Decoration.mark({
+               class: "youtube-link",
+               attributes: {
+                  "data-video-id": cleanedId
+               },
+               inclusive: false
+            }).range(startPos, endPos));
             
-            if (startPos >= 0 && endPos <= doc.length) {
-               decorations.push(Decoration.mark({
-                  class: "youtube-link",
-                  attributes: {
-                     "data-video-id": videoId
-                  },
-                  inclusive: false
-               }).range(startPos, endPos));
-               
-               decorations.push(Decoration.widget({
-                  widget: new DecorationForUrl(videoId),
-                  side: 1
-               }).range(endPos));
-            }
+            decorations.push(Decoration.widget({
+               widget: new DecorationForUrl(cleanedId),
+               side: 1
+            }).range(endPos));
          }
       }
       
@@ -76,13 +72,17 @@ export class DecorationForUrl extends WidgetType {
          display: inline-block;
       `;
       
-      sparkle.addEventListener('click', (e: MouseEvent) => {
+      sparkle.addEventListener('click', async (e: MouseEvent) => {
          e.preventDefault();
          e.stopPropagation();
-         const { PlayerViewAndMode, Settings } = Store.get();
-         PlayerViewAndMode.displayVideo({
+         const store = Store.get();
+         if (!store.PlayerViewAndMode || !store.Settings) {
+            console.error("Store non initialisé");
+            return;
+         }
+         await store.PlayerViewAndMode.displayVideo({
             videoId: this.videoId,
-            mode: Settings?.currentMode || 'sidebar' as VideoMode,
+            mode: store.Settings.currentMode || 'sidebar' as VideoMode,
             timestamp: this.timestamp,
             fromUserClick: true
          });

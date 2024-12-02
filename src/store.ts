@@ -1,7 +1,7 @@
-import { Plugin, App } from 'obsidian';
-import { Settings, PluginSettings } from './settings';
-import { VideoPlayer } from './videoPlayer';
+import { App, Plugin } from 'obsidian';
+import { Settings } from './settings';
 import { PlayerViewAndMode } from './playerViewAndMode';
+import { VideoPlayer } from './videoPlayer';
 
 interface Translations {
    fr: {
@@ -32,14 +32,14 @@ interface PlayerViewAndModeType {
 
 export class Store {
    static instance: Store | null = null;
-   app: App;
-   plugin: Plugin;
+   app!: App;
+   plugin!: Plugin;
    VideoPlayer: VideoPlayer | null = null;
    Settings: Settings | null = null;
    PlayerViewAndMode: PlayerViewAndMode | null = null;
-   translations: Translations;
+   translations!: Translations;
    i18n: any;
-   t: (key: string) => string;
+   t!: (key: string) => string;
 
    constructor(plugin: Plugin) {
       if (Store.instance) {
@@ -102,8 +102,8 @@ export class Store {
       instance.PlayerViewAndMode = new PlayerViewAndMode();
       await instance.PlayerViewAndMode.init();
       
-      // Initialiser le VideoPlayer
-      instance.VideoPlayer = new VideoPlayer(instance.Settings);
+      // Initialiser le VideoPlayer en utilisant getInstance
+      instance.VideoPlayer = VideoPlayer.getInstance(instance.Settings);
       
       return instance;
    }

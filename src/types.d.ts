@@ -3,7 +3,7 @@ import { Plugin } from 'obsidian';
 declare module 'video.js';
 
 interface Window {
-   videojs: VideoJSStatic;
+    videojs: VideoJSStatic; 
 }
 
 export type Volume = number & { _brand: 'Volume' };
@@ -20,25 +20,25 @@ export function isValidPlaybackRate(value: number): value is PlaybackRate {
 }
 
 export interface PluginSettings {
-   lastVideoId: string | null;
-   lastTimestamp: number;
-   isVideoOpen: boolean;
-   isPlaying: boolean;
-   currentMode: VideoMode;
-   viewHeight: number;
-   overlayHeight: number;
-   activeLeafId: string | null;
-   playbackMode: PlaybackMode;
-   playbackRate: PlaybackRate;
-   favoriteSpeed: PlaybackRate;
-   volume: Volume;
-   isMuted: boolean;
-   showYoutubeRecommendations: boolean;
-   playlist: Array<{
-       id: string;
-       title: string;
-       timestamp: number;
-   }>;
+    lastVideoId: string | null;
+    lastTimestamp: number;
+    isVideoOpen: boolean;
+    isPlaying: boolean;
+    currentMode: VideoMode;
+    viewHeight: number;
+    overlayHeight: number;
+    activeLeafId: string | null;
+    playbackMode: PlaybackMode;
+    playbackRate: PlaybackRate;
+    favoriteSpeed: PlaybackRate;
+    volume: Volume;
+    isMuted: boolean;
+    showYoutubeRecommendations: boolean;
+    playlist: Array<{
+        id: string;
+        title: string;
+        timestamp: number;
+}>;
 }
 
 export interface DisplayVideoParams {

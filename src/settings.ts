@@ -1,5 +1,5 @@
 import { Store } from './store';
-import { VideoMode, PlaybackMode, Volume, PlaybackRate, isValidVolume, isValidPlaybackRate } from './types.d';
+import { VideoMode, PlaybackMode, Volume, PlaybackRate } from './types.d';
 import { App, Plugin, PluginSettingTab, Setting, DropdownComponent } from 'obsidian';
 
 export interface PluginSettings {
@@ -110,14 +110,16 @@ export class SettingsTab extends PluginSettingTab {
    }
 }
 
+const DEFAULT_VIDEO_ID = 'dQw4w9WgXcQ'; // Never Gonna Give You Up 😉
+
 const DEFAULT_SETTINGS: PluginSettings = {
-   lastVideoId: null,
+   lastVideoId: DEFAULT_VIDEO_ID,
    isVideoOpen: false,
+   isChangingMode: false,
    playlist: [],
    currentMode: 'sidebar',
    viewHeight: 60,
    overlayHeight: 60,
-   isChangingMode: false,
    activeLeafId: null,
    overlayLeafId: null,
    favoriteSpeed: 2 as PlaybackRate,
@@ -139,11 +141,11 @@ export class Settings {
    }
 
    // Getters et setters pour toutes les propriétés
-   get lastVideoId(): string | null {
-      return this.settings.lastVideoId;
+   get lastVideoId(): string {
+      return this.settings.lastVideoId || DEFAULT_VIDEO_ID;
    }
 
-   set lastVideoId(value: string | null) {
+   set lastVideoId(value: string) {
       this.settings.lastVideoId = value;
       this.save();
    }
@@ -253,6 +255,15 @@ export class Settings {
 
    set showYoutubeRecommendations(value: boolean) {
       this.settings.showYoutubeRecommendations = value;
+      this.save();
+   }
+
+   get lastTimestamp(): number {
+      return this.settings.lastTimestamp;
+   }
+
+   set lastTimestamp(value: number) {
+      this.settings.lastTimestamp = value;
       this.save();
    }
 

@@ -1,5 +1,6 @@
 import { Store } from './store';
 import { VideoMode } from './types';
+import { cleanVideoId, extractVideoId } from './utils';
 
 export class PlayerViewAndMode {
    activeLeafId: string | null = null;
@@ -19,67 +20,65 @@ export class PlayerViewAndMode {
 
    async displayVideo(params: { 
       videoId: string; 
-      mode: string; 
+      mode: VideoMode; 
       timestamp?: number; 
       fromUserClick?: boolean; 
    }) {
-      const { Settings } = Store.get();
-      if (!Settings) return;
+      const { app, Settings } = Store.get();
+      if (!app || !Settings) return;
 
-      // Créer les éléments DOM nécessaires
-      const container = document.createElement('div');
-      container.className = 'youtube-view-container';
-      
-      // Ajouter la classe spécifique au mode
-      container.classList.add(`youtube-view-${params.mode}`);
+      // Extraire et nettoyer le videoId
+      const extractedId = extractVideoId(params.videoId);
+      if (!extractedId) {
+         console.error("ID vidéo invalide:", params.videoId);
+         return;
+      }
+      const cleanedVideoId = cleanVideoId(extractedId);
 
-      // Créer les contrôles
-      const controls = document.createElement('div');
-      controls.className = 'youtube-view-controls';
-      
-      // Ajouter le bouton de fermeture
-      const closeButton = document.createElement('button');
-      closeButton.className = 'youtube-view-close';
-      controls.appendChild(closeButton);
+      // Si on a déjà une vue ouverte et qu'on change de mode
+      if (Settings.isVideoOpen && Settings.currentMode !== params.mode) {
+         // Sauvegarder le videoId avant de fermer
+         const currentVideoId = cleanedVideoId;
+         // Forcer la fermeture de toutes les vues précédentes
+         await this.closePreviousVideos();
+         // Réinitialiser l'ID pour forcer une nouvelle création
+         this.activeLeafId = null;
+         // Restaurer le videoId
+         Settings.lastVideoId = currentVideoId;
+      }
 
-      // Créer le conteneur vidéo redimensionnable
-      const videoContainer = document.createElement('div');
-      videoContainer.style.minHeight = '100px';
-      
-      // Utiliser la hauteur appropriée selon le mode
-      if (params.mode === 'overlay') {
-         videoContainer.style.height = `${Settings.overlayHeight}px`;
+      // Créer une nouvelle vue selon le mode
+      let leaf = null;
+      if (params.mode === 'tab') {
+         leaf = app.workspace.getLeaf('split');
+         app.workspace.revealLeaf(leaf);
+      } else if (params.mode === 'sidebar') {
+         leaf = app.workspace.getRightLeaf(false);
+         app.workspace.revealLeaf(leaf);
       } else {
-         videoContainer.style.height = `${Settings.viewHeight}px`;
+         leaf = app.workspace.getLeaf('window');
+         app.workspace.revealLeaf(leaf);
+      }
+      if (!leaf) {
+         console.error("Impossible de créer une nouvelle vue");
+         return;
       }
 
-      // Ajouter la poignée de redimensionnement
-      const resizeHandle = document.createElement('div');
-      resizeHandle.className = 'resize-handle';
-      
-      // Ajouter une classe spécifique pour la poignée en mode overlay
-      if (params.mode === 'overlay') {
-         resizeHandle.classList.add('resize-handle-overlay');
-      }
-      
-      // Assembler les éléments
-      container.appendChild(controls);
-      container.appendChild(videoContainer);
-      container.appendChild(resizeHandle);
-      
-      // Positionner le conteneur selon le mode
-      if (params.mode === 'overlay') {
-         container.style.position = 'fixed';
-         container.style.bottom = '0';
-         container.style.right = '0';
-         container.style.width = '100%';
-         container.style.zIndex = '1000';
-      }
-      
-      document.body.appendChild(container);
+      // Sauvegarder l'ID de la leaf active
+      this.activeLeafId = (leaf as any).id;
+      this.activeView = leaf.view;
+
+      // Ouvrir la vue YouTube
+      await leaf.setViewState({
+         type: 'youtube-player',
+         state: {
+            videoId: cleanedVideoId,
+            timestamp: params.timestamp || 0
+         }
+      });
 
       // Sauvegarder les paramètres
-      Settings.lastVideoId = params.videoId;
+      Settings.lastVideoId = cleanedVideoId;
       Settings.currentMode = params.mode as VideoMode;
       Settings.isVideoOpen = true;
       Settings.activeLeafId = this.activeLeafId;
@@ -90,41 +89,14 @@ export class PlayerViewAndMode {
       const { Settings } = Store.get();
       if (!Settings) return;
 
+      const leaf = app.workspace.getLeafById(this.activeLeafId);
+      if (leaf) {
+         await leaf.close(); // Fermer l'ancienne feuille
+      }
+
       Settings.isVideoOpen = false;
       this.activeLeafId = null;
       this.activeView = null;
       await Settings.save();
    }
-} 
-
-
-
-
-
-       // Nettoyer le videoId
-       const cleanedVideoId = cleanVideoId(videoId);
-       console.log(`displayVideo() ${cleanedVideoId} en mode ${mode} avec timestamp ${timestamp}`);
-       
-       // Si on a déjà une vue ouverte et qu'on change de mode
-       if (this.Settings.settings.isVideoOpen && 
-           this.Settings.settings.currentMode !== mode) {
-           // Sauvegarder le videoId avant de fermer
-           const currentVideoId = cleanedVideoId;
-           // Forcer la fermeture de toutes les vues précédentes
-           await this.closePreviousVideos();
-           // Réinitialiser l'ID pour forcer une nouvelle création
-           this.activeLeafId = null;
-           // Restaurer le videoId
-           this.Settings.settings.lastVideoId = currentVideoId;
-       }
-       
-       
-       // Créer une nouvelle vue selon le mode
-       const { PlayerViewAndMode } = Store.get();
-       await PlayerViewAndMode.displayVideo({
-           videoId: cleanedVideoId,
-           mode: mode,
-           timestamp: timestamp,
-           fromUserClick: fromUserClick
-       });
-       
+}
