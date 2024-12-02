@@ -4,7 +4,7 @@ import { VideoJsPlayerOptions } from 'video.js';
 import type { default as VideoJs } from 'video.js';
 import { App, Plugin, Menu } from 'obsidian';
 import { Store } from './store';
-import { PlayerSettings, PluginSettings } from './types.d';
+import { Settings, PluginSettings } from './settings';
 
 type VideoJsPlayer = ReturnType<typeof videojs>;
 type VideoJsPlayerOptions = Parameters<typeof videojs>[1];
@@ -12,7 +12,7 @@ type VideoJsPlayerEvents = VideoJsPlayer;
 
 export class VideoPlayer {
    Player: VideoJsPlayer | null = null;
-   Settings: PluginSettings;
+   Settings: Settings;
    hasVideoJS: boolean = false;
    currentLanguage: string;
    container: HTMLElement | null = null;
@@ -22,10 +22,11 @@ export class VideoPlayer {
    startY: number = 0;
    startHeight: number = 0;
 
-   constructor(Settings: PluginSettings) {
+   constructor(Settings: Settings) {
       this.Settings = Settings;
       this.currentLanguage = document.documentElement.lang || 'en';
       this.hasVideoJS = typeof window.videojs !== 'undefined';
+      this.addCustomStyles();
    }
 
 // getObsidianLanguage() : Récupérer la langue de l'interface d'Obsidian avec fallback sur EN
@@ -52,7 +53,7 @@ export class VideoPlayer {
 // initializePlayer() : Initialiser le player
    async initializePlayer(videoId: string, container: HTMLElement, timestamp: number = 0, fromUserClick: boolean = false): Promise<VideoJsPlayer | HTMLElement> {
    try {
-      if (!this.Settings?.settings) {
+      if (!this.Settings) {
          console.warn('Settings non initialisés');
          return this.createFallbackPlayer(videoId, container, timestamp);
       }
@@ -109,16 +110,16 @@ export class VideoPlayer {
             type: 'video/youtube',
             src: `https://www.youtube.com/watch?v=${videoId}`
          }],
-// Désactiver les composants non désirés
+         // Désactiver les composants non désirés
          liveTracker: false,
          liveui: false,
-// Option générique pour tous les types de sources
+         // Option générique pour tous les types de sources
          autoplay: fromUserClick,
-// Définir l'ordre des composants
+         // Définir l'ordre des composants
          children: [
             'MediaLoader'
          ],
-// Configuration de la barre de contrôle
+         // Configuration de la barre de contrôle
          controlBar: {
             children: [
                'playToggle',
@@ -134,7 +135,7 @@ export class VideoPlayer {
             ]
          },
          
-// Traductions de la barre de contrôle
+         // Traductions de la barre de contrôle
          language: this.currentLanguage,
          languages: {
             en: {
@@ -169,12 +170,12 @@ export class VideoPlayer {
             }
          },
          
-// Configuration spécifique à YouTube
+         // Configuration spécifique à YouTube
          youtube: {
             iv_load_policy: 3,
             modestbranding: 1,
-            rel: this.Settings.settings.showYoutubeRecommendations ? 1 : 0,
-            endscreen: this.Settings.settings.showYoutubeRecommendations ? 1 : 0,
+            rel: this.Settings.showYoutubeRecommendations ? 1 : 0,
+            endscreen: this.Settings.showYoutubeRecommendations ? 1 : 0,
             controls: 0,
             ytControls: 0,
             preload: 'auto',
@@ -186,31 +187,30 @@ export class VideoPlayer {
             origin: window.location.origin,
          },
          
-// Configuration de la barre de progression
+         // Configuration de la barre de progression
          progressControl: {
             seekBar: true
          },
          enableSmoothSeeking: true,
          
-// Actions utilisateur
+         // Actions utilisateur
          userActions: {
             hotkeys: true
          },
          startTime: timestamp,
          
-// Configuration du plein écran
+         // Configuration du plein écran
          fullscreen: {
             options: {
                navigationUI: 'hide'
             }
          },
          
-// Appliquer le mode muet depuis les settings
-         muted: this.Settings.settings.isMuted ? 1 : 0,
-         
+         // Appliquer le mode muet depuis les settings
+         muted: this.Settings.isMuted ? 1 : 0,
       };
 
-      console.log("Player créé avec videoId:", this.Settings.settings.lastVideoId);
+      console.log("Player créé avec videoId:", this.Settings.getSettings().lastVideoId);
 
 // Créer le player
       console.log("Création du player VideoJS");
@@ -275,7 +275,7 @@ export class VideoPlayer {
       }
 
 // Appliquer la dernière vitesse utilisée
-      const savedRate = this.Settings.settings.playbackRate || 1;
+      const savedRate = this.Settings.getSettings().playbackRate || 1;
       this.Player!.playbackRate(savedRate);
       this.updatePlaybackRateButton(savedRate);
 
@@ -283,17 +283,13 @@ export class VideoPlayer {
       this.Player!.on('ratechange', () => {
          const newRate = this.Player!.playbackRate();
          this.updatePlaybackRateButton(newRate);
-         this.Settings.settings.playbackRate = newRate;
-         this.Settings.save();
+         this.Settings.playbackRate = newRate;
       });
 
 // Après l'initialisation du player
       this.Player!.on('volumechange', () => {
-         if (this.Settings.settings) {
-            this.Settings.settings.volume = this.Player!.volume();
-            this.Settings.settings.isMuted = this.Player!.muted();
-            this.Settings.save();
-         }
+         this.Settings.volume = this.Player!.volume() || 0;
+         this.Settings.isMuted = this.Player!.muted() || false;
       });
 
 // Mettre à jour le player dans le Store
@@ -606,8 +602,8 @@ export class VideoPlayer {
          youtube: {
                iv_load_policy: 3,
                modestbranding: 1,
-               rel: this.Settings.settings.showYoutubeRecommendations ? 1 : 0,
-               endscreen: this.Settings.settings.showYoutubeRecommendations ? 1 : 0,
+               rel: this.Settings.showYoutubeRecommendations ? 1 : 0,
+               endscreen: this.Settings.showYoutubeRecommendations ? 1 : 0,
                controls: 0,
                ytControls: 0,
                preload: 'auto',
@@ -638,7 +634,7 @@ export class VideoPlayer {
          },
          
          // État initial
-         muted: this.Settings.settings.isMuted ? 1 : 0,
+         muted: this.Settings.isMuted ? 1 : 0,
       };
    }
 
@@ -646,31 +642,27 @@ export class VideoPlayer {
       if (!this.Player) return;
       
       this.Player.on('play', (() => {
-         if (this.Settings.settings) {
-            this.Settings.settings.isPlaying = true;
-            this.Settings.save();
+         if (this.Settings) {
+            this.Settings.isPlaying = true;
          }
       }) as VideoJsPlayerEvents['play']);
 
       this.Player.on('pause', () => {
-         if (this.Settings.settings) {
-               this.Settings.settings.isPlaying = false;
-               this.Settings.save();
+         if (this.Settings) {
+            this.Settings.isPlaying = false;
          }
       });
 
       this.Player.on('volumechange', () => {
-         if (this.Player && this.Settings.settings) {
-               this.Settings.settings.volume = this.Player.volume();
-               this.Settings.settings.isMuted = this.Player.muted();
-               this.Settings.save();
+         if (this.Player && this.Settings) {
+            this.Settings.volume = this.Player.volume();
+            this.Settings.isMuted = this.Player.muted();
          }
       });
 
       this.Player.on('ratechange', () => {
-         if (this.Player && this.Settings.settings) {
-               this.Settings.settings.playbackRate = this.Player.playbackRate();
-               this.Settings.save();
+         if (this.Player && this.Settings) {
+            this.Settings.playbackRate = this.Player.playbackRate();
          }
       });
 
@@ -739,9 +731,9 @@ export class VideoPlayer {
       const { Settings } = Store.get();
       if (Settings) {
          if (isOverlay) {
-               Settings.settings.overlayHeight = newHeight;
+               Settings.overlayHeight = newHeight;
          } else {
-               Settings.settings.viewHeight = newHeight;
+               Settings.viewHeight = newHeight;
          }
          Settings.save();
       }
@@ -801,7 +793,7 @@ export class VideoPlayer {
                   this.updatePlaybackRateButton(newRate3);
                   break;
                case '4': // Favori
-                  const favoriteSpeed = this.Settings.settings.favoriteSpeed;
+                  const favoriteSpeed = this.Settings.favoriteSpeed;
                   if (favoriteSpeed) {
                      this.Player.playbackRate(favoriteSpeed);
                      this.updatePlaybackRateButton(favoriteSpeed);
@@ -814,8 +806,7 @@ export class VideoPlayer {
    updatePlaybackRateButton(rate: number): void {
       if (this.Player) {
          this.Player.playbackRate(rate);
-         this.Settings.settings.playbackRate = rate;
-         this.Settings.save();
+         this.Settings.playbackRate = rate;
       }
    }
 

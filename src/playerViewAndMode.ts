@@ -1,5 +1,5 @@
-import { Plugin } from 'obsidian';
 import { Store } from './store';
+import { VideoMode } from './types';
 
 export class PlayerViewAndMode {
    activeLeafId: string | null = null;
@@ -7,14 +7,14 @@ export class PlayerViewAndMode {
 
    constructor() {
       const { Settings } = Store.get();
-      this.activeLeafId = Settings?.settings?.activeLeafId || null;
+      this.activeLeafId = Settings?.activeLeafId || null;
    }
 
    async init() {
       const { app, Settings } = Store.get();
       if (!app || !Settings) return;
       
-      this.activeLeafId = Settings.settings.activeLeafId || null;
+      this.activeLeafId = Settings.activeLeafId || null;
    }
 
    async displayVideo(params: { 
@@ -48,9 +48,9 @@ export class PlayerViewAndMode {
       
       // Utiliser la hauteur appropriée selon le mode
       if (params.mode === 'overlay') {
-         videoContainer.style.height = `${Settings.settings.overlayHeight}px`;
+         videoContainer.style.height = `${Settings.overlayHeight}px`;
       } else {
-         videoContainer.style.height = `${Settings.settings.viewHeight}px`;
+         videoContainer.style.height = `${Settings.viewHeight}px`;
       }
 
       // Ajouter la poignée de redimensionnement
@@ -79,9 +79,9 @@ export class PlayerViewAndMode {
       document.body.appendChild(container);
 
       // Sauvegarder les paramètres
-      Settings.settings.lastVideoId = params.videoId;
-      Settings.settings.currentMode = params.mode;
-      Settings.settings.isVideoOpen = true;
+      Settings.lastVideoId = params.videoId;
+      Settings.currentMode = params.mode as VideoMode;
+      Settings.isVideoOpen = true;
       await Settings.save();
    }
 
@@ -89,9 +89,63 @@ export class PlayerViewAndMode {
       const { Settings } = Store.get();
       if (!Settings) return;
 
-      Settings.settings.isVideoOpen = false;
+      Settings.isVideoOpen = false;
       this.activeLeafId = null;
       this.activeView = null;
       await Settings.save();
    }
 } 
+
+
+
+
+class PlayerViewAndMode {
+   // ... existing code ...
+
+   async displayVideo({ videoId, mode, timestamp = 0, fromUserClick = false }) {
+       // Gérer le cas où params est null
+       if (!videoId) {
+           console.warn("Pas de videoId fourni à displayVideo");
+           return;
+       }
+
+       // Nettoyer le videoId
+       const cleanedVideoId = cleanVideoId(videoId);
+       console.log(`displayVideo() ${cleanedVideoId} en mode ${mode} avec timestamp ${timestamp}`);
+       
+       // Si on a déjà une vue ouverte et qu'on change de mode
+       if (this.Settings.settings.isVideoOpen && 
+           this.Settings.settings.currentMode !== mode) {
+           // Sauvegarder le videoId avant de fermer
+           const currentVideoId = cleanedVideoId;
+           // Forcer la fermeture de toutes les vues précédentes
+           await this.closePreviousVideos();
+           // Réinitialiser l'ID pour forcer une nouvelle création
+           this.activeLeafId = null;
+           // Restaurer le videoId
+           this.Settings.settings.lastVideoId = currentVideoId;
+       }
+       
+       // Mettre à jour le mode immédiatement
+       this.Settings.settings.currentMode = mode;
+       await this.Settings.save();
+       
+       // Créer une nouvelle vue selon le mode
+       const { PlayerViewAndMode } = Store.get();
+       await PlayerViewAndMode.displayVideo({
+           videoId: cleanedVideoId,
+           mode: mode,
+           timestamp: timestamp,
+           fromUserClick: fromUserClick
+       });
+       
+       // Sauvegarder l'état final
+       this.Settings.settings.lastVideoId = cleanedVideoId;
+       this.Settings.settings.lastTimestamp = timestamp;
+       this.Settings.settings.isVideoOpen = true;
+       this.Settings.settings.activeLeafId = this.activeLeafId;
+       await this.Settings.save();
+   }
+
+   // ... existing code ...
+}

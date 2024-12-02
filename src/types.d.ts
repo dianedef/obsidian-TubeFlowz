@@ -6,36 +6,40 @@ interface Window {
    videojs: VideoJSStatic;
 }
 
-export interface PlayerSettings {
-   lastVideoId: string | null;
-   isVideoOpen: boolean | null;
-   playlist: any[];
-   currentMode: VideoMode;
-   viewHeight: number;
-   playbackMode: PlaybackMode;
-   favoriteSpeed: number;
-   isMuted: boolean;
-   showYoutubeRecommendations: boolean;
-   playbackRate: number;
-   volume: number;
-   isPlaying: boolean;
-   activeLeafId: string | null;
-   overlayHeight: number;
+export type Volume = number & { _brand: 'Volume' };
+export type PlaybackRate = number & { _brand: 'PlaybackRate' };
+export type VideoMode = 'sidebar' | 'tab' | 'overlay';
+export type PlaybackMode = 'stream' | 'download';
+
+export function isValidVolume(value: number): value is Volume {
+    return value >= 0 && value <= 1;
+}
+
+export function isValidPlaybackRate(value: number): value is PlaybackRate {
+    return value >= 0.25 && value <= 16;
 }
 
 export interface PluginSettings {
-   settings: PlayerSettings;
-   save: () => Promise<void>;
+   lastVideoId: string | null;
+   lastTimestamp: number;
+   isVideoOpen: boolean;
+   isPlaying: boolean;
+   currentMode: VideoMode;
+   viewHeight: number;
+   overlayHeight: number;
+   activeLeafId: string | null;
+   playbackMode: PlaybackMode;
+   playbackRate: PlaybackRate;
+   favoriteSpeed: PlaybackRate;
+   volume: Volume;
+   isMuted: boolean;
+   showYoutubeRecommendations: boolean;
+   playlist: Array<{
+       id: string;
+       title: string;
+       timestamp: number;
+   }>;
 }
-
-export interface PluginWithSettings extends Plugin {
-   settings: PlayerSettings;
-}
-
-
-
-export type VideoMode = 'sidebar' | 'tab' | 'overlay';
-export type PlaybackMode = 'stream' | 'download' | 'default';
 
 export interface DisplayVideoParams {
     videoId: string;

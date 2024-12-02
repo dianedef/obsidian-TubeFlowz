@@ -1,18 +1,46 @@
-import { Plugin } from 'obsidian';
-import { Settings } from './settings';
-import { PlayerViewAndMode } from './playerViewAndMode';
+import { Plugin, App } from 'obsidian';
+import { Settings, PluginSettings } from './settings';
 import { VideoPlayer } from './videoPlayer';
+import { PlayerViewAndMode } from './playerViewAndMode';
+
+interface Translations {
+   fr: {
+      player: {
+         title: string;
+         close: string;
+      }
+   };
+   en: {
+      player: {
+         title: string;
+         close: string;
+      }
+   };
+}
+
+// Interface pour le typage uniquement
+interface PlayerViewAndModeType {
+   Settings: Settings | null;
+   i18n: any;
+   app: App | null;
+   activeLeafId: string | null;
+   activeView: any;
+   init(): void;
+   displayVideo(params: { videoId: string; mode: string; timestamp?: number; fromUserClick?: boolean }): Promise<void>;
+   closePreviousVideos(): Promise<void>;
+}
 
 export class Store {
    static instance: Store | null = null;
-   app: any;
-   plugin!: Plugin;
+   app: App;
+   plugin: Plugin;
    VideoPlayer: VideoPlayer | null = null;
    Settings: Settings | null = null;
    PlayerViewAndMode: PlayerViewAndMode | null = null;
+   translations: Translations;
    i18n: any;
-   t!: (key: string) => string;
-   
+   t: (key: string) => string;
+
    constructor(plugin: Plugin) {
       if (Store.instance) {
          return Store.instance;
@@ -22,36 +50,44 @@ export class Store {
       this.app = plugin.app;
       this.plugin = plugin;
       
-      // Traductions - définies une seule fois à l'initialisation
-      const translations = {
+      // Instance du VideoPlayer
+      this.VideoPlayer = null;
+      
+      // Traductions
+      this.translations = {
          fr: {
-            player: {
-               title: 'Lecteur YouTube',
-               close: 'Fermer'
-            }
+               player: {
+                  title: 'Lecteur YouTube',
+                  close: 'Fermer'
+               }
          },
          en: {
-            player: {
-               title: 'YouTube Player',
-               close: 'Close'
-            }
+               player: {
+                  title: 'YouTube Player',
+                  close: 'Close'
+               }
          }
-      } as const;
+      };
       
-      // Détecter la langue d'Obsidian - une seule fois à l'initialisation
+      // Détecter la langue d'Obsidian
       const locale = document.documentElement.lang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
-      this.i18n = translations[locale] || translations.en;
+      
+      // Utiliser la langue détectée
+      this.i18n = this.translations[locale] || this.translations.en;
       
       // Définir la méthode de traduction
-      this.t = (key: string): string => {
-         if (!this.i18n) return key;
-         const result = key.split('.').reduce((o: any, i: string) => o?.[i], this.i18n);
+      this.t = (key: string) => {
+         if (!this.i18n) {
+               return key;
+         }
+         
+         const result = key.split('.').reduce((o, i) => o?.[i], this.i18n);
          return result || key;
       };
       
       Store.instance = this;
    }
-   
+
    static async init(plugin: Plugin) {
       if (!Store.instance) {
          Store.instance = new Store(plugin);
@@ -75,12 +111,14 @@ export class Store {
    static get() {
       if (!Store.instance) {
          return {
-            Settings: null,
-            PlayerViewAndMode: null,
-            VideoPlayer: null,
-            app: null,
-            i18n: null,
-            t: (key: string) => key
+               Settings: null,
+               PlayerViewAndMode: null,
+               VideoPlayer: null,
+               app: null,
+               i18n: null,
+               settings: null,
+               translations: null,
+               t: (key: string) => key
          };
       }
       return Store.instance;
@@ -95,4 +133,4 @@ export class Store {
    static destroy() {
       Store.instance = null;
    }
-} 
+}
