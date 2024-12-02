@@ -1,12 +1,14 @@
-import { Plugin, Notice, ItemView, PluginSettingTab, Setting, Menu, WorkspaceLeaf } from 'obsidian';
+import { Plugin, Notice, ItemView, PluginSettingTab, Setting, Menu, WorkspaceLeaf, App } from 'obsidian';
 import { ViewPlugin, Decoration, WidgetType } from '@codemirror/view';
 import videojs from 'video.js';
 import 'videojs-youtube';
 import { DisplayVideoParams, VideoMode } from './types';
-import { Settings } from './settings';
+import { Settings, SettingsTab } from './settings';
 import { VideoPlayer } from './videoPlayer';
+import { createDecorations } from './decorations';
 import { Store } from './store';
 import { PlayerViewAndMode } from './playerViewAndMode';
+import { Hotkeys } from './hotkeys';
 
 // ---------- VIEW ----------
 interface IPlayerContainer {
@@ -25,10 +27,10 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
    Settings: Settings;
    PlayerViewAndMode: PlayerViewAndMode;
    t: (key: string) => string;
-   videoId: string | null;
-   timestamp: number;
-   activeLeafId: string | null;
-   VideoPlayer: VideoPlayer | null;
+   videoId: string | null = null;
+   timestamp: number = 0;
+   activeLeafId: string | null = null;
+   VideoPlayer: VideoPlayer | null = null;
    static videoPlayer: VideoPlayer | null;
 
    constructor(leaf: WorkspaceLeaf, activeLeafId: string | null, plugin: Plugin) {
@@ -259,10 +261,10 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
 
       let startY = 0;
       let startHeight = 0;
-      let rafId = null;
+      let rafId: number | null = null;
       let lastSaveTime = Date.now();
 
-      const updateSize = (newHeight) => {
+      const updateSize = (newHeight: number) => {
          if (rafId) cancelAnimationFrame(rafId);
          
          rafId = requestAnimationFrame(() => {
@@ -320,7 +322,7 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
          `;
          document.body.appendChild(overlay);
          
-         const handleMouseMove = (e) => {
+         const handleMouseMove = (e: MouseEvent) => {
                const deltaY = e.clientY - startY;
                const containerHeight = container.getBoundingClientRect().height;
                const newHeight = startHeight + (deltaY / containerHeight * 100);
@@ -348,7 +350,7 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
       return handle;
    }
 
-   async setupLocalVideo(path) {
+   async setupLocalVideo(path: string) {
       const { app } = Store.get();
       if (!app) throw new Error("App not initialized");
       const url = await app.vault.adapter.getResourcePath(path);
@@ -361,28 +363,29 @@ function cleanVideoId(videoId: string): string {
     return videoId.split('?')[0];
 }
 
-
-
 export default class TubeFlows extends Plugin {
+   hotkeys: Hotkeys;
+   Settings: Settings;
+   PlayerViewAndMode: PlayerViewAndMode;
+
+   constructor(app: App, manifest: any) {
+      super(app, manifest);
+      this.hotkeys = new Hotkeys(this);
+      const { Settings, PlayerViewAndMode } = Store.get();
+      if (!Settings || !PlayerViewAndMode) throw new Error("Settings or PlayerViewAndMode not initialized");
+      this.Settings = Settings;
+      this.PlayerViewAndMode = PlayerViewAndMode;
+   }
+
    async onload() {
       console.log("Chargement du plugin YouTubeFlow");
-      
-      // Initialiser le Store en premier
       await Store.init(this);
-      const { Settings, PlayerViewAndMode } = Store.get();
-      this.PlayerViewAndMode = PlayerViewAndMode;
-
-      // Initialiser les hotkeys en passant l'instance du plugin
-      this.hotkeys = new Hotkeys(this);
-      
-      // Enregistrer les commandes avec Obsidian
-      console.log("Enregistrement des raccourcis clavier...:", this.hotkeys);
       this.hotkeys.registerHotkeys();
 
       // Enregistrer notre vue
       this.registerView(
          'youtube-player',
-         (leaf) => new PlayerContainer(leaf, PlayerViewAndMode.activeLeafId)
+         (leaf) => new PlayerContainer(leaf, PlayerViewAndMode.activeLeafId, this)
       );
       
       // Attendre que le layout soit prêt
@@ -394,10 +397,10 @@ export default class TubeFlows extends Plugin {
             this.app.workspace.on('layout-change', () => {
                // Si aucune vue YouTube n'est ouverte mais qu'on devrait en avoir une
                const hasYouTubeView = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
-               if (!hasYouTubeView && Settings.settings.isVideoOpen) {
+               if (!hasYouTubeView && this.Settings.isVideoOpen) {
                   // Réinitialiser l'état
-                  Settings.settings.isVideoOpen = false;
-                  Settings.save();
+                  this.Settings.isVideoOpen = false;
+                  this.Settings.save();
                }
             })
          );
@@ -418,9 +421,9 @@ export default class TubeFlows extends Plugin {
                   if (overlay) {
                      const height = parseFloat(overlay.style.height);
                      if (!isNaN(height)) {
-                        Settings.settings.viewHeight = height;
-                        Settings.settings.overlayHeight = height;
-                        await Settings.save();
+                        this.Settings.viewHeight = height;
+                        this.Settings.overlayHeight = height;
+                        await this.Settings.save();
                      }
                   }
                   // Forcer la fermeture des vues précédentes avant de changer de mode
@@ -428,7 +431,7 @@ export default class TubeFlows extends Plugin {
                   // Rinitialiser l'activeLeafId pour forcer la cration d'une nouvelle vue
                   PlayerViewAndMode.activeLeafId = null;
                   await PlayerViewAndMode.displayVideo({
-                     videoId: Settings.settings.lastVideoId,
+                     videoId: this.Settings.lastVideoId,
                      mode: 'tab',
                      timestamp: 0,
                      fromUserClick: true
@@ -444,15 +447,15 @@ export default class TubeFlows extends Plugin {
                   if (overlay) {
                      const height = parseFloat(overlay.style.height);
                      if (!isNaN(height)) {
-                        Settings.settings.viewHeight = height;
-                        Settings.settings.overlayHeight = height;
-                        await Settings.save();
+                        this.Settings.viewHeight = height;
+                        this.Settings.overlayHeight = height;
+                        await this.Settings.save();
                      }
                   }
-                  await PlayerViewAndMode.closePreviousVideos();
-                  PlayerViewAndMode.activeLeafId = null;
-                  await PlayerViewAndMode.displayVideo({
-                     videoId: Settings.settings.lastVideoId,
+                  await this.PlayerViewAndMode.closePreviousVideos();
+                  this.PlayerViewAndMode.activeLeafId = null;
+                  await this.PlayerViewAndMode.displayVideo({
+                     videoId: this.Settings.lastVideoId,
                      mode: 'sidebar',
                      timestamp: 0,
                      fromUserClick: true
@@ -468,15 +471,15 @@ export default class TubeFlows extends Plugin {
                   if (videoContainer) {
                      const height = parseFloat(videoContainer.style.height);
                      if (!isNaN(height)) {
-                        Settings.settings.viewHeight = height;
-                        Settings.settings.overlayHeight = height;
-                        await Settings.save();
+                        Settings.viewHeight = height;
+                        this.Settings.overlayHeight = height;
+                        await this.Settings.save();
                      }
                   }
                   await PlayerViewAndMode.closePreviousVideos();
-                  PlayerViewAndMode.activeLeafId = null;
-                  await PlayerViewAndMode.displayVideo({
-                     videoId: Settings.settings.lastVideoId,
+                  this.PlayerViewAndMode.activeLeafId = null;
+                  await this.PlayerViewAndMode.displayVideo({
+                     videoId: this.Settings.lastVideoId,
                      mode: 'overlay',
                      timestamp: 0,
                      fromUserClick: true
@@ -490,7 +493,7 @@ export default class TubeFlows extends Plugin {
             y: iconRect.top - 10
          });
 
-         const menuEl = menu.dom;
+         const menuEl = menu;
          menuEl.style.pointerEvents = 'all';
          
          const handleMouseLeave = (e) => {

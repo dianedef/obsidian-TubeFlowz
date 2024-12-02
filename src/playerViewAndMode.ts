@@ -82,6 +82,7 @@ export class PlayerViewAndMode {
       Settings.lastVideoId = params.videoId;
       Settings.currentMode = params.mode as VideoMode;
       Settings.isVideoOpen = true;
+      Settings.activeLeafId = this.activeLeafId;
       await Settings.save();
    }
 
@@ -99,15 +100,6 @@ export class PlayerViewAndMode {
 
 
 
-class PlayerViewAndMode {
-   // ... existing code ...
-
-   async displayVideo({ videoId, mode, timestamp = 0, fromUserClick = false }) {
-       // Gérer le cas où params est null
-       if (!videoId) {
-           console.warn("Pas de videoId fourni à displayVideo");
-           return;
-       }
 
        // Nettoyer le videoId
        const cleanedVideoId = cleanVideoId(videoId);
@@ -126,9 +118,6 @@ class PlayerViewAndMode {
            this.Settings.settings.lastVideoId = currentVideoId;
        }
        
-       // Mettre à jour le mode immédiatement
-       this.Settings.settings.currentMode = mode;
-       await this.Settings.save();
        
        // Créer une nouvelle vue selon le mode
        const { PlayerViewAndMode } = Store.get();
@@ -139,13 +128,3 @@ class PlayerViewAndMode {
            fromUserClick: fromUserClick
        });
        
-       // Sauvegarder l'état final
-       this.Settings.settings.lastVideoId = cleanedVideoId;
-       this.Settings.settings.lastTimestamp = timestamp;
-       this.Settings.settings.isVideoOpen = true;
-       this.Settings.settings.activeLeafId = this.activeLeafId;
-       await this.Settings.save();
-   }
-
-   // ... existing code ...
-}
