@@ -1,26 +1,37 @@
 import { VideoId, Timestamp } from './video';
 
+// Interface pour le redimensionnement
+export interface ResizerOptions {
+    container: HTMLElement;
+    targetElement: HTMLElement;
+    handle: HTMLElement;
+    mode: ViewMode;
+    onResize: (height: number) => void;
+    minHeight?: number;
+    maxHeight?: number;
+}
+
 // Types de base pour les paramètres
 export type Volume = number & { readonly _brand: unique symbol };
 export type PlaybackRate = number & { readonly _brand: unique symbol };
 
 // Type Guards pour les paramètres
-export const isValidVolume = (value: number): value is Volume => {
-    return value >= 0 && value <= 1;
+export const isValidVolume = (value: unknown): value is Volume => {
+    return typeof value === 'number' && value >= 0 && value <= 1;
 };
 
-export const isValidPlaybackRate = (value: number): value is PlaybackRate => {
-    return value >= 0.25 && value <= 16;
+export const isValidPlaybackRate = (value: unknown): value is PlaybackRate => {
+    return typeof value === 'number' && value >= 0.25 && value <= 16;
 };
 
-export const createVolume = (value: number): Volume => {
+export const createVolume = (value: unknown): Volume => {
     if (!isValidVolume(value)) {
         throw new Error(`Invalid volume value: ${value}`);
     }
     return value as Volume;
 };
 
-export const createPlaybackRate = (value: number): PlaybackRate => {
+export const createPlaybackRate = (value: unknown): PlaybackRate => {
     if (!isValidPlaybackRate(value)) {
         throw new Error(`Invalid playback rate value: ${value}`);
     }
@@ -28,11 +39,13 @@ export const createPlaybackRate = (value: number): PlaybackRate => {
 };
 
 // Modes d'affichage
-export enum ViewMode {
-    Sidebar = 'sidebar',
-    Tab = 'tab',
-    Overlay = 'overlay'
-}
+export type ViewMode = 'sidebar' | 'overlay' | 'tab';
+
+export const VIEW_MODES = {
+    Sidebar: 'sidebar' as ViewMode,
+    Tab: 'tab' as ViewMode,
+    Overlay: 'overlay' as ViewMode
+} as const;
 
 // Mode de lecture
 export enum PlaybackMode {
@@ -42,13 +55,17 @@ export enum PlaybackMode {
 
 // Configuration du plugin
 export interface PluginSettings {
+    language: string;
     // Dernière session
-    lastVideoId: VideoId | null;
+    lastVideoId: VideoId;
     lastTimestamp: Timestamp;
-    lastViewMode: ViewMode;
+    isVideoOpen: boolean;
+    currentMode: ViewMode;
+    isChangingMode: boolean;
+    activeLeafId: string | null;
+    overlayLeafId: string | null;
     
     // État de lecture
-    isVideoOpen: boolean;
     isPlaying: boolean;
     playbackMode: PlaybackMode;
     playbackRate: PlaybackRate;
@@ -61,7 +78,6 @@ export interface PluginSettings {
     // Interface
     viewHeight: number;
     overlayHeight: number;
-    activeLeafId: string | null;
     showYoutubeRecommendations: boolean;
     
     // Raccourcis clavier
@@ -82,22 +98,32 @@ export interface PluginSettings {
         textColor?: string;
         backgroundColor?: string;
     };
+    // Playlist
+    playlist: Array<{
+        id: string;
+        title: string;
+        timestamp: number;
+    }>;
 }
 
 // Valeurs par défaut
 export const DEFAULT_SETTINGS: PluginSettings = {
-    lastVideoId: null,
-    lastTimestamp: 0,
-    lastViewMode: ViewMode.Sidebar,
+    language: 'en',
+    lastVideoId: 'dQw4w9WgXcQ' as VideoId,
+    lastTimestamp: 0 as Timestamp,
     isVideoOpen: false,
+    currentMode: 'sidebar',
+    isChangingMode: false,
+    activeLeafId: null,
+    overlayLeafId: null,
     isPlaying: false,
     playbackMode: PlaybackMode.Stream,
     playbackRate: createPlaybackRate(1),
-    favoriteSpeed: createPlaybackRate(1),
+    favoriteSpeed: createPlaybackRate(2),
     volume: createVolume(1),
     isMuted: false,
-    viewHeight: 300,
-    overlayHeight: 200,
-    activeLeafId: null,
-    showYoutubeRecommendations: false
+    viewHeight: 60,
+    overlayHeight: 60,
+    showYoutubeRecommendations: false,
+    playlist: []
 }; 

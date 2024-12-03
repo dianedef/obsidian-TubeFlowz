@@ -77,6 +77,51 @@ export const errorMessages = {
 // Type pour les clés de messages
 export type MessageKey = keyof typeof errorMessages.en;
 
+// Objet constant pour les clés de messages
+export const MESSAGE_KEYS = {
+    // YouTube errors
+    VIDEO_NOT_FOUND: 'VIDEO_NOT_FOUND' as MessageKey,
+    VIDEO_NOT_EMBEDDABLE: 'VIDEO_NOT_EMBEDDABLE' as MessageKey,
+    VIDEO_REMOVED: 'VIDEO_REMOVED' as MessageKey,
+    INVALID_PARAMETER: 'INVALID_PARAMETER' as MessageKey,
+    HTML5_ERROR: 'HTML5_ERROR' as MessageKey,
+
+    // Player errors
+    MEDIA_ERR_ABORTED: 'MEDIA_ERR_ABORTED' as MessageKey,
+    MEDIA_ERR_NETWORK: 'MEDIA_ERR_NETWORK' as MessageKey,
+    MEDIA_ERR_DECODE: 'MEDIA_ERR_DECODE' as MessageKey,
+    MEDIA_ERR_SRC_NOT_SUPPORTED: 'MEDIA_ERR_SRC_NOT_SUPPORTED' as MessageKey,
+    MEDIA_ERR_ENCRYPTED: 'MEDIA_ERR_ENCRYPTED' as MessageKey,
+    CONTAINER_NOT_INITIALIZED: 'CONTAINER_NOT_INITIALIZED' as MessageKey,
+
+    // Cache errors
+    STORAGE_FULL: 'STORAGE_FULL' as MessageKey,
+    INVALID_DATA: 'INVALID_DATA' as MessageKey,
+    EXPIRED: 'EXPIRED' as MessageKey,
+    CORRUPTED: 'CORRUPTED' as MessageKey,
+    CACHE_NOT_FOUND: 'CACHE_NOT_FOUND' as MessageKey,
+
+    // Config errors
+    INVALID_SETTINGS: 'INVALID_SETTINGS' as MessageKey,
+    MISSING_REQUIRED: 'MISSING_REQUIRED' as MessageKey,
+    TYPE_MISMATCH: 'TYPE_MISMATCH' as MessageKey,
+    VALIDATION_FAILED: 'VALIDATION_FAILED' as MessageKey,
+    INITIALIZATION_ERROR: 'INITIALIZATION_ERROR' as MessageKey,
+    INVALID_CONFIG_PARAMETER: 'INVALID_CONFIG_PARAMETER' as MessageKey,
+
+    // Volume and playback errors
+    INVALID_VOLUME: 'INVALID_VOLUME' as MessageKey,
+    INVALID_PLAYBACK_RATE: 'INVALID_PLAYBACK_RATE' as MessageKey,
+    LOAD_ERROR: 'LOAD_ERROR' as MessageKey,
+
+    // UI errors
+    VIDEO_ID_MISSING: 'INVALID_PARAMETER' as MessageKey,
+    SIDEBAR_CREATE_ERROR: 'MEDIA_ERR_ABORTED' as MessageKey,
+    VIDEO_LOAD_ERROR: 'LOAD_ERROR' as MessageKey,
+    RESIZE_ERROR: 'MEDIA_ERR_ABORTED' as MessageKey,
+    FULLSCREEN_ERROR: 'MEDIA_ERR_ABORTED' as MessageKey
+} as const;
+
 // Fonction pour obtenir un message traduit
 export function getErrorMessage(key: MessageKey, lang: 'en' | 'fr' = 'en'): string {
     return errorMessages[lang][key] || errorMessages.en[key];

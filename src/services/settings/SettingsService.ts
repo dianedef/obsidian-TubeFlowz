@@ -1,29 +1,6 @@
 import { App, Plugin } from 'obsidian';
-import { PluginSettings } from './types';
-import { PlaybackMode, PlaybackRate, VideoMode, Volume } from '../../types';
-
-const DEFAULT_VIDEO_ID = 'dQw4w9WgXcQ';
-
-const DEFAULT_SETTINGS: PluginSettings = {
-    lastVideoId: DEFAULT_VIDEO_ID,
-    isVideoOpen: false,
-    isChangingMode: false,
-    playlist: [],
-    currentMode: 'sidebar' as VideoMode,
-    viewHeight: 60,
-    overlayHeight: 60,
-    isPlaying: false,
-    activeLeafId: null,
-    overlayLeafId: null,
-    favoriteSpeed: 2 as PlaybackRate,
-    lastTimestamp: 0,
-    showYoutubeRecommendations: false,
-    isMuted: false,
-    playbackRate: 1 as PlaybackRate,
-    volume: 1 as Volume,
-    playbackMode: 'stream' as PlaybackMode,
-    language: 'en'
-};
+import { PluginSettings, DEFAULT_SETTINGS, ViewMode, PlaybackMode, PlaybackRate, Volume, createVolume, createPlaybackRate } from '../../types/settings';
+import { createVideoId } from '../../types/video';
 
 export class SettingsService {
     private plugin: Plugin;
@@ -32,6 +9,14 @@ export class SettingsService {
     constructor(plugin: Plugin) {
         this.plugin = plugin;
         this.settings = DEFAULT_SETTINGS;
+    }
+
+    public getPlugin(): Plugin {
+        return this.plugin;
+    }
+
+    public getSettings(): PluginSettings {
+        return this.settings;
     }
 
     get isPlaying(): boolean {
@@ -43,21 +28,20 @@ export class SettingsService {
         this.save();
     }
 
-    // Getters et setters pour toutes les propriétés
-    get lastVideoId(): string {
-        return this.settings.lastVideoId || DEFAULT_VIDEO_ID;
+    get lastVideoId(): string | null {
+        return this.settings.lastVideoId;
     }
 
-    set lastVideoId(value: string) {
-        this.settings.lastVideoId = value;
+    set lastVideoId(value: string | null) {
+        this.settings.lastVideoId = value ? createVideoId(value) : null;
         this.save();
     }
 
-    get currentMode(): VideoMode {
+    get currentMode(): ViewMode {
         return this.settings.currentMode;
     }
 
-    set currentMode(value: VideoMode) {
+    set currentMode(value: ViewMode) {
         this.settings.currentMode = value;
         this.save();
     }
@@ -67,7 +51,7 @@ export class SettingsService {
     }
 
     set viewHeight(value: number) {
-        this.settings.viewHeight = value;
+        this.settings.viewHeight = Math.max(0, Math.min(100, value));
         this.save();
     }
 
@@ -76,7 +60,7 @@ export class SettingsService {
     }
 
     set overlayHeight(value: number) {
-        this.settings.overlayHeight = value;
+        this.settings.overlayHeight = Math.max(0, Math.min(100, value));
         this.save();
     }
 
@@ -86,6 +70,15 @@ export class SettingsService {
 
     set activeLeafId(value: string | null) {
         this.settings.activeLeafId = value;
+        this.save();
+    }
+
+    get overlayLeafId(): string | null {
+        return this.settings.overlayLeafId;
+    }
+
+    set overlayLeafId(value: string | null) {
+        this.settings.overlayLeafId = value;
         this.save();
     }
 
@@ -107,17 +100,17 @@ export class SettingsService {
         this.save();
     }
 
-    get volume(): number {
+    get volume(): Volume {
         return this.settings.volume;
     }
 
     set volume(value: number) {
-        this.settings.volume = Math.max(0, Math.min(1, value)) as Volume;
+        this.settings.volume = createVolume(Math.max(0, Math.min(1, value)));
         this.save();
     }
 
     get isMuted(): boolean {
-        return this.settings.isMuted || this.settings.volume === 0;
+        return this.settings.isMuted;
     }
 
     set isMuted(value: boolean) {
@@ -125,21 +118,21 @@ export class SettingsService {
         this.save();
     }
 
-    get playbackRate(): number {
+    get playbackRate(): PlaybackRate {
         return this.settings.playbackRate;
     }
 
     set playbackRate(value: number) {
-        this.settings.playbackRate = Math.max(0.25, Math.min(16, value)) as PlaybackRate;
+        this.settings.playbackRate = createPlaybackRate(Math.max(0.25, Math.min(16, value)));
         this.save();
     }
 
-    get favoriteSpeed(): number {
+    get favoriteSpeed(): PlaybackRate {
         return this.settings.favoriteSpeed;
     }
 
     set favoriteSpeed(value: number) {
-        this.settings.favoriteSpeed = Math.max(0.25, Math.min(16, value)) as PlaybackRate;
+        this.settings.favoriteSpeed = createPlaybackRate(Math.max(0.25, Math.min(16, value)));
         this.save();
     }
 
@@ -170,11 +163,34 @@ export class SettingsService {
         this.save();
     }
 
-    // Méthodes pour la gestion des settings
+    get playlist(): Array<{id: string, title: string, timestamp: number}> {
+        return this.settings.playlist;
+    }
+
+    set playlist(value: Array<{id: string, title: string, timestamp: number}>) {
+        this.settings.playlist = value;
+        this.save();
+    }
+
     async loadSettings() {
         try {
             const savedData = await this.plugin.loadData();
             if (savedData) {
+                if (typeof savedData.volume === 'number') {
+                    savedData.volume = createVolume(savedData.volume);
+                }
+                if (typeof savedData.playbackRate === 'number') {
+                    savedData.playbackRate = createPlaybackRate(savedData.playbackRate);
+                }
+                if (typeof savedData.favoriteSpeed === 'number') {
+                    savedData.favoriteSpeed = createPlaybackRate(savedData.favoriteSpeed);
+                }
+                if (typeof savedData.viewHeight === 'number') {
+                    savedData.viewHeight = Math.max(0, Math.min(100, savedData.viewHeight));
+                }
+                if (typeof savedData.overlayHeight === 'number') {
+                    savedData.overlayHeight = Math.max(0, Math.min(100, savedData.overlayHeight));
+                }
                 this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
             }
         } catch (error) {
@@ -192,16 +208,8 @@ export class SettingsService {
         }
     }
 
-    // Méthode pour obtenir tous les settings (lecture seule)
-    getSettings(): Readonly<PluginSettings> {
-        return Object.freeze({ ...this.settings });
-    }
-
-    // Ajouter une méthode pour obtenir la langue courante d'Obsidian
     getCurrentLanguage(): string {
-        // Récupérer la langue de l'interface d'Obsidian
         const htmlLang = document.documentElement.lang;
-        // Mettre à jour les settings si la langue a changé
         const newLang = htmlLang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
         if (this.settings.language !== newLang) {
             this.settings.language = newLang;

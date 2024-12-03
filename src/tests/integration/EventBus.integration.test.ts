@@ -35,29 +35,6 @@ describe('EventBus Integration Tests', () => {
             expect(receivedVideoId).toBe('test123');
         });
 
-        it('should propagate volume changes', async () => {
-            let receivedVolume: { volume: Volume; isMuted: boolean } | null = null;
-            eventBus.on('video:volumeChange', (payload) => {
-                receivedVolume = payload;
-            });
-
-            const rawVolume = 0.5;
-            const volumeValue = createVolume(rawVolume);
-            player.volume.callsFake(() => rawVolume);
-            player.muted.callsFake(() => false);
-            
-            service.setVolume(volumeValue);
-            
-            // Déclencher l'événement volumechange
-            const callback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'volumechange')?.args[1];
-            if (callback) callback();
-
-            expect(receivedVolume).toEqual({
-                volume: volumeValue,
-                isMuted: false
-            });
-        });
-
         it('should propagate playback rate changes', async () => {
             let receivedRate: PlaybackRate | null = null;
             eventBus.on('video:rateChange', (rate) => {

@@ -1,11 +1,12 @@
-import { App, Plugin, WorkspaceLeaf } from 'obsidian';
-import { eventBus } from './EventBus';
-import type { VideoMode } from '../types';
+import { Plugin } from 'obsidian';
+import { ViewMode, VIEW_MODES } from '../types/settings';
+import { eventBus } from '../core/EventBus';
+import { App } from 'obsidian';
 
 export interface PluginState {
     videoId: string | null;
     timestamp: number;
-    mode: VideoMode;
+    mode: ViewMode;
     isPlaying: boolean;
 }
 
@@ -13,7 +14,7 @@ export class TubeFlowsPlugin extends Plugin {
     private state: PluginState = {
         videoId: null,
         timestamp: 0,
-        mode: 'sidebar',
+        mode: VIEW_MODES.Sidebar,
         isPlaying: false
     };
 
@@ -81,7 +82,7 @@ export class TubeFlowsPlugin extends Plugin {
     }
 
     // Méthodes publiques pour interagir avec le plugin
-    public async loadVideo(videoId: string, mode: VideoMode = 'sidebar'): Promise<void> {
+    public async loadVideo(videoId: string, mode: ViewMode = VIEW_MODES.Sidebar): Promise<void> {
         this.state.mode = mode;
         eventBus.emit('video:load', videoId);
     }

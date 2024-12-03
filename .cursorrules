@@ -1,3 +1,28 @@
+Donc pour résumer :
+PlayerView : La vue Obsidian elle-même
+ViewModeService : Gère la création/fermeture des vues et leur mode
+PlayerUI : Gère l'interface utilisateur du lecteur
+PlayerService : Gère la logique métier du lecteur
+On peut maintenant migrer progressivement la logique de PlayerContainer vers ces différents composants. Par où voulez-vous commencer ?
+
+
+Je vois maintenant que le resize est géré différemment de ce que nous pensions :
+Dans PlayerService :
+Il utilise un ResizeObserver pour détecter les changements de taille du container
+Il émet un événement 'view:resize' via eventBus
+Dans utils.ts :
+Il y a des fonctions saveHeight et getHeight qui gèrent la persistance et la récupération des hauteurs
+Ces fonctions sont liées aux settings et au mode de vue
+La méthode resize dans IPlayerUI n'est en fait pas nécessaire car :
+Le redimensionnement est géré au niveau du service via ResizeObserver
+La persistance est gérée via les utils
+L'UI n'a pas besoin de gérer directement le resize
+Je suggère donc de :
+Soit modifier l'interface IPlayerUI pour retirer la méthode resize
+2. Soit vérifier où cette interface est utilisée pour comprendre pourquoi elle requiert cette méthode
+Voulez-vous que je vérifie l'interface IPlayerUI pour voir où elle est définie et utilisée ?
+
+
 Avant de passer en production, voici ce qu'il nous reste à faire :
 1. Corriger les tests (priorité haute)
 Résoudre les problèmes de Type Guards

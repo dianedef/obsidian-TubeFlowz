@@ -180,4 +180,21 @@ export const isCacheError = (error: unknown): error is CacheAppError => {
 
 export const isConfigError = (error: unknown): error is ConfigAppError => {
     return error instanceof ConfigAppError;
-}; 
+};
+
+export enum CommandErrorCode {
+    NO_PLAYER = 'NO_PLAYER',
+    INVALID_STATE = 'INVALID_STATE',
+    PLAYBACK_ERROR = 'PLAYBACK_ERROR'
+}
+
+export class CommandError extends Error {
+    constructor(
+        public code: CommandErrorCode,
+        public message: string,
+        public details?: any
+    ) {
+        super(message);
+        this.name = 'CommandError';
+    }
+} 

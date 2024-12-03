@@ -1,10 +1,10 @@
-import { VideoMode, PlaybackMode, Volume, PlaybackRate } from '../../types.d';
+import { ViewMode, PlaybackMode, Volume, PlaybackRate } from '../../types/settings';
 
 export interface PluginSettings {
    lastVideoId: string | null;
    lastTimestamp: number;
    isVideoOpen: boolean;
-   currentMode: VideoMode;
+   currentMode: ViewMode;
    isChangingMode: boolean;
    activeLeafId: string | null;
    overlayLeafId: string | null;

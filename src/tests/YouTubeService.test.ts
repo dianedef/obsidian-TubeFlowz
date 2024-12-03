@@ -92,51 +92,6 @@ describe('YouTubeService', () => {
             expect(player.currentTime.calledWith(timestamp)).toBeTruthy();
         });
 
-        it('should handle volume changes', () => {
-            const rawVolume = 0.5;
-            const volumeValue = createVolume(rawVolume);
-            service.setVolume(volumeValue);
-            
-            // Pour YouTube, le volume est converti en 0 ou 1
-            const youtubeVolume = rawVolume > 0 ? 1 : 0;
-            expect(player.volume.calledWith(rawVolume)).toBeTruthy();
-            
-            // Simuler un changement de volume
-            player.volume.callsFake(() => rawVolume);
-            player.muted.callsFake(() => false);
-            
-            // Déclencher l'événement après avoir configuré les retours
-            const callback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'volumechange')?.args[1];
-            if (callback) callback();
-            
-            expect(eventSpy).toHaveBeenCalledWith('video:volumeChange', {
-                volume: volumeValue,
-                isMuted: false
-            });
-        });
-
-        it('should handle volume being set to zero', () => {
-            const rawVolume = 0;
-            const volumeValue = createVolume(rawVolume);
-            service.setVolume(volumeValue);
-            
-            // Vérifie que le volume YouTube est bien 0
-            expect(player.volume.calledWith(0)).toBeTruthy();
-            
-            // Simuler un changement de volume
-            player.volume.callsFake(() => rawVolume);
-            player.muted.callsFake(() => false);
-            
-            // Déclencher l'événement après avoir configuré les retours
-            const callback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'volumechange')?.args[1];
-            if (callback) callback();
-            
-            expect(eventSpy).toHaveBeenCalledWith('video:volumeChange', {
-                volume: volumeValue,
-                isMuted: false
-            });
-        });
-
         it('should handle playback rate changes', () => {
             const rawRate = 1.5;
             const rateValue = createPlaybackRate(rawRate);

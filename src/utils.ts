@@ -1,4 +1,4 @@
-import { VideoMode } from './types';
+import { ViewMode, VIEW_MODES } from './types/settings';
 import { PluginSettings, DEFAULT_SETTINGS } from './types/settings';
 import { Plugin } from 'obsidian';
 
@@ -41,9 +41,9 @@ export function extractVideoId(url: string): string | null {
  * @param mode Le mode pour lequel sauvegarder la hauteur
  * @param plugin Le plugin Obsidian
  */
-export async function saveHeight(height: number, mode: VideoMode, plugin: Plugin): Promise<void> {
+export async function saveHeight(height: number, mode: ViewMode, plugin: Plugin): Promise<void> {
     const settings = await plugin.loadData() as PluginSettings;
-    if (mode === 'overlay') {
+    if (mode === VIEW_MODES.Overlay) {
         settings.overlayHeight = height;
     } else {
         settings.viewHeight = height;
@@ -57,42 +57,18 @@ export async function saveHeight(height: number, mode: VideoMode, plugin: Plugin
  * @param settings Les paramètres du plugin
  * @returns La hauteur en pourcentage
  */
-export function getHeight(mode: VideoMode, settings: PluginSettings): number {
-    if (mode === 'overlay') {
-        return settings.overlayHeight || DEFAULT_SETTINGS.overlayHeight;
-    }
-    return settings.viewHeight || DEFAULT_SETTINGS.viewHeight;
-}
+export function getHeight(mode: ViewMode, settings: PluginSettings): number {
+    // Utiliser les valeurs par défaut si non définies
+    const defaultHeight = mode === VIEW_MODES.Overlay 
+        ? DEFAULT_SETTINGS.overlayHeight 
+        : DEFAULT_SETTINGS.viewHeight;
 
-/**
- * Sauvegarde la hauteur actuelle d'un élément
- * @param element L'élément dont on veut sauvegarder la hauteur
- * @param mode Le mode actuel
- * @param plugin Le plugin Obsidian
- * @returns true si la sauvegarde a réussi, false sinon
- */
-export async function saveElementHeight(element: HTMLElement | null, mode: VideoMode, plugin: Plugin): Promise<boolean> {
-    if (!element) return false;
+    // Récupérer la valeur appropriée selon le mode
+    const height = mode === VIEW_MODES.Overlay
+        ? settings.overlayHeight ?? defaultHeight
+        : settings.viewHeight ?? defaultHeight;
 
-    const height = parseFloat(element.style.height);
-    if (isNaN(height)) return false;
-
-    await saveHeight(height, mode, plugin);
-    return true;
-}
-
-/**
- * Trouve et sauvegarde la hauteur du conteneur vidéo actuel
- * @param mode Le mode actuel
- * @param plugin Le plugin Obsidian
- * @returns true si la sauvegarde a réussi, false sinon
- */
-export async function saveCurrentVideoHeight(mode: VideoMode, plugin: Plugin): Promise<boolean> {
-    const selector = mode === 'overlay' 
-        ? '.youtube-overlay' 
-        : '.youtube-player div[style*="height"]';
-    
-    const container = document.querySelector(selector);
-    return saveElementHeight(container as HTMLElement, mode, plugin);
+    // S'assurer que la valeur est dans les limites
+    return Math.min(Math.max(height, 20), 90);
 }
 

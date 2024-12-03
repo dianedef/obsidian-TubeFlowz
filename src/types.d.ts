@@ -20,7 +20,7 @@ export function isValidPlaybackRate(value: number): value is PlaybackRate {
 }
 
 export interface PluginSettings {
-    lastVideoId: string | null;
+    lastVideoId: string;
     lastTimestamp: number;
     isVideoOpen: boolean;
     isPlaying: boolean;

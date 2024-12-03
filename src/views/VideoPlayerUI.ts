@@ -4,7 +4,13 @@ import type { default as VideoJs } from 'video.js';
 import 'videojs-youtube';
 import { App, Plugin, Menu } from 'obsidian';
 import { SettingsService } from '../services/settings/SettingsService';
-import { VideoMode, VideoJsOptions, VideoJsEvents, PlayerControls, Translations, PlaybackRate } from '../types';
+import { ViewMode } from '../types/settings';
+import { VideoJsOptions, VideoJsEvents, PlayerControls, Translations, PlaybackRate } from '../types';
+import { IPlayerUI } from '../types/IPlayerUI';
+import { IPlayerState } from '../types/IPlayer';
+import { DEFAULT_SETTINGS } from '../types/settings';
+import { PlayerAppError, YouTubeAppError, PlayerErrorCode, YouTubeErrorCode } from '../types/errors';
+import { MESSAGE_KEYS } from '../i18n/messages';
 
 type VideoJsPlayer = ReturnType<typeof videojs> & PlayerControls;
 type VideoJsPlayerOptions = VideoJsOptions;
@@ -33,8 +39,8 @@ interface VideoJsEventMap {
     'ended': () => void;
 }
 
-export default class VideoPlayer {
-   private static instance: VideoPlayer | null = null;
+export class VideoPlayerUI implements IPlayerUI {
+   private static instance: VideoPlayerUI | null = null;
    Player: ExtendedVideoJsPlayer | null = null;
    private settings: SettingsService;
    hasVideoJS: boolean = false;
@@ -45,6 +51,7 @@ export default class VideoPlayer {
    isDragging: boolean = false;
    startY: number = 0;
    startHeight: number = 0;
+   private currentVideoId: string | null = null;
 
    private constructor(settings: SettingsService) {
       this.settings = settings;
@@ -52,17 +59,17 @@ export default class VideoPlayer {
    }
 
    // Méthodes du Singleton
-   static getInstance(settings: SettingsService): VideoPlayer {
-      if (!VideoPlayer.instance) {
-         VideoPlayer.instance = new VideoPlayer(settings);
+   static getInstance(settings: SettingsService): VideoPlayerUI {
+      if (!VideoPlayerUI.instance) {
+         VideoPlayerUI.instance = new VideoPlayerUI(settings);
       }
-      return VideoPlayer.instance;
+      return VideoPlayerUI.instance;
    }
 
    static destroyInstance(): void {
-      if (VideoPlayer.instance) {
-         VideoPlayer.instance.dispose();
-         VideoPlayer.instance = null;
+      if (VideoPlayerUI.instance) {
+         VideoPlayerUI.instance.dispose();
+         VideoPlayerUI.instance = null;
       }
    }
 
@@ -81,7 +88,7 @@ export default class VideoPlayer {
          this.Player.language(newLang);
          
          // Mettre à jour les traductions
-         const translations: Translations[string] = newLang === 'fr' ? {
+         const translations = newLang === 'fr' ? {
             "Play": "Lecture",
             "Pause": "Pause",
             "Mute": "Muet",
@@ -111,8 +118,8 @@ export default class VideoPlayer {
             "Close": "Close"
          };
          
-         // Utiliser la méthode language pour définir les traductions
-         this.Player.language(newLang, translations);
+         // Utiliser la méthode language pour définir la langue uniquement
+         this.Player.language(newLang);
       }
    }
 
@@ -131,18 +138,18 @@ export default class VideoPlayer {
    // Mettre à jour initializePlayer pour initialiser l'observateur de langue
    async initializePlayer(videoId: string, container: HTMLElement, timestamp: number = 0, fromUserClick: boolean = false): Promise<ExtendedVideoJsPlayer | HTMLElement> {
       try {
-         if (!this.settings) {
-            console.warn('Settings non initialisés');
-            return this.createFallbackPlayer(videoId, container, timestamp);
-         }
+         const settings = this.settings || DEFAULT_SETTINGS;
 
          if (!videoId) {
             console.warn('VideoId manquant');
-            return this.createFallbackPlayer('ag7HXbgJtuk', container, timestamp);
+            throw new YouTubeAppError(
+               YouTubeErrorCode.INVALID_PARAMETER,
+               MESSAGE_KEYS.VIDEO_ID_MISSING
+            );
          }
 
          // Si on a déjà un player avec le même ID, ne rien faire
-         if (this.Player && this.Player.src().includes(videoId)) {
+         if (this.Player && this.Player.src() && this.Player.src().toString().includes(videoId)) {
             console.log("Player déjà initialisé avec le même ID");
             return this.Player;
          }
@@ -157,7 +164,10 @@ export default class VideoPlayer {
          console.log("Initialisation du player avec videoId:", videoId);
          // Vérifier si videojs est disponible
          if (typeof videojs !== 'function') {
-            return this.createFallbackPlayer(videoId, container, timestamp);
+            throw new PlayerAppError(
+               PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED,
+               MESSAGE_KEYS.INITIALIZATION_ERROR
+            );
          }
 
          // Conteneur principal
@@ -191,6 +201,32 @@ export default class VideoPlayer {
                src: `https://www.youtube.com/watch?v=${videoId}`
             }],
             language: this.currentLanguage,
+            languages: {
+               fr: {
+                  "Play": "Lecture",
+                  "Pause": "Pause",
+                  "Mute": "Muet",
+                  "Unmute": "Son activé",
+                  "Current Time": "Temps actuel",
+                  "Duration": "Durée",
+                  "Remaining Time": "Temps restant",
+                  "Playback Rate": "Vitesse de lecture",
+                  "Fullscreen": "Plein écran",
+                  "Non-Fullscreen": "Fenêtré"
+               },
+               en: {
+                  "Play": "Play",
+                  "Pause": "Pause",
+                  "Mute": "Mute",
+                  "Unmute": "Unmute",
+                  "Current Time": "Current Time",
+                  "Duration": "Duration",
+                  "Remaining Time": "Remaining Time",
+                  "Playback Rate": "Playback Rate",
+                  "Fullscreen": "Fullscreen",
+                  "Non-Fullscreen": "Exit Fullscreen"
+               }
+            },
             controlBar: {
                children: [
                   'playToggle',
@@ -232,9 +268,9 @@ export default class VideoPlayer {
 
          console.log("Player créé avec videoId:", this.settings.getSettings().lastVideoId);
 
-// Créer le player avec le bon type
+         // Créer le player avec le bon élément
          console.log("Création du player VideoJS");
-         const player = videojs(container, options) as ExtendedVideoJsPlayer;
+         const player = videojs(video, options) as ExtendedVideoJsPlayer;
          this.Player = player;
 
          if (!this.Player) {
@@ -277,7 +313,13 @@ export default class VideoPlayer {
          return this.Player;
       } catch (error) {
          console.error("Erreur lors de l'initialisation du player vidéo:", error);
-         return this.createFallbackPlayer(videoId, container, timestamp);
+         if (error instanceof YouTubeAppError || error instanceof PlayerAppError) {
+            throw error;
+         }
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_DECODE,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
       }
    }
 
@@ -443,7 +485,12 @@ export default class VideoPlayer {
    }
 
    private initializeEvents(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
 
       // Typer correctement les événements
       this.Player.on('play', () => {
@@ -505,14 +552,10 @@ export default class VideoPlayer {
    }
 
    updatePlaybackRateButton(rate: number): void {
-      if (!this.Player || !this.settings) return;
-      
-      if (this.isValidPlaybackRate(rate)) {
-         this.Player.playbackRate(rate);
-         this.settings.playbackRate = rate;
-         
-         if (this.playbackRateButton) {
-            this.playbackRateButton.textContent = `${rate}x`;
+      if (this.playbackRateButton) {
+         const buttonElement = this.playbackRateButton.el();
+         if (buttonElement) {
+            buttonElement.textContent = `${rate}x`;
          }
       }
    }
@@ -638,22 +681,10 @@ export default class VideoPlayer {
       if (this.resizeObserver) {
          this.resizeObserver.disconnect();
       }
-      document.removeEventListener('keydown', this.handleKeydown.bind(this));
-      document.removeEventListener('mousemove', this.handleResizeMove.bind(this));
-      document.removeEventListener('mouseup', this.handleResizeEnd.bind(this));
-      
-      if (this.Player && typeof this.Player.dispose === 'function') {
-         this.Player.dispose();
-      }
-
+      this.destroy();
       if (this.container) {
          this.container.remove();
          this.container = null;
-      }
-
-      const videoContainer = document.querySelector('.video-container');
-      if (videoContainer) {
-         videoContainer.remove();
       }
    }
 
@@ -669,30 +700,61 @@ export default class VideoPlayer {
    }
 
    requestFullscreen(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       try {
          this.Player.requestFullscreen().catch(error => {
             console.error("Erreur lors du passage en plein écran:", error);
+            throw new PlayerAppError(
+               PlayerErrorCode.MEDIA_ERR_ABORTED,
+               MESSAGE_KEYS.FULLSCREEN_ERROR
+            );
          });
       } catch (error) {
          console.error("Erreur lors du passage en plein écran:", error);
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.FULLSCREEN_ERROR
+         );
       }
    }
 
    exitFullscreen(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       try {
          this.Player.exitFullscreen().catch(error => {
             console.error("Erreur lors de la sortie du plein écran:", error);
+            throw new PlayerAppError(
+               PlayerErrorCode.MEDIA_ERR_ABORTED,
+               MESSAGE_KEYS.FULLSCREEN_ERROR
+            );
          });
       } catch (error) {
          console.error("Erreur lors de la sortie du plein écran:", error);
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.FULLSCREEN_ERROR
+         );
       }
    }
 
    // Méthodes de contrôle du player
    togglePlayPause(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       if (this.Player.paused()) {
          this.Player.play();
       } else {
@@ -701,7 +763,12 @@ export default class VideoPlayer {
    }
 
    rewind(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       const currentTime = this.Player.currentTime();
       if (typeof currentTime === 'number') {
          this.Player.currentTime(Math.max(0, currentTime - 10));
@@ -709,7 +776,12 @@ export default class VideoPlayer {
    }
 
    forward(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       const currentTime = this.Player.currentTime();
       const duration = this.Player.duration();
       if (typeof currentTime === 'number' && typeof duration === 'number') {
@@ -718,7 +790,12 @@ export default class VideoPlayer {
    }
 
    increaseSpeed(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       const currentRate = this.Player.playbackRate();
       if (typeof currentRate === 'number') {
          const newRate = Math.min(16, currentRate + 0.25);
@@ -728,7 +805,12 @@ export default class VideoPlayer {
    }
 
    decreaseSpeed(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       const currentRate = this.Player.playbackRate();
       if (typeof currentRate === 'number') {
          const newRate = Math.max(0.25, currentRate - 0.25);
@@ -738,13 +820,60 @@ export default class VideoPlayer {
    }
 
    resetSpeed(): void {
-      if (!this.Player) return;
+      if (!this.Player) {
+         throw new PlayerAppError(
+            PlayerErrorCode.MEDIA_ERR_ABORTED,
+            MESSAGE_KEYS.INITIALIZATION_ERROR
+         );
+      }
       this.Player.playbackRate(1);
       this.updatePlaybackRateButton(1);
    }
+
+   async initialize(videoId: string, container: HTMLElement, timestamp: number = 0): Promise<void> {
+      this.currentVideoId = videoId;
+   }
+
+   getCurrentVideoId(): string | null {
+      return this.currentVideoId;
+   }
+
+   render(container: HTMLElement): void {
+      this.container = container;
+      this.initializePlayer(this.currentVideoId || '', container);
+   }
+
+   update(state: IPlayerState): void {
+      if (this.Player) {
+         if (state.isPlaying) {
+            this.Player.play();
+         } else {
+            this.Player.pause();
+         }
+      }
+   }
+
+   show(): void {
+      if (this.container) {
+         this.container.style.display = 'block';
+      }
+   }
+
+   hide(): void {
+      if (this.container) {
+         this.container.style.display = 'none';
+      }
+   }
+
+   destroy(): void {
+      if (this.Player) {
+         this.Player.dispose();
+         this.Player = null;
+      }
+      if (this.container) {
+         this.container.empty();
+         this.container.detach();
+      }
+   }
 }
-
-
-
-
 

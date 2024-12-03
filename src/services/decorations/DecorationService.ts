@@ -1,10 +1,11 @@
 import { EditorView } from '@codemirror/view';
 import { Decoration, WidgetType } from '@codemirror/view';
-import { VideoMode } from '../types';
-import { extractVideoId, cleanVideoId, type CleanVideoId } from '../utils';
-import { SettingsService } from './settings/SettingsService';
+import { ViewMode, VIEW_MODES } from '../../types/settings';
+import { extractVideoId, cleanVideoId, type CleanVideoId } from '../../utils';
+import { SettingsService } from '../settings/SettingsService';
+import PlayerService from '../player/PlayerService';
 
-export function createDecorations(view: EditorView, settings: SettingsService) {
+export default function createDecorations(view: EditorView, settings: SettingsService) {
    const decorations = [];
    const doc = view.state.doc;
    
@@ -77,13 +78,14 @@ export class DecorationForUrl extends WidgetType {
       sparkle.addEventListener('click', async (e: MouseEvent) => {
          e.preventDefault();
          e.stopPropagation();
-         if (!this.settings.playerViewAndMode) {
-            console.error("PlayerViewAndMode non initialisé");
+         const playerService = PlayerService.getInstance(this.settings.getSettings());
+         if (!playerService) {
+            console.error("PlayerService non initialisé");
             return;
          }
-         await this.settings.playerViewAndMode.displayVideo({
+         await playerService.loadVideo({
             videoId: this.videoId,
-            mode: this.settings.currentMode || 'sidebar' as VideoMode,
+            mode: this.settings.currentMode || VIEW_MODES.Sidebar,
             timestamp: this.timestamp,
             fromUserClick: true
          });

@@ -163,7 +163,7 @@ export class MockItemView {
     containerEl: HTMLElement;
     plugin: any;
     Settings: any;
-    PlayerViewAndMode: any;
+    ViewModeService: any;
     t: (key: string) => string;
     activeLeafId: string | null;
     VideoPlayer: any;
@@ -171,7 +171,7 @@ export class MockItemView {
     constructor() {
         this.containerEl = document.createElement('div');
         this.Settings = {};
-        this.PlayerViewAndMode = {
+        this.ViewModeService = {
             mode: 'sidebar',
             viewType: 'youtube-player',
             displayText: 'YouTube Player'
@@ -219,8 +219,14 @@ export class MockPlugin {
     // Méthodes de base
     load() { return Promise.resolve(); }
     unload() { return Promise.resolve(); }
-    addChild(child: any) { this.children.push(child); }
-    removeChild(child: any) { this.children = this.children.filter(c => c !== child); }
+    addChild<T>(child: T): T { 
+        this.children.push(child); 
+        return child;
+    }
+    removeChild<T>(child: T): T { 
+        this.children = this.children.filter(c => c !== child);
+        return child;
+    }
     register() {}
 
     // Méthodes requises
@@ -242,17 +248,32 @@ export class MockPlugin {
     registerMarkdownPostProcessor(processor: MarkdownPostProcessor): MarkdownPostProcessor {
         return processor;
     }
-    registerMarkdownCodeBlockProcessor(language: string, processor: MarkdownPostProcessor): MarkdownPostProcessor {
-        return processor;
+    registerMarkdownCodeBlockProcessor(
+        language: string, 
+        handler: (source: string, el: HTMLElement, ctx: any) => void | Promise<any>,
+        sortOrder?: number
+    ): any {
+        return handler;
     }
     registerCodeMirror() {}
     registerEditorExtension(extension: Extension) {}
     registerObsidianProtocolHandler() {}
-    registerDomEvent() { return { unsubscribe: () => {} }; }
-    registerEvent() { return { unsubscribe: () => {} }; }
-    registerInterval() { return { unsubscribe: () => {} }; }
+    registerDomEvent(
+        el: HTMLElement | Document | Window,
+        type: string,
+        callback: (evt: Event) => any,
+        options?: boolean | AddEventListenerOptions
+    ): void {
+        el.addEventListener(type, callback, options);
+    }
+    registerEvent(evt: any) { 
+        return { unsubscribe: () => {} }; 
+    }
+    registerInterval(cb: () => any): number {
+        return window.setInterval(cb, 1000);
+    }
     removeCommand() {}
-    registerHoverLinkSource(source: HoverLinkSource) { return { unsubscribe: () => {} }; }
+    registerHoverLinkSource(id: string, info: HoverLinkSource) { return { unsubscribe: () => {} }; }
     registerEditorSuggest(suggest: EditorSuggest<any>) {}
     onUserEnable() {}
 
@@ -266,10 +287,18 @@ export class MockPlugin {
     }
 }
 
+// Mock de Notice pour Obsidian
+export class Notice {
+    constructor(message: string) {
+        console.log('Notice:', message);
+    }
+}
+
 // Configuration globale pour les tests
 vi.mock('obsidian', () => ({
     ItemView: MockItemView,
     Plugin: MockPlugin,
+    Notice: Notice,
     WorkspaceLeaf: class WorkspaceLeaf {
         view: any;
         containerEl: HTMLElement;
@@ -293,6 +322,19 @@ const extendHTMLElement = () => {
 
     HTMLElement.prototype.removeClass = function(className: string) {
         this.classList.remove(className);
+    };
+
+    HTMLElement.prototype.createDiv = function(className?: string) {
+        const div = document.createElement('div');
+        if (className) {
+            div.className = className;
+        }
+        this.appendChild(div);
+        return div;
+    };
+
+    HTMLElement.prototype.detach = function() {
+        this.remove();
     };
 };
 
