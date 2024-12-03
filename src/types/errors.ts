@@ -1,3 +1,5 @@
+import { getErrorMessage, MessageKey } from '../i18n/messages';
+
 // Codes d'erreur génériques de l'application
 export enum AppErrorCode {
     // Erreurs générales
@@ -22,12 +24,30 @@ export enum AppErrorCode {
 
 // Interface de base pour toutes les erreurs de l'application
 export interface BaseError extends Error {
-    readonly code: AppErrorCode;
+    readonly code: AppErrorCode | YouTubeErrorCode | PlayerErrorCode | CacheErrorCode | ConfigErrorCode;
     readonly timestamp: number;
     readonly details?: Record<string, unknown>;
 }
 
-// Interface pour les erreurs YouTube
+// Classes d'erreur personnalisées
+export abstract class AppBaseError extends Error implements BaseError {
+    readonly timestamp: number;
+    readonly details?: Record<string, unknown>;
+
+    constructor(
+        readonly code: AppErrorCode | YouTubeErrorCode | PlayerErrorCode | CacheErrorCode | ConfigErrorCode,
+        messageKey: MessageKey,
+        details?: Record<string, unknown>,
+        lang: 'en' | 'fr' = 'en'
+    ) {
+        super(getErrorMessage(messageKey, lang));
+        this.timestamp = Date.now();
+        this.details = details;
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+}
+
+// Interface et classe pour les erreurs YouTube
 export enum YouTubeErrorCode {
     INVALID_PARAMETER = 2,
     HTML5_ERROR = 5,
@@ -42,7 +62,20 @@ export interface YouTubeError extends BaseError {
     readonly playerState?: number;
 }
 
-// Interface pour les erreurs de lecture vidéo
+export class YouTubeAppError extends AppBaseError implements YouTubeError {
+    constructor(
+        readonly code: YouTubeErrorCode,
+        messageKey: MessageKey,
+        public readonly videoId?: string,
+        public readonly playerState?: number,
+        lang: 'en' | 'fr' = 'en'
+    ) {
+        super(code, messageKey, { videoId, playerState }, lang);
+        this.name = 'YouTubeError';
+    }
+}
+
+// Interface et classe pour les erreurs de lecture vidéo
 export enum PlayerErrorCode {
     MEDIA_ERR_ABORTED = 1,
     MEDIA_ERR_NETWORK = 2,
@@ -57,7 +90,20 @@ export interface PlayerError extends BaseError {
     readonly currentTime?: number;
 }
 
-// Interface pour les erreurs de cache
+export class PlayerAppError extends AppBaseError implements PlayerError {
+    constructor(
+        readonly code: PlayerErrorCode,
+        messageKey: MessageKey,
+        public readonly mediaError?: MediaError,
+        public readonly currentTime?: number,
+        lang: 'en' | 'fr' = 'en'
+    ) {
+        super(code, messageKey, { mediaError, currentTime }, lang);
+        this.name = 'PlayerError';
+    }
+}
+
+// Interface et classe pour les erreurs de cache
 export enum CacheErrorCode {
     STORAGE_FULL = 'STORAGE_FULL',
     INVALID_DATA = 'INVALID_DATA',
@@ -72,7 +118,20 @@ export interface CacheError extends BaseError {
     readonly size?: number;
 }
 
-// Interface pour les erreurs de configuration
+export class CacheAppError extends AppBaseError implements CacheError {
+    constructor(
+        readonly code: CacheErrorCode,
+        messageKey: MessageKey,
+        public readonly key?: string,
+        public readonly size?: number,
+        lang: 'en' | 'fr' = 'en'
+    ) {
+        super(code, messageKey, { key, size }, lang);
+        this.name = 'CacheError';
+    }
+}
+
+// Interface et classe pour les erreurs de configuration
 export enum ConfigErrorCode {
     INVALID_SETTINGS = 'INVALID_SETTINGS',
     MISSING_REQUIRED = 'MISSING_REQUIRED',
@@ -89,22 +148,36 @@ export interface ConfigError extends BaseError {
     readonly receivedType?: string;
 }
 
+export class ConfigAppError extends AppBaseError implements ConfigError {
+    constructor(
+        readonly code: ConfigErrorCode,
+        messageKey: MessageKey,
+        public readonly setting?: string,
+        public readonly expectedType?: string,
+        public readonly receivedType?: string,
+        lang: 'en' | 'fr' = 'en'
+    ) {
+        super(code, messageKey, { setting, expectedType, receivedType }, lang);
+        this.name = 'ConfigError';
+    }
+}
+
 // Type union pour toutes les erreurs possibles
-export type AppError = YouTubeError | PlayerError | CacheError | ConfigError;
+export type AppError = YouTubeAppError | PlayerAppError | CacheAppError | ConfigAppError;
 
 // Type guard functions pour vérifier le type d'erreur
-export const isYouTubeError = (error: unknown): error is YouTubeError => {
-    return error instanceof Error && 'code' in error && typeof (error as YouTubeError).code === 'number';
+export const isYouTubeError = (error: unknown): error is YouTubeAppError => {
+    return error instanceof YouTubeAppError;
 };
 
-export const isPlayerError = (error: unknown): error is PlayerError => {
-    return error instanceof Error && 'code' in error && typeof (error as PlayerError).code === 'number';
+export const isPlayerError = (error: unknown): error is PlayerAppError => {
+    return error instanceof PlayerAppError;
 };
 
-export const isCacheError = (error: unknown): error is CacheError => {
-    return error instanceof Error && 'code' in error && typeof (error as CacheError).code === 'string';
+export const isCacheError = (error: unknown): error is CacheAppError => {
+    return error instanceof CacheAppError;
 };
 
-export const isConfigError = (error: unknown): error is ConfigError => {
-    return error instanceof Error && 'code' in error && typeof (error as ConfigError).code === 'string';
+export const isConfigError = (error: unknown): error is ConfigAppError => {
+    return error instanceof ConfigAppError;
 }; 

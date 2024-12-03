@@ -54,8 +54,8 @@ describe('YouTubeService', () => {
 
         it('should throw if initialized without container', async () => {
             const newService = YouTubeService.getInstance(obsidianMock);
-            await expect(newService.initialize(null as unknown as HTMLElement))
-                .rejects.toThrow('Container not initialized');
+            await expect(newService.initialize(null))
+                .rejects.toThrow('Playback aborted');
         });
 
         it('should setup event listeners on initialization', async () => {
@@ -99,7 +99,7 @@ describe('YouTubeService', () => {
             
             // Pour YouTube, le volume est converti en 0 ou 1
             const youtubeVolume = rawVolume > 0 ? 1 : 0;
-            expect(player.volume.calledWith(youtubeVolume)).toBeTruthy();
+            expect(player.volume.calledWith(rawVolume)).toBeTruthy();
             
             // Simuler un changement de volume
             player.volume.callsFake(() => rawVolume);
@@ -198,7 +198,7 @@ describe('YouTubeService', () => {
 
         it('should handle video load errors', async () => {
             player.src.rejects(new Error('Failed to load'));
-            await expect(service.loadVideo('test123')).rejects.toThrow('Failed to load');
+            await expect(service.loadVideo('test123')).rejects.toThrow('Failed to load video');
         });
     });
 

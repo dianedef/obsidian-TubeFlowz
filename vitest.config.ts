@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { resolve } from 'path';
 
 export default defineConfig({
     test: {
@@ -34,6 +35,9 @@ export default defineConfig({
         hookTimeout: 10000,
         clearMocks: true,
         restoreMocks: true,
-        mockReset: true
-    },
+        mockReset: true,
+        alias: {
+            'obsidian': resolve(__dirname, './src/tests/mocks/obsidian.ts')
+        }
+    }
 }); 

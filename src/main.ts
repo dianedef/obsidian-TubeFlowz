@@ -113,12 +113,12 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
          
          container.style.background = 'var(--background-primary)';
          
-         const { Settings } = Store.get();
-         if (!Settings) return;
+         const settings = this.settings;
+         if (!settings) return;
          
-         // Utiliser soit les valeurs de l'état, soit celles des Settings
-         const videoId = this.videoId || Settings.lastVideoId;
-         const timestamp = this.timestamp || Settings.lastTimestamp || 0;
+         // Utiliser soit les valeurs de l'état, soit celles des settings
+         const videoId = this.videoId || settings.lastVideoId;
+         const timestamp = this.timestamp || settings.lastTimestamp || 0;
          
          container.appendChild(playerSection);
 
@@ -219,9 +219,9 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
 
       // Ajouter l'événement click sur le bouton de fermeture
       closeButton.addEventListener('click', async () => {
-         const { PlayerViewAndMode } = Store.get();
-         if (PlayerViewAndMode) {
-            await PlayerViewAndMode.closePreviousVideos();
+         const playerViewAndMode = this.playerViewAndMode;
+         if (playerViewAndMode) {
+            await playerViewAndMode.closePreviousVideos();
          }
       });
 
@@ -392,9 +392,8 @@ class PlayerContainer extends ItemView implements IPlayerContainer {
    }
 
    async setupLocalVideo(path: string) {
-      const { app } = Store.get();
-      if (!app) throw new Error("App not initialized");
-      const url = await app.vault.adapter.getResourcePath(path);
+      if (!this.app) throw new Error("App not initialized");
+      const url = await this.app.vault.adapter.getResourcePath(path);
    }
 }
 
@@ -402,21 +401,28 @@ export default class TubeFlows extends Plugin {
    private settings!: SettingsService;
    private playerViewAndMode!: PlayerViewAndMode;
    private translationService!: TranslationsService;
-   hotkeys!: Hotkeys;
+   private hotkeys!: Hotkeys;
 
    constructor(app: App, manifest: any) {
       super(app, manifest);
-      this.hotkeys = new Hotkeys(this);
    }
 
    async onload() {
       console.log("Chargement du plugin YouTubeFlow");
 
-      // Initialisation des services
+      // Initialisation des services dans le bon ordre
       this.settings = new SettingsService(this);
       await this.settings.loadSettings();
-      this.playerViewAndMode = new PlayerViewAndMode(this.app, this.settings);
+      
       this.translationService = new TranslationsService();
+      
+      this.playerViewAndMode = new PlayerViewAndMode(
+         this.app, 
+         this.settings
+      );
+      
+      // Initialiser Hotkeys après les autres services
+      this.hotkeys = new Hotkeys(this, this.settings);
       
       // registerHotkeys
       this.hotkeys.registerHotkeys();

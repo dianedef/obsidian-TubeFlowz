@@ -1,197 +1,212 @@
 import { App, Plugin } from 'obsidian';
 import { PluginSettings } from './types';
-import { PlaybackMode, PlaybackRate, VideoMode, Volume } from '../../types.d';
+import { PlaybackMode, PlaybackRate, VideoMode, Volume } from '../../types';
 
-const DEFAULT_VIDEO_ID = 'dQw4w9WgXcQ'; // Never Gonna Give You Up 😉
+const DEFAULT_VIDEO_ID = 'dQw4w9WgXcQ';
 
 const DEFAULT_SETTINGS: PluginSettings = {
-   lastVideoId: DEFAULT_VIDEO_ID,
-   isVideoOpen: false,
-   isChangingMode: false,
-   playlist: [],
-   currentMode: 'sidebar',
-   viewHeight: 60,
-   overlayHeight: 60,
-   isPlaying: false,
-   activeLeafId: null,
-   overlayLeafId: null,
-   favoriteSpeed: 2 as PlaybackRate,
-   lastTimestamp: 0,
-   showYoutubeRecommendations: false,
-   isMuted: false,
-   playbackRate: 1 as PlaybackRate,
-   volume: 1 as Volume,
-   playbackMode: 'stream'
+    lastVideoId: DEFAULT_VIDEO_ID,
+    isVideoOpen: false,
+    isChangingMode: false,
+    playlist: [],
+    currentMode: 'sidebar' as VideoMode,
+    viewHeight: 60,
+    overlayHeight: 60,
+    isPlaying: false,
+    activeLeafId: null,
+    overlayLeafId: null,
+    favoriteSpeed: 2 as PlaybackRate,
+    lastTimestamp: 0,
+    showYoutubeRecommendations: false,
+    isMuted: false,
+    playbackRate: 1 as PlaybackRate,
+    volume: 1 as Volume,
+    playbackMode: 'stream' as PlaybackMode,
+    language: 'en'
 };
 
 export class SettingsService {
-   private plugin: Plugin;
-   private settings: PluginSettings;
+    private plugin: Plugin;
+    private settings: PluginSettings;
 
-   constructor(plugin: Plugin) {
-      this.plugin = plugin;
-      this.settings = Object.assign({}, DEFAULT_SETTINGS);
-   }
-   get isPlaying(): boolean {
-      return this.settings.isPlaying;
-   }
+    constructor(plugin: Plugin) {
+        this.plugin = plugin;
+        this.settings = DEFAULT_SETTINGS;
+    }
 
-   set isPlaying(value: boolean) {
-      this.settings.isPlaying = value;
-      this.save();
-   }
+    get isPlaying(): boolean {
+        return this.settings.isPlaying;
+    }
 
-   // Getters et setters pour toutes les propriétés
-   get lastVideoId(): string {
-      return this.settings.lastVideoId || DEFAULT_VIDEO_ID;
-   }
+    set isPlaying(value: boolean) {
+        this.settings.isPlaying = value;
+        this.save();
+    }
 
-   set lastVideoId(value: string) {
-      this.settings.lastVideoId = value;
-      this.save();
-   }
+    // Getters et setters pour toutes les propriétés
+    get lastVideoId(): string {
+        return this.settings.lastVideoId || DEFAULT_VIDEO_ID;
+    }
 
-   get currentMode(): VideoMode {
-      return this.settings.currentMode;
-   }
+    set lastVideoId(value: string) {
+        this.settings.lastVideoId = value;
+        this.save();
+    }
 
-   set currentMode(value: VideoMode) {
-      this.settings.currentMode = value;
-      this.save();
-   }
+    get currentMode(): VideoMode {
+        return this.settings.currentMode;
+    }
 
-   get viewHeight(): number {
-      return this.settings.viewHeight;
-   }
+    set currentMode(value: VideoMode) {
+        this.settings.currentMode = value;
+        this.save();
+    }
 
-   set viewHeight(value: number) {
-      this.settings.viewHeight = value;
-      this.save();
-   }
+    get viewHeight(): number {
+        return this.settings.viewHeight;
+    }
 
-   get overlayHeight(): number {
-      return this.settings.overlayHeight;
-   }
+    set viewHeight(value: number) {
+        this.settings.viewHeight = value;
+        this.save();
+    }
 
-   set overlayHeight(value: number) {
-      this.settings.overlayHeight = value;
-      this.save();
-   }
+    get overlayHeight(): number {
+        return this.settings.overlayHeight;
+    }
 
-   get activeLeafId(): string | null {
-      return this.settings.activeLeafId;
-   }
+    set overlayHeight(value: number) {
+        this.settings.overlayHeight = value;
+        this.save();
+    }
 
-   set activeLeafId(value: string | null) {
-      this.settings.activeLeafId = value;
-      this.save();
-   }
+    get activeLeafId(): string | null {
+        return this.settings.activeLeafId;
+    }
 
-   get isVideoOpen(): boolean {
-      return this.settings.isVideoOpen;
-   }
+    set activeLeafId(value: string | null) {
+        this.settings.activeLeafId = value;
+        this.save();
+    }
 
-   set isVideoOpen(value: boolean) {
-      this.settings.isVideoOpen = value;
-      this.save();
-   }
+    get isVideoOpen(): boolean {
+        return this.settings.isVideoOpen;
+    }
 
-   get playbackMode(): PlaybackMode {
-      return this.settings.playbackMode;
-   }
+    set isVideoOpen(value: boolean) {
+        this.settings.isVideoOpen = value;
+        this.save();
+    }
 
-   set playbackMode(value: PlaybackMode) {
-      this.settings.playbackMode = value;
-      this.save();
-   }
+    get playbackMode(): PlaybackMode {
+        return this.settings.playbackMode;
+    }
 
-   get volume(): number {
-      return this.settings.volume;
-   }
+    set playbackMode(value: PlaybackMode) {
+        this.settings.playbackMode = value;
+        this.save();
+    }
 
-   set volume(value: number) {
-      this.settings.volume = Math.max(0, Math.min(1, value)) as Volume;
-      this.save();
-   }
+    get volume(): number {
+        return this.settings.volume;
+    }
 
-   get isMuted(): boolean {
-      return this.settings.isMuted || this.settings.volume === 0;
-   }
+    set volume(value: number) {
+        this.settings.volume = Math.max(0, Math.min(1, value)) as Volume;
+        this.save();
+    }
 
-   set isMuted(value: boolean) {
-      this.settings.isMuted = value;
-      this.save();
-   }
+    get isMuted(): boolean {
+        return this.settings.isMuted || this.settings.volume === 0;
+    }
 
-   get playbackRate(): number {
-      return this.settings.playbackRate;
-   }
+    set isMuted(value: boolean) {
+        this.settings.isMuted = value;
+        this.save();
+    }
 
-   set playbackRate(value: number) {
-      this.settings.playbackRate = Math.max(0.25, Math.min(16, value)) as PlaybackRate;
-      this.save();
-   }
+    get playbackRate(): number {
+        return this.settings.playbackRate;
+    }
 
-   get favoriteSpeed(): number {
-      return this.settings.favoriteSpeed;
-   }
+    set playbackRate(value: number) {
+        this.settings.playbackRate = Math.max(0.25, Math.min(16, value)) as PlaybackRate;
+        this.save();
+    }
 
-   set favoriteSpeed(value: number) {
-      this.settings.favoriteSpeed = Math.max(0.25, Math.min(16, value)) as PlaybackRate;
-      this.save();
-   }
+    get favoriteSpeed(): number {
+        return this.settings.favoriteSpeed;
+    }
 
-   get showYoutubeRecommendations(): boolean {
-      return this.settings.showYoutubeRecommendations;
-   }
+    set favoriteSpeed(value: number) {
+        this.settings.favoriteSpeed = Math.max(0.25, Math.min(16, value)) as PlaybackRate;
+        this.save();
+    }
 
-   set showYoutubeRecommendations(value: boolean) {
-      this.settings.showYoutubeRecommendations = value;
-      this.save();
-   }
+    get showYoutubeRecommendations(): boolean {
+        return this.settings.showYoutubeRecommendations;
+    }
 
-   get lastTimestamp(): number {
-      return this.settings.lastTimestamp;
-   }
+    set showYoutubeRecommendations(value: boolean) {
+        this.settings.showYoutubeRecommendations = value;
+        this.save();
+    }
 
-   set lastTimestamp(value: number) {
-      this.settings.lastTimestamp = value;
-      this.save();
-   }
+    get lastTimestamp(): number {
+        return this.settings.lastTimestamp;
+    }
 
-   get isChangingMode(): boolean {
-      return this.settings.isChangingMode;
-   }
+    set lastTimestamp(value: number) {
+        this.settings.lastTimestamp = value;
+        this.save();
+    }
 
-   set isChangingMode(value: boolean) {
-      this.settings.isChangingMode = value;
-      this.save();
-   }
+    get isChangingMode(): boolean {
+        return this.settings.isChangingMode;
+    }
 
-   // Méthodes pour la gestion des settings
-   async loadSettings() {
-      try {
-         const savedData = await this.plugin.loadData();
-         if (savedData) {
-            this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
-         }
-      } catch (error) {
-         console.error("Erreur lors du chargement des paramètres:", error);
-         this.settings = Object.assign({}, DEFAULT_SETTINGS);
-      }
-   }
+    set isChangingMode(value: boolean) {
+        this.settings.isChangingMode = value;
+        this.save();
+    }
 
-   async save() {
-      try {
-         await this.plugin.saveData(this.settings);
-      } catch (error) {
-         console.error("Erreur lors de la sauvegarde des paramètres:", error);
-         throw error;
-      }
-   }
+    // Méthodes pour la gestion des settings
+    async loadSettings() {
+        try {
+            const savedData = await this.plugin.loadData();
+            if (savedData) {
+                this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
+            }
+        } catch (error) {
+            console.error("Erreur lors du chargement des paramètres:", error);
+            this.settings = Object.assign({}, DEFAULT_SETTINGS);
+        }
+    }
 
-   // Méthode pour obtenir tous les settings (lecture seule)
-   getSettings(): Readonly<PluginSettings> {
-      return Object.freeze({ ...this.settings });
-   }
+    async save() {
+        try {
+            await this.plugin.saveData(this.settings);
+        } catch (error) {
+            console.error("Erreur lors de la sauvegarde des paramètres:", error);
+            throw error;
+        }
+    }
+
+    // Méthode pour obtenir tous les settings (lecture seule)
+    getSettings(): Readonly<PluginSettings> {
+        return Object.freeze({ ...this.settings });
+    }
+
+    // Ajouter une méthode pour obtenir la langue courante d'Obsidian
+    getCurrentLanguage(): string {
+        // Récupérer la langue de l'interface d'Obsidian
+        const htmlLang = document.documentElement.lang;
+        // Mettre à jour les settings si la langue a changé
+        const newLang = htmlLang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+        if (this.settings.language !== newLang) {
+            this.settings.language = newLang;
+            this.save();
+        }
+        return newLang;
+    }
 } 

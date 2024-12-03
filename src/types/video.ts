@@ -99,4 +99,10 @@ export interface YouTubePlayerOptions {
         onError?: (event: any) => void;
         onApiChange?: (event: any) => void;
     };
+}
+
+import type { Player } from 'video.js';
+
+export interface VideoPlayer extends Player {
+    // Ajoutez ici des propriétés spécifiques si nécessaire
 } 

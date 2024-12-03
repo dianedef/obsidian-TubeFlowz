@@ -2,28 +2,32 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PlayerContainer } from '../../views/PlayerContainer';
 import { YouTubeService } from '../../services/youtube/YouTubeService';
 import { eventBus } from '../../core/EventBus';
-import { videojsMock, obsidianMock } from '../setup';
-import { ViewMode } from '../../types/settings';
+import { videojsMock, obsidianMock, MockPlugin } from '../setup';
+import { ViewMode, PlaybackMode, createVolume, createPlaybackRate, DEFAULT_SETTINGS } from '../../types/settings';
+import { WorkspaceLeaf } from 'obsidian';
 
 describe('PlayerContainer Integration', () => {
     let container: PlayerContainer;
-    let mockLeaf: any;
-    let mockPlugin: any;
+    let mockLeaf: WorkspaceLeaf;
+    let mockPlugin: MockPlugin;
 
     beforeEach(() => {
         document.body.innerHTML = '';
         
         // Mock du WorkspaceLeaf
-        mockLeaf = {
-            containerEl: document.createElement('div')
-        };
+        mockLeaf = new WorkspaceLeaf();
 
         // Mock du Plugin
-        mockPlugin = {
-            app: obsidianMock
-        };
+        mockPlugin = new MockPlugin(obsidianMock);
 
         container = new PlayerContainer(mockLeaf, mockPlugin);
+        container.Settings = {
+            ...DEFAULT_SETTINGS,
+            lastViewMode: ViewMode.Sidebar,
+            volume: createVolume(1),
+            playbackRate: createPlaybackRate(1),
+            playbackMode: PlaybackMode.Stream
+        };
     });
 
     afterEach(() => {
@@ -75,13 +79,13 @@ describe('PlayerContainer Integration', () => {
             document.dispatchEvent(mousemove);
             document.dispatchEvent(mouseup);
 
-            const playerSection = container.containerEl.querySelector('.youtube-player-section');
+            const playerSection = container.containerEl.querySelector('.youtube-player-section') as HTMLElement;
             expect(playerSection?.style.height).toBeTruthy();
         });
 
         it('should respect minimum and maximum height constraints', async () => {
             await container.onOpen();
-            const playerSection = container.containerEl.querySelector('.youtube-player-section');
+            const playerSection = container.containerEl.querySelector('.youtube-player-section') as HTMLElement;
             
             // Simuler un redimensionnement extrême
             const height = playerSection?.style.height;

@@ -1,7 +1,7 @@
 import videojs from 'video.js';
 
 declare module 'videojs-youtube' {
-    interface YouTubePlayerOptions extends videojs.PlayerOptions {
+    interface YouTubePlayerOptions {
         youtube?: {
             iv_load_policy?: number;
             modestbranding?: number;
@@ -13,35 +13,19 @@ declare module 'videojs-youtube' {
     }
 
     interface YouTubePlayer extends videojs.Player {
-        src(options: {
-            type: string;
-            src: string;
-        }): Promise<void>;
-        
-        videoHeight(): number;
-        
-        error(): {
-            code: number;
-            message?: string;
-            status?: number;
-            type?: string;
-        } | null;
-    }
-
-    const Player: YouTubePlayer;
-    export default Player;
-}
-
-// Augmentation du module video.js pour inclure les options YouTube
-declare module 'video.js' {
-    interface PlayerOptions {
-        youtube?: {
-            iv_load_policy?: number;
-            modestbranding?: number;
-            rel?: number;
-            customVars?: {
-                playsinline?: number;
-            };
+        youtube: {
+            getVideoQuality(): string;
+            setVideoQuality(quality: string): void;
         };
+        src(options: { type: string; src: string; }): Promise<void>;
+        videoHeight(): number;
+        error(): { code: number; message?: string; } | null;
     }
+
+    const Player: {
+        prototype: YouTubePlayer;
+        new (element: string | Element, options?: YouTubePlayerOptions): YouTubePlayer;
+    };
+
+    export default Player;
 } 
