@@ -1,21 +1,25 @@
 import { Plugin, Notice } from 'obsidian';
 import { SettingsService } from '../settings/SettingsService';
 import { TranslationsService } from '../translations/TranslationsService';
-import VideoPlayerUI from '../../views/VideoPlayerUI';
-import { CommandError, CommandErrorCode } from '../../types/errors';
+import { PlayerUI } from '../../views/PlayerUI';
+import { CommandError, CommandErrorCode } from '../../types/IErrors';
 import { PlaybackRate } from '../../types';
 
 export class Hotkeys {
    constructor(
       private plugin: Plugin,
       private settings: SettingsService,
-      private videoPlayer: VideoPlayerUI,
+      private playerUI: PlayerUI,
       private translations: TranslationsService
    ) {}
 
-   private handleCommandError(error: CommandError) {
-      console.error('[HotkeysService]', error);
-      new Notice(this.translations.translate(`errors.${error.code}`));
+   private handleCommandError(error: unknown) {
+      if (error instanceof CommandError) {
+         console.error('[HotkeysService]', error);
+         new Notice(this.translations.translate(`errors.${error.code}`));
+         throw error;
+      }
+      throw error;
    }
 
    registerHotkeys() {
@@ -26,16 +30,16 @@ export class Hotkeys {
          icon: 'play',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerUI?.Player) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               if (this.videoPlayer.Player.paused()) {
-                  this.videoPlayer.Player.play();
+               if (this.playerUI.Player.paused()) {
+                  this.playerUI.Player.play();
                } else {
-                  this.videoPlayer.Player.pause();
+                  this.playerUI.Player.pause();
                }
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: [], key: this.settings.getSettings().hotkeys?.togglePlay || 'space' }]
@@ -48,16 +52,16 @@ export class Hotkeys {
          icon: 'arrow-left',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerUI?.Player) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const currentTime = this.videoPlayer.Player.currentTime();
+               const currentTime = this.playerUI.Player.currentTime();
                if (typeof currentTime !== 'number') {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get current time');
                }
-               this.videoPlayer.Player.currentTime(Math.max(0, currentTime - 10));
+               this.playerUI.Player.currentTime(Math.max(0, currentTime - 10));
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: [], key: this.settings.getSettings().hotkeys?.rewind || 'arrowleft' }]
@@ -80,7 +84,7 @@ export class Hotkeys {
                }
                this.videoPlayer.Player.currentTime(Math.min(duration, currentTime + 10));
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: [], key: this.settings.getSettings().hotkeys?.forward || 'arrowright' }]
@@ -103,7 +107,7 @@ export class Hotkeys {
                const newRate = Math.min(16, currentRate + 0.25) as PlaybackRate;
                this.videoPlayer.Player.playbackRate(newRate);
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.speedUp || '>' }]
@@ -126,7 +130,7 @@ export class Hotkeys {
                const newRate = Math.max(0.25, currentRate - 0.25) as PlaybackRate;
                this.videoPlayer.Player.playbackRate(newRate);
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.speedDown || '<' }]
@@ -144,7 +148,7 @@ export class Hotkeys {
                }
                this.videoPlayer.Player.playbackRate(1);
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.speedReset || '0' }]
@@ -157,12 +161,12 @@ export class Hotkeys {
          icon: 'volume-x',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerUI?.Player) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               this.videoPlayer.Player.muted(!this.videoPlayer.Player.muted());
+               this.playerUI.Player.muted(!this.playerUI.Player.muted());
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.toggleMute || 'm' }]
@@ -175,13 +179,13 @@ export class Hotkeys {
          icon: 'star',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerUI?.Player) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
                const favoriteSpeed = this.settings.getSettings().favoriteSpeed;
-               this.videoPlayer.Player.playbackRate(favoriteSpeed);
+               this.playerUI.Player.playbackRate(favoriteSpeed);
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.favoriteSpeed || 'f' }]
@@ -194,13 +198,13 @@ export class Hotkeys {
          icon: 'maximize',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerUI?.Player) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const isFullscreen = this.videoPlayer.Player.isFullscreen();
-               this.videoPlayer.Player.requestFullscreen(!isFullscreen);
+               const isFullscreen = this.playerUI.Player.isFullscreen();
+               this.playerUI.Player.requestFullscreen(!isFullscreen);
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.toggleFullscreen || 'f' }]
@@ -213,10 +217,10 @@ export class Hotkeys {
          icon: 'clock',
          editorCallback: (editor) => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerUI?.Player) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const currentTime = this.videoPlayer.Player.currentTime();
+               const currentTime = this.playerUI.Player.currentTime();
                if (typeof currentTime !== 'number') {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get current time');
                }
@@ -225,7 +229,7 @@ export class Hotkeys {
                // Arrondir les secondes pour le lien YouTube
                const youtubeSeconds = Math.floor(currentTime);
                // Récupérer l'ID de la vidéo actuelle
-               const videoId = this.videoPlayer.getCurrentVideoId();
+               const videoId = this.playerUI.getCurrentVideoId();
                if (!videoId) {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get video ID');
                }
@@ -234,7 +238,7 @@ export class Hotkeys {
                // Insérer le lien formaté en Markdown
                editor.replaceSelection(`\n[${displayTimestamp}](${youtubeLink})`);
             } catch (error) {
-               this.handleCommandError(error as CommandError);
+               this.handleCommandError(error);
             }
          },
          hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.insertTimestamp || 't' }]

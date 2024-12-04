@@ -1,6 +1,6 @@
 import { App } from 'obsidian';
 import { createError } from '../../core/errors/ErrorClasses';
-import { ConfigErrorCode, CacheErrorCode } from '../../types/errors';
+import { ConfigErrorCode, CacheErrorCode } from '../../types/IErrors';
 import { eventBus } from '../../core/EventBus';
 import { cleanVideoId, type CleanVideoId } from '../../utils';
 

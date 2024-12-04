@@ -1,18 +1,37 @@
-import videojs from 'video.js';
-import type { YouTubePlayer } from '../../types/videojs-youtube';
-import 'videojs-youtube';
 import { App } from 'obsidian';
 import { eventBus } from '../../core/EventBus';
-import { Volume, PlaybackRate, createVolume, createPlaybackRate, isValidVolume, isValidPlaybackRate } from '../../types/settings';
-import { YouTubeErrorCode, PlayerErrorCode, YouTubeAppError, PlayerAppError } from '../../types/errors';
+import { YouTubeErrorCode, PlayerErrorCode, YouTubeAppError, PlayerAppError } from '../../types/IErrors';
 import { MessageKey } from '../../i18n/messages';
+import { IPlayer } from '../../types/IPlayer';
+import videojs from 'video.js';
+import 'videojs-youtube';
 
-export class YouTubeService {
+export interface YouTubeOptions {
+    iv_load_policy: number;
+    modestbranding: number;
+    rel: number;
+    endscreen: number;
+    controls: number;
+    ytControls: number;
+    preload: string;
+    showinfo: number;
+    fs: number;
+    playsinline: number;
+    disablekb: number;
+    enablejsapi: number;
+    origin: string;
+    customVars?: {
+        playsinline: number;
+    };
+}
+
+export class YouTubeService implements IPlayer {
     private static instance: YouTubeService;
-    private player: YouTubePlayer | null = null;
-    private container: HTMLElement | null = null;
-    private resizeObserver: ResizeObserver | null = null;
     private currentLang: 'en' | 'fr' = 'en';
+    private player: any = null;
+    private container: HTMLElement | null = null;
+
+    private constructor(private app: App) {}
 
     public static getInstance(app: App): YouTubeService {
         if (!YouTubeService.instance) {
@@ -25,181 +44,30 @@ export class YouTubeService {
         this.currentLang = lang;
     }
 
-    public async initialize(container: HTMLElement | null): Promise<void> {
-        if (!container) {
-            throw new PlayerAppError(
-                PlayerErrorCode.MEDIA_ERR_ABORTED,
-                'MEDIA_ERR_ABORTED',
-                undefined,
-                0,
-                this.currentLang
-            );
-        }
-
-        try {
-            this.container = container;
-            await this.setupPlayer();
-            this.setupResizeObserver();
-        } catch (error) {
-            console.error('[YouTubeService] Initialization error:', error);
-            throw new YouTubeAppError(
-                YouTubeErrorCode.HTML5_ERROR,
-                'HTML5_ERROR',
-                undefined,
-                undefined,
-                this.currentLang
-            );
-        }
-    }
-
-    private async setupPlayer(): Promise<void> {
-        if (!this.container) {
-            throw new PlayerAppError(
-                PlayerErrorCode.MEDIA_ERR_ABORTED,
-                'MEDIA_ERR_ABORTED',
-                undefined,
-                0,
-                this.currentLang
-            );
-        }
-
-        const videoElement = document.createElement('video');
-        videoElement.className = 'video-js vjs-default-skin';
-        this.container.appendChild(videoElement);
-
-        const options = {
-            controls: true,
-            fluid: true,
-            techOrder: ['youtube'],
-            autoplay: false,
-            youtube: {
-                iv_load_policy: 3,
-                modestbranding: 1,
-                rel: 0,
-                customVars: {
-                    playsinline: 1
-                }
-            },
-            controlBar: {
-                children: [
-                    'playToggle',
-                    'volumePanel',
-                    'currentTimeDisplay',
-                    'timeDivider',
-                    'durationDisplay',
-                    'progressControl',
-                    'playbackRateMenuButton',
-                    'fullscreenToggle'
-                ]
-            }
+    public getYouTubeOptions(showRecommendations: boolean = false): YouTubeOptions {
+        return {
+            iv_load_policy: 3,
+            modestbranding: 1,
+            rel: showRecommendations ? 1 : 0,
+            endscreen: showRecommendations ? 1 : 0,
+            controls: 0,
+            ytControls: 0,
+            preload: 'auto',
+            showinfo: 0,
+            fs: 0,
+            playsinline: 1,
+            disablekb: 1,
+            enablejsapi: 1,
+            origin: window.location.origin
         };
-
-        try {
-            this.player = videojs(videoElement, options);
-            this.setupEventListeners();
-            eventBus.emit('video:ready', this.player);
-        } catch (error) {
-            console.error('[YouTubeService] Player setup error:', error);
-            throw new PlayerAppError(
-                PlayerErrorCode.MEDIA_ERR_DECODE,
-                'MEDIA_ERR_DECODE',
-                undefined,
-                undefined,
-                this.currentLang
-            );
-        }
     }
 
-    private setupEventListeners(): void {
-        if (!this.player) return;
-
-        // Événements de lecture
-        this.player.on('play', () => eventBus.emit('video:play'));
-        this.player.on('pause', () => eventBus.emit('video:pause'));
-        this.player.on('ended', () => eventBus.emit('video:ended'));
-
-        // Événements de temps
-        this.player.on('timeupdate', () => {
-            const currentTime = this.player?.currentTime() || 0;
-            eventBus.emit('video:timeUpdate', currentTime);
-        });
-
-        // Événements de volume
-        this.player.on('volumechange', () => {
-            try {
-                const rawVolume = this.player?.volume() || 0;
-                const isMuted = this.player?.muted() || false;
-                const typedVolume = createVolume(rawVolume);
-                eventBus.emit('video:volumeChange', {
-                    volume: typedVolume,
-                    isMuted
-                });
-            } catch (error) {
-                console.error('[YouTubeService] Volume change error:', error);
-                eventBus.emit('video:error', {
-                    code: String(PlayerErrorCode.MEDIA_ERR_DECODE),
-                    message: new PlayerAppError(
-                        PlayerErrorCode.MEDIA_ERR_DECODE,
-                        'INVALID_VOLUME',
-                        undefined,
-                        this.getCurrentTime(),
-                        this.currentLang
-                    ).message,
-                    type: 'MEDIA_ERR_DECODE'
-                });
-            }
-        });
-
-        // Événements de vitesse
-        this.player.on('ratechange', () => {
-            try {
-                const rawRate = this.player?.playbackRate() || 1;
-                const typedRate = createPlaybackRate(rawRate);
-                eventBus.emit('video:rateChange', typedRate);
-            } catch (error) {
-                console.error('[YouTubeService] Rate change error:', error);
-                eventBus.emit('video:error', {
-                    code: String(PlayerErrorCode.MEDIA_ERR_DECODE),
-                    message: new PlayerAppError(
-                        PlayerErrorCode.MEDIA_ERR_DECODE,
-                        'INVALID_PLAYBACK_RATE',
-                        undefined,
-                        this.getCurrentTime(),
-                        this.currentLang
-                    ).message,
-                    type: 'MEDIA_ERR_DECODE'
-                });
-            }
-        });
-
-        // Événements de qualité
-        this.player.on('qualitychange', () => {
-            const quality = this.player?.videoHeight() ? `${this.player.videoHeight()}p` : 'auto';
-            eventBus.emit('video:qualityChange', quality);
-        });
-
-        // Événements d'erreur
-        this.player.on('error', () => {
-            const error = this.player?.error();
-            if (error) {
-                const playerError = new PlayerAppError(
-                    error.code as PlayerErrorCode,
-                    this.getErrorMessageKey(error.code),
-                    error,
-                    this.getCurrentTime(),
-                    this.currentLang
-                );
-                
-                eventBus.emit('video:error', {
-                    code: String(playerError.code),
-                    message: playerError.message,
-                    type: this.getErrorType(error.code)
-                });
-            }
-        });
+    public handleQualityChange(height: number | undefined): void {
+        const quality = height && height > 0 ? `${height}p` : 'auto';
+        eventBus.emit('video:qualityChange', quality);
     }
 
-    private getErrorMessageKey(code: number): MessageKey {
+    public getErrorMessageKey(code: number): MessageKey {
         switch (code) {
             case 1:
                 return 'MEDIA_ERR_ABORTED';
@@ -216,7 +84,7 @@ export class YouTubeService {
         }
     }
 
-    private getErrorType(code: number): string {
+    public getErrorType(code: number): string {
         switch (code) {
             case 1:
                 return 'MEDIA_ERR_ABORTED';
@@ -233,17 +101,118 @@ export class YouTubeService {
         }
     }
 
-    private setupResizeObserver(): void {
-        if (!this.container) return;
+    public createYouTubeError(code: YouTubeErrorCode, messageKey: MessageKey, videoId?: string): YouTubeAppError {
+        return new YouTubeAppError(
+            code,
+            messageKey,
+            videoId,
+            undefined,
+            this.currentLang
+        );
+    }
 
-        this.resizeObserver = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                const height = entry.contentRect.height;
-                eventBus.emit('view:resize', height);
+    public async dispose(): Promise<void> {
+        if (this.player) {
+            this.player.dispose();
+            this.player = null;
+        }
+        if (this.container) {
+            this.container.innerHTML = '';
+            this.container = null;
+        }
+        eventBus.clear();
+        YouTubeService.instance = null as any;
+    }
+
+    public async initialize(): Promise<void> {
+        if (!this.container) {
+            throw new PlayerAppError(
+                PlayerErrorCode.MEDIA_ERR_ABORTED,
+                'MEDIA_ERR_ABORTED',
+                undefined,
+                undefined,
+                this.currentLang
+            );
+        }
+
+        const video = document.createElement('video');
+        video.className = 'video-js vjs-default-skin';
+        this.container.appendChild(video);
+
+        const options = {
+            ...this.getYouTubeOptions(),
+            techOrder: ['youtube'],
+            autoplay: false,
+            controls: true,
+            fluid: true,
+            language: this.currentLang
+        };
+
+        try {
+            this.player = videojs(video, options);
+            await new Promise<void>((resolve) => {
+                this.player.ready(() => resolve());
+            });
+
+            this.setupEventListeners();
+        } catch (error) {
+            console.error('[YouTubeService] Initialization error:', error);
+            throw new PlayerAppError(
+                PlayerErrorCode.MEDIA_ERR_ABORTED,
+                'MEDIA_ERR_ABORTED',
+                undefined,
+                undefined,
+                this.currentLang
+            );
+        }
+    }
+
+    private setupEventListeners(): void {
+        if (!this.player) return;
+
+        const player = this.player;
+        
+        this.player.on('error', () => {
+            const error = player.error();
+            if (error) {
+                const messageKey = this.getErrorMessageKey(error.code);
+                const errorType = this.getErrorType(error.code);
+                eventBus.emit('video:error', {
+                    code: String(error.code),
+                    type: errorType
+                });
             }
         });
 
-        this.resizeObserver.observe(this.container);
+        this.player.on('qualitychange', () => {
+            const height = this.player?.videoHeight?.();
+            this.handleQualityChange(height);
+        });
+
+        this.player.on('play', () => {
+            eventBus.emit('video:play');
+        });
+
+        this.player.on('pause', () => {
+            eventBus.emit('video:pause');
+        });
+
+        this.player.on('timeupdate', () => {
+            eventBus.emit('video:timeupdate', this.getCurrentTime());
+        });
+
+        this.player.on('volumechange', () => {
+            eventBus.emit('video:volumeChange', this.player.volume());
+        });
+
+        this.player.on('ratechange', () => {
+            if (this.player) {
+                const rate = this.player.playbackRate();
+                if (rate !== null && rate !== undefined) {
+                    eventBus.emit('video:rateChange', rate);
+                }
+            }
+        });
     }
 
     public async loadVideo(videoId: string, timestamp?: number): Promise<void> {
@@ -252,7 +221,7 @@ export class YouTubeService {
                 PlayerErrorCode.MEDIA_ERR_ABORTED,
                 'MEDIA_ERR_ABORTED',
                 undefined,
-                0,
+                undefined,
                 this.currentLang
             );
         }
@@ -270,92 +239,13 @@ export class YouTubeService {
             eventBus.emit('video:load', videoId);
         } catch (error) {
             console.error('[YouTubeService] Load video error:', error);
-            if (error instanceof Error) {
-                throw new YouTubeAppError(
-                    YouTubeErrorCode.VIDEO_NOT_FOUND,
-                    'LOAD_ERROR',
-                    videoId,
-                    undefined,
-                    this.currentLang
-                );
-            } else {
-                throw new YouTubeAppError(
-                    YouTubeErrorCode.VIDEO_NOT_FOUND,
-                    'VIDEO_NOT_FOUND',
-                    videoId,
-                    undefined,
-                    this.currentLang
-                );
-            }
-        }
-    }
-
-    public play(): void {
-        this.player?.play();
-    }
-
-    public pause(): void {
-        this.player?.pause();
-    }
-
-    public setVolume(volume: Volume): void {
-        if (this.player) {
-            const rawVolume = Number(volume);
-            if (isValidVolume(rawVolume)) {
-                this.player.volume(rawVolume);
-                eventBus.emit('video:volumeChange', {
-                    volume,
-                    isMuted: this.player.muted() || false
-                });
-            } else {
-                throw new PlayerAppError(
-                    PlayerErrorCode.MEDIA_ERR_DECODE,
-                    'INVALID_VOLUME',
-                    undefined,
-                    this.getCurrentTime(),
-                    this.currentLang
-                );
-            }
-        }
-    }
-
-    public setPlaybackRate(rate: PlaybackRate): void {
-        if (this.player) {
-            const rawRate = Number(rate);
-            if (isValidPlaybackRate(rawRate)) {
-                this.player.playbackRate(rawRate);
-                eventBus.emit('video:rateChange', rate);
-            } else {
-                throw new PlayerAppError(
-                    PlayerErrorCode.MEDIA_ERR_DECODE,
-                    'INVALID_PLAYBACK_RATE',
-                    undefined,
-                    this.getCurrentTime(),
-                    this.currentLang
-                );
-            }
-        }
-    }
-
-    public getCurrentTime(): number {
-        return this.player?.currentTime() || 0;
-    }
-
-    public getDuration(): number {
-        return this.player?.duration() || 0;
-    }
-
-    public getMuted(): boolean {
-        return this.player?.muted() || false;
-    }
-
-    public setMuted(muted: boolean): void {
-        if (this.player) {
-            this.player.muted(muted);
-            eventBus.emit('video:volumeChange', {
-                volume: this.player.volume(),
-                isMuted: muted
-            });
+            throw new PlayerAppError(
+                PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED,
+                'MEDIA_ERR_SRC_NOT_SUPPORTED',
+                undefined,
+                undefined,
+                this.currentLang
+            );
         }
     }
 
@@ -364,12 +254,52 @@ export class YouTubeService {
             this.player.dispose();
             this.player = null;
         }
-
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
+        if (this.container) {
+            this.container.innerHTML = '';
+            this.container = null;
         }
-
-        this.container = null;
+        this.dispose();
     }
+
+    public getCurrentTime(): number {
+        if (!this.player) return 0;
+        return this.player.currentTime();
+    }
+
+    public getDuration(): number {
+        if (!this.player) return 0;
+        return this.player.duration();
+    }
+
+    public play(): void {
+        if (this.player) {
+            this.player.play();
+        }
+    }
+
+    public pause(): void {
+        if (this.player) {
+            this.player.pause();
+        }
+    }
+
+    public setVolume(volume: number): void {
+        if (this.player) {
+            this.player.volume(volume);
+        }
+    }
+
+    public setPlaybackRate(rate: number): void {
+        if (this.player) {
+            this.player.playbackRate(rate);
+            eventBus.emit('video:rateChange', rate);
+        }
+    }
+
+    public seekTo(time: number): void {
+        if (this.player) {
+            this.player.currentTime(time);
+        }
+    }
+
 } 

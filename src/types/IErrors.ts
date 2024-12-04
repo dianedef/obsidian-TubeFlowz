@@ -23,14 +23,14 @@ export enum AppErrorCode {
 }
 
 // Interface de base pour toutes les erreurs de l'application
-export interface BaseError extends Error {
+export interface IBaseError extends Error {
     readonly code: AppErrorCode | YouTubeErrorCode | PlayerErrorCode | CacheErrorCode | ConfigErrorCode;
     readonly timestamp: number;
     readonly details?: Record<string, unknown>;
 }
 
 // Classes d'erreur personnalisées
-export abstract class AppBaseError extends Error implements BaseError {
+export abstract class AppBaseError extends Error implements IBaseError {
     readonly timestamp: number;
     readonly details?: Record<string, unknown>;
 
@@ -56,13 +56,13 @@ export enum YouTubeErrorCode {
     VIDEO_REMOVED = 150
 }
 
-export interface YouTubeError extends BaseError {
+export interface IYouTubeError extends IBaseError {
     readonly code: YouTubeErrorCode;
     readonly videoId?: string;
     readonly playerState?: number;
 }
 
-export class YouTubeAppError extends AppBaseError implements YouTubeError {
+export class YouTubeAppError extends AppBaseError implements IYouTubeError {
     constructor(
         readonly code: YouTubeErrorCode,
         messageKey: MessageKey,
@@ -84,13 +84,13 @@ export enum PlayerErrorCode {
     MEDIA_ERR_ENCRYPTED = 5
 }
 
-export interface PlayerError extends BaseError {
+export interface IPlayerError extends IBaseError {
     readonly code: PlayerErrorCode;
     readonly mediaError?: MediaError;
     readonly currentTime?: number;
 }
 
-export class PlayerAppError extends AppBaseError implements PlayerError {
+export class PlayerAppError extends AppBaseError implements IPlayerError {
     constructor(
         readonly code: PlayerErrorCode,
         messageKey: MessageKey,
@@ -112,13 +112,13 @@ export enum CacheErrorCode {
     NOT_FOUND = 'NOT_FOUND'
 }
 
-export interface CacheError extends BaseError {
+export interface ICacheError extends IBaseError {
     readonly code: CacheErrorCode;
     readonly key?: string;
     readonly size?: number;
 }
 
-export class CacheAppError extends AppBaseError implements CacheError {
+export class CacheAppError extends AppBaseError implements ICacheError {
     constructor(
         readonly code: CacheErrorCode,
         messageKey: MessageKey,
@@ -141,14 +141,14 @@ export enum ConfigErrorCode {
     INVALID_PARAMETER = 'INVALID_PARAMETER'
 }
 
-export interface ConfigError extends BaseError {
+export interface IConfigError extends IBaseError {
     readonly code: ConfigErrorCode;
     readonly setting?: string;
     readonly expectedType?: string;
     readonly receivedType?: string;
 }
 
-export class ConfigAppError extends AppBaseError implements ConfigError {
+export class ConfigAppError extends AppBaseError implements IConfigError {
     constructor(
         readonly code: ConfigErrorCode,
         messageKey: MessageKey,

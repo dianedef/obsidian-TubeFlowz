@@ -12,7 +12,7 @@ export const errorMessages = {
         MEDIA_ERR_ABORTED: 'Playback aborted',
         MEDIA_ERR_NETWORK: 'Network error',
         MEDIA_ERR_DECODE: 'Decoding error',
-        MEDIA_ERR_SRC_NOT_SUPPORTED: 'Format not supported',
+        MEDIA_ERR_SRC_NOT_SUPPORTED: 'Source not supported',
         MEDIA_ERR_ENCRYPTED: 'Media is encrypted',
         CONTAINER_NOT_INITIALIZED: 'Container not initialized',
 
@@ -48,7 +48,7 @@ export const errorMessages = {
         MEDIA_ERR_ABORTED: 'Lecture interrompue',
         MEDIA_ERR_NETWORK: 'Erreur réseau lors de la lecture',
         MEDIA_ERR_DECODE: 'Erreur de décodage',
-        MEDIA_ERR_SRC_NOT_SUPPORTED: 'Format non supporté',
+        MEDIA_ERR_SRC_NOT_SUPPORTED: 'Source non supporté',
         MEDIA_ERR_ENCRYPTED: 'Média crypté',
         CONTAINER_NOT_INITIALIZED: 'Conteneur non initialisé',
 

@@ -1,7 +1,7 @@
-import { VideoId, Timestamp } from './video';
+import { VideoId, Timestamp } from './IBase';
 
 // Interface pour le redimensionnement
-export interface ResizerOptions {
+export interface IResizerOptions {
     container: HTMLElement;
     targetElement: HTMLElement;
     handle: HTMLElement;
@@ -52,11 +52,8 @@ export enum PlaybackMode {
     Stream = 'stream',
     Download = 'download'
 }
-
-// Configuration du plugin
 export interface PluginSettings {
     language: string;
-    // Dernière session
     lastVideoId: VideoId;
     lastTimestamp: Timestamp;
     isVideoOpen: boolean;
@@ -64,50 +61,24 @@ export interface PluginSettings {
     isChangingMode: boolean;
     activeLeafId: string | null;
     overlayLeafId: string | null;
-    
-    // État de lecture
     isPlaying: boolean;
     playbackMode: PlaybackMode;
     playbackRate: PlaybackRate;
     favoriteSpeed: PlaybackRate;
-    
-    // Audio
     volume: Volume;
     isMuted: boolean;
-    
-    // Interface
     viewHeight: number;
     overlayHeight: number;
     showYoutubeRecommendations: boolean;
-    
-    // Raccourcis clavier
-    hotkeys?: {
-        togglePlay?: string;
-        volumeUp?: string;
-        volumeDown?: string;
-        speedUp?: string;
-        speedDown?: string;
-        toggleMute?: string;
-    };
-    
-    // Thème
-    theme?: {
-        useCustomColors: boolean;
-        primaryColor?: string;
-        secondaryColor?: string;
-        textColor?: string;
-        backgroundColor?: string;
-    };
-    // Playlist
-    playlist: Array<{
+    playlist: {
         id: string;
         title: string;
         timestamp: number;
-    }>;
+    }[];
 }
 
 // Valeurs par défaut
-export const DEFAULT_SETTINGS: PluginSettings = {
+export const DEFAULT_SETTINGS: IPluginSettings = {
     language: 'en',
     lastVideoId: 'dQw4w9WgXcQ' as VideoId,
     lastTimestamp: 0 as Timestamp,

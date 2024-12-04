@@ -23,7 +23,9 @@ export interface VideoJsPlayer {
     dispose: sinon.SinonStub;
     error: sinon.SinonStub;
     el: sinon.SinonStub;
+    ready: sinon.SinonStub;
     controlBar: {
+        addChild: sinon.SinonStub;
         progressControl: {
             seekBar: {
                 update: sinon.SinonStub;
@@ -59,12 +61,26 @@ const createVideoJSMock = () => {
         error: sinon.stub().returns(null),
         el: sinon.stub().returns(document.createElement('div')),
         controlBar: {
+            addChild: sinon.stub().callsFake((type, options) => {
+                const buttonEl = document.createElement('button');
+                buttonEl.className = options?.className || '';
+                return {
+                    el: () => buttonEl,
+                    on: sinon.stub().returnsThis(),
+                    off: sinon.stub().returnsThis(),
+                    trigger: sinon.stub().returnsThis()
+                };
+            }),
             progressControl: {
                 seekBar: {
                     update: sinon.stub()
                 }
             }
-        }
+        },
+        ready: sinon.stub().callsFake((callback) => {
+            callback();
+            return playerStub;
+        })
     } as VideoJsPlayer;
 
     const videojsMock = Object.assign(sinon.stub().returns(playerStub), {
@@ -99,14 +115,15 @@ const createVideoJSMock = () => {
 const createObsidianMock = () => {
     const mock = {
         workspace: {
-            on: sinon.stub(),
-            off: sinon.stub(),
-            getActiveViewOfType: sinon.stub(),
-            getLeaf: sinon.stub(),
-            getLeavesOfType: sinon.stub().returns([]),
+            on: vi.fn(),
+            off: vi.fn(),
+            getLeaf: vi.fn(),
+            getActiveViewOfType: vi.fn(),
+            iterateAllLeaves: vi.fn(),
+            revealLeaf: vi.fn(),
             activeLeaf: {
                 view: {
-                    getViewType: sinon.stub()
+                    getViewType: vi.fn()
                 }
             }
         },
@@ -117,7 +134,8 @@ const createObsidianMock = () => {
                 exists: sinon.stub().resolves(true),
                 read: sinon.stub().resolves(''),
                 write: sinon.stub().resolves()
-            }
+            },
+            getConfig: vi.fn()
         },
         keymap: {},
         scope: {},
@@ -205,9 +223,9 @@ export class MockPlugin {
     settings: any;
     children: any[];
 
-    constructor(app: App) {
+    constructor(app: App, manifest?: any) {
         this.app = app;
-        this.manifest = {
+        this.manifest = manifest || {
             id: 'test-plugin',
             name: 'Test Plugin',
             version: '1.0.0'
@@ -269,8 +287,8 @@ export class MockPlugin {
     registerEvent(evt: any) { 
         return { unsubscribe: () => {} }; 
     }
-    registerInterval(cb: () => any): number {
-        return window.setInterval(cb, 1000);
+    registerInterval(id: number): number {
+        return id;
     }
     removeCommand() {}
     registerHoverLinkSource(id: string, info: HoverLinkSource) { return { unsubscribe: () => {} }; }

@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { YouTubeService } from '../../services/youtube/YouTubeService';
 import { eventBus } from '../../core/EventBus';
-import { Volume, PlaybackRate, createVolume, createPlaybackRate } from '../../types/settings';
+import { Volume, PlaybackRate, createVolume, createPlaybackRate } from '../../types/ISettings';
 import { videojsMock, obsidianMock } from '../setup';
 import type { VideoJsPlayer, MethodCall } from '../setup';
 
 describe('EventBus Integration Tests', () => {
     let service: YouTubeService;
-    let container: HTMLElement;
     let player: VideoJsPlayer;
+    let container: HTMLElement;
 
     beforeEach(async () => {
         document.body.innerHTML = '';
@@ -16,99 +16,141 @@ describe('EventBus Integration Tests', () => {
         document.body.appendChild(container);
         service = YouTubeService.getInstance(obsidianMock);
         player = videojsMock.player;
-        await service.initialize(container);
-    });
-
-    afterEach(() => {
-        service.destroy();
+        
+        // Configurer le mock de ready
+        player.ready.callsFake((callback) => {
+            callback();
+            return player;
+        });
+        
+        (service as any).container = container;
+        await service.initialize();
+        
+        // Réinitialiser eventBus
         eventBus.clear();
     });
 
-    describe('YouTubeService and EventBus Integration', () => {
-        it('should propagate video load events', async () => {
-            let receivedVideoId: string | null = null;
-            eventBus.on('video:load', (videoId) => {
-                receivedVideoId = videoId;
-            });
+    afterEach(async () => {
+        await service.dispose();
+        eventBus.clear();
+    });
 
-            await service.loadVideo('test123');
-            expect(receivedVideoId).toBe('test123');
-        });
+    it('should propagate video load events', async () => {
+        const videoId = 'test123';
+        let receivedVideoId: string | null = null;
+        
+        const handler = (data: string) => {
+            receivedVideoId = data;
+        };
+        
+        eventBus.on('video:load', handler);
+        await service.loadVideo(videoId);
+        
+        expect(receivedVideoId).toBe(videoId);
+        eventBus.off('video:load', handler);
+    });
 
-        it('should propagate playback rate changes', async () => {
-            let receivedRate: PlaybackRate | null = null;
-            eventBus.on('video:rateChange', (rate) => {
-                receivedRate = rate;
-            });
+    it('should propagate playback rate changes', async () => {
+        const rawRate = 1.5;
+        let receivedRate: number | null = null;
+        
+        const handler = (data: number) => {
+            receivedRate = data;
+        };
+        
+        eventBus.on('video:rateChange', handler);
+        player.playbackRate.returns(rawRate);
+        service.setPlaybackRate(createPlaybackRate(rawRate));
 
-            const rawRate = 1.5;
-            const rateValue = createPlaybackRate(rawRate);
-            player.playbackRate.callsFake(() => rawRate);
-            
-            service.setPlaybackRate(rateValue);
-            
-            // Déclencher l'événement ratechange
-            const callback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'ratechange')?.args[1];
-            if (callback) callback();
+        expect(receivedRate).toBe(rawRate);
+        eventBus.off('video:rateChange', handler);
+    });
 
-            expect(receivedRate).toBe(rateValue);
-        });
+    it('should handle multiple event subscriptions', async () => {
+        const events: string[] = [];
+        
+        const playHandler = () => events.push('play');
+        const pauseHandler = () => events.push('pause');
+        
+        eventBus.on('video:play', playHandler);
+        eventBus.on('video:pause', pauseHandler);
+        
+        // Simuler play
+        service.play();
+        const playCallback = player.on.getCalls()
+            .find((call: MethodCall) => call.args[0] === 'play')?.args[1];
+        if (playCallback) playCallback();
+        
+        // Simuler pause
+        service.pause();
+        const pauseCallback = player.on.getCalls()
+            .find((call: MethodCall) => call.args[0] === 'pause')?.args[1];
+        if (pauseCallback) pauseCallback();
 
-        it('should handle multiple event subscriptions', async () => {
-            const events: string[] = [];
-            
-            eventBus.on('video:play', () => events.push('play'));
-            eventBus.on('video:pause', () => events.push('pause'));
-            
-            service.play();
-            const playCallback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'play')?.args[1];
-            if (playCallback) playCallback();
-            
-            service.pause();
-            const pauseCallback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'pause')?.args[1];
-            if (pauseCallback) pauseCallback();
+        expect(events).toEqual(['play', 'pause']);
+        
+        eventBus.off('video:play', playHandler);
+        eventBus.off('video:pause', pauseHandler);
+    });
 
-            expect(events).toEqual(['play', 'pause']);
-        });
+    it('should maintain event order', async () => {
+        const events: string[] = [];
+        
+        const loadHandler = () => events.push('load');
+        const playHandler = () => events.push('play');
+        const pauseHandler = () => events.push('pause');
+        
+        eventBus.on('video:load', loadHandler);
+        eventBus.on('video:play', playHandler);
+        eventBus.on('video:pause', pauseHandler);
+        
+        // Simuler load
+        await service.loadVideo('test123');
+        
+        // Simuler play
+        service.play();
+        const playCallback = player.on.getCalls()
+            .find((call: MethodCall) => call.args[0] === 'play')?.args[1];
+        if (playCallback) playCallback();
+        
+        // Simuler pause
+        service.pause();
+        const pauseCallback = player.on.getCalls()
+            .find((call: MethodCall) => call.args[0] === 'pause')?.args[1];
+        if (pauseCallback) pauseCallback();
 
-        it('should maintain event order', async () => {
-            const events: string[] = [];
-            
-            eventBus.on('video:load', () => events.push('load'));
-            eventBus.on('video:play', () => events.push('play'));
-            eventBus.on('video:pause', () => events.push('pause'));
-            
-            await service.loadVideo('test123');
-            
-            service.play();
-            const playCallback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'play')?.args[1];
-            if (playCallback) playCallback();
-            
-            service.pause();
-            const pauseCallback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'pause')?.args[1];
-            if (pauseCallback) pauseCallback();
+        expect(events).toEqual(['load', 'play', 'pause']);
+        
+        eventBus.off('video:load', loadHandler);
+        eventBus.off('video:play', playHandler);
+        eventBus.off('video:pause', pauseHandler);
+    });
 
-            expect(events).toEqual(['load', 'play', 'pause']);
-        });
+    it('should clean up event listeners', async () => {
+        const events: string[] = [];
+        
+        const playHandler = () => events.push('play');
+        eventBus.on('video:play', playHandler);
+        
+        // Simuler play avant dispose
+        service.play();
+        const playCallback = player.on.getCalls()
+            .find((call: MethodCall) => call.args[0] === 'play')?.args[1];
+        if (playCallback) playCallback();
 
-        it('should clean up event listeners', async () => {
-            const events: string[] = [];
-            
-            eventBus.on('video:play', () => events.push('play'));
-            
-            service.play();
-            const playCallback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'play')?.args[1];
-            if (playCallback) playCallback();
-            
-            expect(events).toEqual(['play']);
-            
-            events.length = 0;
-            eventBus.clear();
-            
-            service.play();
-            if (playCallback) playCallback();
-            
-            expect(events).toEqual([]);
-        });
+        expect(events).toEqual(['play']);
+
+        // Nettoyer les événements
+        events.length = 0;
+        await service.dispose();
+
+        // Simuler play après dispose
+        service.play();
+        if (playCallback) playCallback();
+
+        // Aucun événement ne devrait être émis après dispose
+        expect(events).toEqual([]);
+        
+        eventBus.off('video:play', playHandler);
     });
 }); 

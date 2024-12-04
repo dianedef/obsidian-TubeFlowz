@@ -11,7 +11,7 @@ import {
     PlayerErrorCode,
     CacheErrorCode,
     ConfigErrorCode
-} from '../types/errors';
+} from '../types/IErrors';
 
 describe('Error Classes', () => {
     describe('YouTubeAppError', () => {

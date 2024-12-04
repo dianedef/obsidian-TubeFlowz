@@ -1,4 +1,4 @@
-import { ViewMode } from './settings';
+import { ViewMode } from './ISettings';
 import { IPlayerState, IPlayerOptions } from './IPlayer';
 
 export interface IPlayerUI {
@@ -12,6 +12,8 @@ export interface IPlayerUI {
      */
     dispose(): void;
 }
+
+
 
 export interface IPlayerControls {
     createControlsContainer(): HTMLElement;

@@ -1,6 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting, DropdownComponent } from 'obsidian';
 import { SettingsService } from './SettingsService';
-import { VideoMode, PlaybackMode } from './types';
+import { PlaybackMode } from '../../types/ISettings';
 
 export class SettingsTab extends PluginSettingTab {
    private Settings: SettingsService;

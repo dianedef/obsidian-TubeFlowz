@@ -1,4 +1,4 @@
-import { ViewMode } from './settings';
+import { ViewMode } from './ISettings';
 import { PlayerView } from '../views/PlayerView';
 export interface IViewModeService {
     getCurrentMode(): ViewMode;

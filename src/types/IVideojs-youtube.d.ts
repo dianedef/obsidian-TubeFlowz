@@ -1,15 +1,27 @@
 import videojs from 'video.js';
 
 declare module 'videojs-youtube' {
-    interface YouTubePlayerOptions {
-        youtube?: {
-            iv_load_policy?: number;
-            modestbranding?: number;
-            rel?: number;
-            customVars?: {
-                playsinline?: number;
-            };
+    export interface YouTubeOptions {
+        iv_load_policy: number;
+        modestbranding: number;
+        rel: number;
+        endscreen: number;
+        controls: number;
+        ytControls: number;
+        preload: string;
+        showinfo: number;
+        fs: number;
+        playsinline: number;
+        disablekb: number;
+        enablejsapi: number;
+        origin: string;
+        customVars?: {
+            playsinline: number;
         };
+    }
+
+    interface YouTubePlayerOptions {
+        youtube?: YouTubeOptions;
     }
 
     interface YouTubePlayer extends videojs.Player {

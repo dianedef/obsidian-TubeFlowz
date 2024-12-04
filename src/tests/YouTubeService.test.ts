@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { YouTubeService } from '../services/youtube/YouTubeService';
 import { eventBus } from '../core/EventBus';
-import { createVolume, createPlaybackRate } from '../types/settings';
+import { createVolume, createPlaybackRate } from '../types/ISettings';
 import { videojsMock, obsidianMock } from './setup';
 import type { VideoJsPlayer, MethodCall } from './setup';
 import sinon from 'sinon';
@@ -25,15 +25,24 @@ describe('YouTubeService', () => {
         // Créer un spy pour eventBus.emit
         eventSpy = vi.spyOn(eventBus, 'emit');
         
+        // Définir le container
+        (service as any).container = container;
+        
+        // Configurer le mock de ready
+        player.ready.callsFake((callback) => {
+            callback();
+            return player;
+        });
+        
         // Initialiser le service
-        await service.initialize(container);
+        await service.initialize();
         
         // Réinitialiser l'historique des appels
         eventSpy.mockClear();
     });
 
-    afterEach(() => {
-        service.destroy();
+    afterEach(async () => {
+        await service.dispose();
         eventBus.clear();
         vi.clearAllMocks();
     });
@@ -47,20 +56,23 @@ describe('YouTubeService', () => {
 
         it('should initialize with a container', async () => {
             const newService = YouTubeService.getInstance(obsidianMock);
-            await newService.initialize(container);
+            (newService as any).container = container;
+            await newService.initialize();
             expect(container.querySelector('.video-js')).toBeTruthy();
             expect(videojsMock.videojs.called).toBeTruthy();
         });
 
         it('should throw if initialized without container', async () => {
             const newService = YouTubeService.getInstance(obsidianMock);
-            await expect(newService.initialize(null))
+            (newService as any).container = null;
+            await expect(newService.initialize())
                 .rejects.toThrow('Playback aborted');
         });
 
         it('should setup event listeners on initialization', async () => {
             const newService = YouTubeService.getInstance(obsidianMock);
-            await newService.initialize(container);
+            (newService as any).container = container;
+            await newService.initialize();
             
             expect(player.on.calledWith('play')).toBeTruthy();
             expect(player.on.calledWith('pause')).toBeTruthy();
@@ -131,64 +143,53 @@ describe('YouTubeService', () => {
     });
 
     describe('Error Handling', () => {
-        it('should handle player errors', () => {
+        it('should handle player errors', async () => {
             const mockError = {
                 code: 2,
-                message: 'Network error',
                 type: 'MEDIA_ERR_NETWORK'
             };
 
-            player.error.callsFake(() => mockError);
+            // Configurer le mock avant l'initialisation
+            player.error = sinon.stub().returns(mockError);
             
-            // Déclencher l'événement error
-            const callback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'error')?.args[1];
-            if (callback) callback();
+            // Initialiser le service avec le player
+            await service.initialize();
 
+            // Vérifier que le player est initialisé
+            expect((service as any).player).toBeDefined();
+            
+            // Simuler une erreur
+            const errorCallback = player.on.getCalls()
+                .find((call: MethodCall) => call.args[0] === 'error')
+                ?.args[1];
+            
+            if (!errorCallback) {
+                throw new Error('Error callback not found');
+            }
+
+            // Déclencher l'erreur
+            errorCallback();
+
+            // Vérifier que l'événement a été émis
             expect(eventSpy).toHaveBeenCalledWith('video:error', {
                 code: '2',
-                message: 'Network error',
                 type: 'MEDIA_ERR_NETWORK'
             });
         });
 
         it('should handle video load errors', async () => {
             player.src.rejects(new Error('Failed to load'));
-            await expect(service.loadVideo('test123')).rejects.toThrow('Failed to load video');
+            await expect(service.loadVideo('test123')).rejects.toThrow('Source not supported');
         });
     });
 
     describe('Cleanup', () => {
         it('should clean up resources on destroy', () => {
-            service.destroy();
+            service.dispose();
             
             expect(player.dispose.called).toBeTruthy();
             expect((service as any).player).toBeNull();
             expect((service as any).container).toBeNull();
-            expect((service as any).resizeObserver).toBeNull();
-        });
-    });
-
-    describe('Video Quality', () => {
-        it('should handle quality changes', () => {
-            // Simuler un changement de qualité
-            player.videoHeight.returns(720);
-            
-            // Déclencher l'événement qualitychange
-            const callback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'qualitychange')?.args[1];
-            if (callback) callback();
-            
-            expect(eventSpy).toHaveBeenCalledWith('video:qualityChange', '720p');
-        });
-
-        it('should default to auto quality when height is not available', () => {
-            // Simuler l'absence de hauteur vidéo
-            player.videoHeight.returns(0);
-            
-            // Déclencher l'événement qualitychange
-            const callback = player.on.getCalls().find((call: MethodCall) => call.args[0] === 'qualitychange')?.args[1];
-            if (callback) callback();
-            
-            expect(eventSpy).toHaveBeenCalledWith('video:qualityChange', 'auto');
         });
     });
 }); 

@@ -12,7 +12,7 @@ import {
     PlayerAppError,
     CacheAppError,
     ConfigAppError
-} from '../types/errors';
+} from '../types/IErrors';
 
 describe('Error Types', () => {
     describe('Type Guards', () => {

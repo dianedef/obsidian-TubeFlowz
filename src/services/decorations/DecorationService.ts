@@ -1,6 +1,6 @@
 import { EditorView } from '@codemirror/view';
 import { Decoration, WidgetType } from '@codemirror/view';
-import { ViewMode, VIEW_MODES } from '../../types/settings';
+import { ViewMode, VIEW_MODES } from '../../types/ISettings';
 import { extractVideoId, cleanVideoId, type CleanVideoId } from '../../utils';
 import { SettingsService } from '../settings/SettingsService';
 import PlayerService from '../player/PlayerService';

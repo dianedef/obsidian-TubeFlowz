@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { Hotkeys } from '../services/hotkeys/HotkeysService';
-import { CommandError, CommandErrorCode } from '../types/errors';
+import { CommandError, CommandErrorCode } from '../types/IErrors';
+
+// Mock Obsidian
+vi.mock('obsidian', () => ({
+    Notice: class {
+        constructor(message: string) {
+            console.log('Notice:', message);
+        }
+    }
+}));
 
 interface MockCommand {
    id: string;
@@ -23,7 +32,18 @@ describe('HotkeysService', () => {
       mockSettings = {
          getSettings: () => ({
             favoriteSpeed: 1.5,
-            hotkeys: { favoriteSpeed: 'f' }
+            hotkeys: {
+               togglePlay: 'space',
+               rewind: 'arrowleft',
+               forward: 'arrowright',
+               speedUp: '>',
+               speedDown: '<',
+               speedReset: '0',
+               toggleMute: 'm',
+               favoriteSpeed: 'f',
+               toggleFullscreen: 'f',
+               insertTimestamp: 't'
+            }
          })
       };
 
@@ -32,6 +52,7 @@ describe('HotkeysService', () => {
             playbackRate: vi.fn(),
             requestFullscreen: vi.fn(),
             currentTime: vi.fn(() => 123), // 2 minutes et 3 secondes
+            isFullscreen: vi.fn(() => false)
          },
          getCurrentVideoId: vi.fn(() => 'test-video-id')
       };
@@ -133,7 +154,13 @@ describe('HotkeysService', () => {
             call[0].id === 'youtube-insert-timestamp'
          )[0];
          
-         expect(() => command.editorCallback(mockEditor)).toThrow(CommandError);
+         try {
+            command.editorCallback(mockEditor);
+            fail('Should have thrown an error');
+         } catch (error) {
+            expect(error).toBeInstanceOf(CommandError);
+            expect(error.code).toBe(CommandErrorCode.INVALID_STATE);
+         }
          expect(mockTranslations.translate).toHaveBeenCalledWith('errors.INVALID_STATE');
       });
 
@@ -145,7 +172,13 @@ describe('HotkeysService', () => {
             call[0].id === 'youtube-insert-timestamp'
          )[0];
          
-         expect(() => command.editorCallback(mockEditor)).toThrow(CommandError);
+         try {
+            command.editorCallback(mockEditor);
+            fail('Should have thrown an error');
+         } catch (error) {
+            expect(error).toBeInstanceOf(CommandError);
+            expect(error.code).toBe(CommandErrorCode.INVALID_STATE);
+         }
          expect(mockTranslations.translate).toHaveBeenCalledWith('errors.INVALID_STATE');
       });
 
@@ -157,7 +190,13 @@ describe('HotkeysService', () => {
             call[0].id === 'youtube-insert-timestamp'
          )[0];
          
-         expect(() => command.editorCallback(mockEditor)).toThrow(CommandError);
+         try {
+            command.editorCallback(mockEditor);
+            fail('Should have thrown an error');
+         } catch (error) {
+            expect(error).toBeInstanceOf(CommandError);
+            expect(error.code).toBe(CommandErrorCode.NO_PLAYER);
+         }
          expect(mockTranslations.translate).toHaveBeenCalledWith('errors.NO_PLAYER');
       });
    });
@@ -169,18 +208,53 @@ describe('HotkeysService', () => {
          { code: CommandErrorCode.PLAYBACK_ERROR, key: 'errors.PLAYBACK_ERROR', translation: 'Erreur de lecture' }
       ];
 
+      beforeEach(() => {
+         mockPlugin.addCommand.mockClear();
+         mockTranslations.translate.mockClear();
+      });
+
       errorCases.forEach(({ code, key, translation }) => {
          it(`should translate ${code} error correctly`, () => {
             mockTranslations.translate = vi.fn((k) => k === key ? translation : k);
-            mockVideoPlayer.Player = null;
+            
+            // Configurer le mock selon le type d'erreur
+            switch (code) {
+               case CommandErrorCode.NO_PLAYER:
+                  mockVideoPlayer.Player = null;
+                  break;
+               case CommandErrorCode.INVALID_STATE:
+                  mockVideoPlayer.Player = {
+                     ...mockVideoPlayer.Player,
+                     currentTime: vi.fn(() => 'not a number')
+                  };
+                  break;
+               case CommandErrorCode.PLAYBACK_ERROR:
+                  mockVideoPlayer.Player = {
+                     ...mockVideoPlayer.Player,
+                     paused: vi.fn(() => true),
+                     play: vi.fn(() => {
+                        throw new CommandError(CommandErrorCode.PLAYBACK_ERROR, 'Playback failed');
+                     })
+                  };
+                  break;
+            }
+            
+            hotkeys = new Hotkeys(
+               mockPlugin,
+               mockSettings,
+               mockVideoPlayer,
+               mockTranslations
+            );
             
             hotkeys.registerHotkeys();
+            const commandId = code === CommandErrorCode.PLAYBACK_ERROR ? 'youtube-play-pause' : 'youtube-insert-timestamp';
             const command = mockPlugin.addCommand.mock.calls.find((call: {0: MockCommand}) => 
-               call[0].id === 'youtube-insert-timestamp'
+               call[0].id === commandId
             )[0];
             
             expect(() => command.editorCallback(mockEditor)).toThrow(CommandError);
-            expect(mockTranslations.translate).toHaveBeenCalledWith(key);
+            const calls = mockTranslations.translate.mock.calls;
+            expect(calls[calls.length - 1][0]).toBe(key);
          });
       });
    });

@@ -1,6 +1,6 @@
 import { App, Plugin } from 'obsidian';
-import { PluginSettings, DEFAULT_SETTINGS, ViewMode, PlaybackMode, PlaybackRate, Volume, createVolume, createPlaybackRate } from '../../types/settings';
-import { createVideoId } from '../../types/video';
+import { PluginSettings, DEFAULT_SETTINGS, ViewMode, PlaybackMode, PlaybackRate, Volume, createVolume, createPlaybackRate } from '../../types/ISettings';
+import { VideoId,createVideoId, Timestamp } from '../../types/IBase';
 
 export class SettingsService {
     private plugin: Plugin;
@@ -8,7 +8,11 @@ export class SettingsService {
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
-        this.settings = DEFAULT_SETTINGS;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS);
+    }
+
+    public async initialize(): Promise<void> {
+        await this.loadSettings();
     }
 
     public getPlugin(): Plugin {
@@ -28,13 +32,18 @@ export class SettingsService {
         this.save();
     }
 
-    get lastVideoId(): string | null {
+    get lastVideoId(): VideoId {
         return this.settings.lastVideoId;
     }
 
-    set lastVideoId(value: string | null) {
-        this.settings.lastVideoId = value ? createVideoId(value) : null;
-        this.save();
+    set lastVideoId(value: string) {
+        const videoId = createVideoId(value);
+        if (videoId) {
+            this.settings.lastVideoId = videoId;
+            this.save();
+        } else {
+            throw new Error(`Invalid video ID: ${value}`);
+        }
     }
 
     get currentMode(): ViewMode {
@@ -145,12 +154,12 @@ export class SettingsService {
         this.save();
     }
 
-    get lastTimestamp(): number {
+    get lastTimestamp(): Timestamp {
         return this.settings.lastTimestamp;
     }
 
     set lastTimestamp(value: number) {
-        this.settings.lastTimestamp = value;
+        this.settings.lastTimestamp = value as Timestamp;
         this.save();
     }
 
@@ -191,7 +200,12 @@ export class SettingsService {
                 if (typeof savedData.overlayHeight === 'number') {
                     savedData.overlayHeight = Math.max(0, Math.min(100, savedData.overlayHeight));
                 }
+                if (typeof savedData.lastVideoId === 'string') {
+                    savedData.lastVideoId = createVideoId(savedData.lastVideoId) || DEFAULT_SETTINGS.lastVideoId;
+                }
                 this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
+            } else {
+                this.settings = Object.assign({}, DEFAULT_SETTINGS);
             }
         } catch (error) {
             console.error("Erreur lors du chargement des paramètres:", error);

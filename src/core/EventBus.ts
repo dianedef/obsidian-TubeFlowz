@@ -1,5 +1,6 @@
 import type { VideoJsPlayer } from 'video.js';
-import { Volume, PlaybackRate, ViewMode } from '../types/settings';
+import { Volume, PlaybackRate, ViewMode } from '../types/ISettings';
+import { EventMap } from '../types/index';
 
 // Types d'événements spécifiques
 interface VolumeChangePayload {
@@ -12,36 +13,6 @@ interface PlayerErrorPayload {
     message: string;
     type: string;
 }
-
-// Map des événements avec leurs types
-type EventMap = {
-    // Événements vidéo de base
-    'video:load': (videoId: string) => void;
-    'video:play': () => void;
-    'video:pause': () => void;
-    'video:ended': () => void;
-    'video:timeUpdate': (time: number) => void;
-    'video:ready': (player: VideoJsPlayer) => void;
-    
-    // Événements de contrôle
-    'video:volumeChange': (payload: VolumeChangePayload) => void;
-    'video:rateChange': (rate: PlaybackRate) => void;
-    'video:qualityChange': (quality: string) => void;
-    'video:error': (error: PlayerErrorPayload) => void;
-    
-    // Événements de vue
-    'view:resize': (height: number) => void;
-    'view:modeChange': (mode: ViewMode) => void;
-    
-    // Événements de playlist
-    'playlist:update': () => void;
-    'playlist:add': (videoId: string) => void;
-    'playlist:remove': (videoId: string) => void;
-    
-    // Événements de paramètres
-    'settings:update': () => void;
-    'settings:save': () => void;
-};
 
 export class EventBus {
     private static instance: EventBus;
@@ -63,7 +34,7 @@ export class EventBus {
         this.debug = true;
     }
 
-    public on<K extends keyof EventMap>(event: K, callback: EventMap[K]): void {
+    public on<K extends keyof EventMap>(event: K, callback: (data: EventMap[K]) => void): void {
         if (!this.events.has(event)) {
             this.events.set(event, new Set());
         }
@@ -74,7 +45,7 @@ export class EventBus {
         }
     }
 
-    public off<K extends keyof EventMap>(event: K, callback: EventMap[K]): void {
+    public off<K extends keyof EventMap>(event: K, callback: (data: EventMap[K]) => void): void {
         this.events.get(event)?.delete(callback);
         
         if (this.debug) {

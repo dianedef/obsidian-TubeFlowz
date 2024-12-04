@@ -9,7 +9,7 @@ import {
     type PlayerError,
     type CacheError,
     type ConfigError
-} from '../../types/errors';
+} from '../../types/IErrors';
 
 // Classe de base abstraite pour toutes les erreurs
 abstract class BaseAppError extends Error implements BaseError {
@@ -68,7 +68,7 @@ export class PlayerAppError extends BaseAppError implements PlayerError {
             [PlayerErrorCode.MEDIA_ERR_ABORTED]: 'La lecture a été interrompue',
             [PlayerErrorCode.MEDIA_ERR_NETWORK]: 'Erreur réseau lors de la lecture',
             [PlayerErrorCode.MEDIA_ERR_DECODE]: 'Erreur de décodage du média',
-            [PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'Format de média non supporté',
+            [PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'Source de média non supporté',
             [PlayerErrorCode.MEDIA_ERR_ENCRYPTED]: 'Le média est crypté'
         };
 

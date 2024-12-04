@@ -1,35 +1,78 @@
 import { IPlayerService } from '../../types/IPlayerService';
 import { IPlayerState } from '../../types/IPlayer';
-import { EventMap } from '../../types/index';
 import { eventBus } from '../../core/EventBus';
-import { PluginSettings } from '../../types/settings';
+import { YouTubeService } from '../youtube/YouTubeService';
+import { PluginSettings } from '../../types/ISettings';
+import { createVolume, createPlaybackRate } from '../../utils';
+import { App } from 'obsidian';
+import videojs, { VideoJsPlayer, VideoJsOptions } from 'video.js';
+import 'videojs-youtube';
+import { EventMap } from '../../types/IEvents';
+import { Volume, PlaybackRate, Timestamp } from '../../types/IBase';
 
 export default class PlayerService implements IPlayerService {
     private static instance: PlayerService | null = null;
-    private currentState: IPlayerState;
     private container: HTMLElement | null = null;
+    private player: VideoJsPlayer | null = null;
+    private youtubeService: YouTubeService;
+    private settings: Readonly<PluginSettings>;
+    private resizeObserver: ResizeObserver | null = null;
+    private currentState: IPlayerState = {
+        videoId: '',
+        timestamp: 0,
+        currentTime: 0,
+        volume: 1,
+        playbackRate: 1,
+        isMuted: false,
+        isPlaying: false,
+        error: null,
+        mode: 'sidebar',
+        isPaused: true,
+        isStopped: true,
+        isLoading: false,
+        isError: false,
+        containerId: '',
+        height: 0,
+        controls: true,
+        loop: false
+    };
 
-    private constructor(settings: Readonly<PluginSettings>) {
+    private constructor(private app: App, settings: Readonly<PluginSettings>) {
+        this.youtubeService = YouTubeService.getInstance(app);
+        this.settings = settings;
         this.currentState = {
             videoId: settings.lastVideoId || 'dQw4w9WgXcQ',
             timestamp: settings.lastTimestamp,
+            currentTime: settings.lastTimestamp,
             isPlaying: settings.isPlaying,
             volume: settings.volume,
             isMuted: settings.isMuted,
-            playbackRate: settings.playbackRate
+            playbackRate: settings.playbackRate,
+            error: null,
+            mode: settings.currentMode,
+            isPaused: !settings.isPlaying,
+            isStopped: false,
+            isLoading: false,
+            isError: false,
+            containerId: '',
+            height: 0,
+            controls: true,
+            loop: false
         };
+        this.initializeEventListeners();
     }
 
-    public static getInstance(settings: PluginSettings): PlayerService {
+    public static getInstance(app: App, settings: PluginSettings): PlayerService {
         if (!PlayerService.instance) {
-            PlayerService.instance = new PlayerService(settings);
+            PlayerService.instance = new PlayerService(app, settings);
         }
         return PlayerService.instance;
     }
 
     private initializeEventListeners(): void {
-        // Écouter les événements globaux
-        eventBus.on('video:load', this.handleVideoLoad.bind(this));
+        eventBus.on('video:load', async (videoId: string) => {
+            await this.handleVideoLoad(videoId);
+        });
         eventBus.on('video:play', this.play.bind(this));
         eventBus.on('video:pause', this.pause.bind(this));
     }
@@ -42,7 +85,7 @@ export default class PlayerService implements IPlayerService {
             this.emitStateUpdate();
         } catch (error) {
             console.error('[VideoPlayer] Initialization error:', error);
-            this.state.error = error as Error;
+            this.currentState.error = error as Error;
             this.emitStateUpdate();
             throw error;
         }
@@ -57,15 +100,11 @@ export default class PlayerService implements IPlayerService {
         videoElement.className = 'video-js vjs-default-skin';
         this.container.appendChild(videoElement);
 
-        const options: videojs.PlayerOptions = {
+        const options: VideoJsOptions = {
             controls: true,
             fluid: true,
             techOrder: ['youtube'],
-            youtube: {
-                iv_load_policy: 3,
-                modestbranding: 1,
-                rel: 0
-            }
+            youtube: this.youtubeService.getYouTubeOptions(this.settings.showYoutubeRecommendations)
         };
 
         try {
@@ -81,36 +120,42 @@ export default class PlayerService implements IPlayerService {
         if (!this.player) return;
 
         this.player.on('play', () => {
-            this.state.isPlaying = true;
+            this.currentState.isPlaying = true;
             this.emitStateUpdate();
         });
 
         this.player.on('pause', () => {
-            this.state.isPlaying = false;
+            this.currentState.isPlaying = false;
             this.emitStateUpdate();
         });
 
         this.player.on('timeupdate', () => {
-            this.state.currentTime = this.player?.currentTime() || 0;
-            eventBus.emit('video:timeUpdate', this.state.currentTime);
+            this.currentState.timestamp = this.player?.currentTime() || 0;
+            eventBus.emit('video:timeUpdate', this.currentState.timestamp);
             this.emitStateUpdate();
         });
 
-        this.player.on('error', (error) => {
-            this.state.error = error;
-            eventBus.emit('video:error', error);
-            this.emitStateUpdate();
+        this.player.on('error', () => {
+            const error = this.player?.error();
+            if (error) {
+                const messageKey = this.youtubeService.getErrorMessageKey(error.code);
+                const errorType = this.youtubeService.getErrorType(error.code);
+                const youtubeError = this.youtubeService.createYouTubeError(
+                    error.code,
+                    messageKey,
+                    this.currentState.videoId
+                );
+                
+                eventBus.emit('video:error', {
+                    code: String(error.code),
+                    message: youtubeError.message,
+                    type: errorType
+                });
+            }
         });
 
-        this.player.on('loadstart', () => {
-            this.state.isLoading = true;
-            this.emitStateUpdate();
-        });
-
-        this.player.on('loaded', () => {
-            this.state.isLoading = false;
-            this.state.duration = this.player?.duration() || 0;
-            this.emitStateUpdate();
+        this.player.on('qualitychange', () => {
+            this.youtubeService.handleQualityChange(this.player?.videoHeight());
         });
     }
 
@@ -128,69 +173,77 @@ export default class PlayerService implements IPlayerService {
     }
 
     private async handleVideoLoad(videoId: string): Promise<void> {
-        await this.loadVideo({ 
+        await this.loadVideo({
+            ...this.currentState,
             videoId,
-            mode: 'tab'
+            mode: this.settings.currentMode,
+            timestamp: 0,
+            currentTime: 0,
+            volume: this.currentState.volume,
+            playbackRate: this.currentState.playbackRate,
+            isMuted: this.currentState.isMuted,
+            isPlaying: false,
+            error: null,
+            isPaused: true,
+            isStopped: false,
+            isLoading: false,
+            isError: false,
+            containerId: this.currentState.containerId,
+            height: this.currentState.height,
+            controls: this.currentState.controls,
+            loop: this.currentState.loop
         });
     }
 
-    public async loadVideo(videoId: VideoId, timestamp?: Timestamp): Promise<void> {
+    public async loadVideo(options: IPlayerState): Promise<void> {
         if (!this.player) {
             throw new Error('Player not initialized');
         }
 
         try {
-            this.state.isLoading = true;
-            this.emitStateUpdate();
-
+            this.currentState.videoId = options.videoId;
             await this.player.src({
                 type: 'video/youtube',
-                src: `https://www.youtube.com/watch?v=${videoId}`
+                src: `https://www.youtube.com/watch?v=${options.videoId}`
             });
 
-            this.currentVideoId = videoId;
-
-            if (timestamp) {
-                this.player.currentTime(timestamp);
+            if (options.timestamp) {
+                await this.seekTo(options.timestamp);
             }
 
-            // Restaurer les paramètres précédents
-            if (this.state.playbackRate !== 1) {
-                this.player.playbackRate(this.state.playbackRate);
-            }
-            
-            if (this.state.volume !== 1) {
-                this.player.volume(this.state.volume);
+            if (options.volume !== undefined) {
+                await this.setVolume(options.volume);
             }
 
-            if (this.state.isMuted) {
-                this.player.muted(true);
+            if (options.playbackRate !== undefined) {
+                await this.setPlaybackRate(options.playbackRate);
             }
 
+            this.emitStateUpdate();
         } catch (error) {
             console.error('[VideoPlayer] Load video error:', error);
-            this.state.error = error as Error;
+            this.currentState.error = error as Error;
             this.emitStateUpdate();
             throw error;
         }
     }
 
     public async play(): Promise<void> {
-        if (this.player && !this.state.isPlaying) {
+        if (this.player && !this.currentState.isPlaying) {
             await this.player.play();
         }
     }
 
     public async pause(): Promise<void> {
-        if (this.player && this.state.isPlaying) {
-            this.player.pause();
+        if (this.player && this.currentState.isPlaying) {
+            await this.player.pause();
         }
     }
 
     public async setVolume(volume: number): Promise<void> {
         if (this.player) {
             this.player.volume(volume);
-            this.state.volume = volume;
+            this.currentState.volume = volume;
             this.emitStateUpdate();
         }
     }
@@ -198,13 +251,33 @@ export default class PlayerService implements IPlayerService {
     public async setPlaybackRate(rate: number): Promise<void> {
         if (this.player) {
             this.player.playbackRate(rate);
-            this.state.playbackRate = rate;
+            this.currentState.playbackRate = rate;
             this.emitStateUpdate();
         }
     }
 
     private emitStateUpdate(): void {
-        eventBus.emit('video:stateChange' as keyof EventMap, { ...this.currentState });
+        const state: IPlayerState = {
+            isPlaying: this.currentState.isPlaying,
+            currentTime: this.currentState.timestamp as Timestamp,
+            duration: this.player?.duration() || 0,
+            volume: this.currentState.volume as Volume,
+            isMuted: this.currentState.isMuted,
+            playbackRate: this.currentState.playbackRate as PlaybackRate,
+            isLoading: false,
+            isError: false,
+            isPaused: !this.currentState.isPlaying,
+            isStopped: false,
+            error: this.currentState.error || null,
+            mode: this.currentState.mode,
+            containerId: this.currentState.containerId,
+            height: this.currentState.height,
+            controls: this.currentState.controls,
+            loop: this.currentState.loop,
+            videoId: this.currentState.videoId
+        };
+        
+        eventBus.emit('video:stateChange', state);
     }
 
     public getCurrentState(): IPlayerState {
@@ -223,32 +296,41 @@ export default class PlayerService implements IPlayerService {
         }
 
         this.container = null;
-        this.currentVideoId = null;
-        this.state = {
-            isPlaying: false,
+        this.currentState = {
+            videoId: '',
+            timestamp: 0,
             currentTime: 0,
-            duration: 0,
-            volume: 1 as Volume,
+            volume: 1,
+            playbackRate: 1,
             isMuted: false,
-            playbackRate: 1 as PlaybackRate,
+            isPlaying: false,
+            error: null,
+            mode: 'sidebar',
+            isPaused: true,
+            isStopped: true,
             isLoading: false,
-            error: null
+            isError: false,
+            containerId: '',
+            height: 0,
+            controls: true,
+            loop: false
         };
     }
 
     public async dispose(): Promise<void> {
-        // Nettoyer les écouteurs d'événements
-        eventBus.off('video:load', this.handleVideoLoad.bind(this));
+        eventBus.off('video:load', async (videoId: string) => {
+            await this.handleVideoLoad(videoId);
+        });
         eventBus.off('video:play', this.play.bind(this));
         eventBus.off('video:pause', this.pause.bind(this));
-        
-        // Appeler destroy pour nettoyer le player
         this.destroy();
     }
 
     public async seekTo(time: number): Promise<void> {
         if (this.player) {
             this.player.currentTime(time);
+            this.currentState.timestamp = time;
+            this.emitStateUpdate();
         }
     }
 
@@ -258,12 +340,23 @@ export default class PlayerService implements IPlayerService {
 
     public getState(): IPlayerState {
         return {
-            videoId: this.currentVideoId,
-            timestamp: this.state.currentTime,
-            volume: this.state.volume,
-            playbackRate: this.state.playbackRate,
-            isMuted: this.state.isMuted,
-            isPlaying: this.state.isPlaying
+            videoId: this.currentState.videoId,
+            timestamp: this.currentState.timestamp,
+            currentTime: this.currentState.timestamp,
+            volume: this.currentState.volume,
+            playbackRate: this.currentState.playbackRate,
+            isMuted: this.currentState.isMuted,
+            isPlaying: this.currentState.isPlaying,
+            error: this.currentState.error,
+            mode: this.currentState.mode,
+            isPaused: this.currentState.isPaused,
+            isStopped: this.currentState.isStopped,
+            isLoading: this.currentState.isLoading,
+            isError: this.currentState.isError,
+            containerId: this.currentState.containerId,
+            height: this.currentState.height,
+            controls: this.currentState.controls,
+            loop: this.currentState.loop
         };
     }
 
@@ -274,14 +367,35 @@ export default class PlayerService implements IPlayerService {
         if (state.playbackRate !== undefined) {
             await this.setPlaybackRate(state.playbackRate);
         }
-        if (state.isMuted !== undefined) {
-            this.player?.muted(state.isMuted);
+        if (state.isMuted !== undefined && this.player) {
+            this.player.muted(state.isMuted);
+            this.currentState.isMuted = state.isMuted;
+            this.emitStateUpdate();
         }
         if (state.timestamp !== undefined) {
             await this.seekTo(state.timestamp);
         }
         if (state.videoId !== undefined) {
-            await this.loadVideo(state.videoId);
+            await this.loadVideo({
+                ...this.currentState,
+                videoId: state.videoId,
+                mode: this.settings.currentMode,
+                timestamp: state.timestamp || 0,
+                currentTime: state.timestamp || 0,
+                volume: this.currentState.volume,
+                playbackRate: this.currentState.playbackRate,
+                isMuted: this.currentState.isMuted,
+                isPlaying: false,
+                error: null,
+                isPaused: true,
+                isStopped: false,
+                isLoading: false,
+                isError: false,
+                containerId: this.currentState.containerId,
+                height: this.currentState.height,
+                controls: this.currentState.controls,
+                loop: this.currentState.loop
+            });
         }
         if (state.isPlaying !== undefined) {
             if (state.isPlaying) {

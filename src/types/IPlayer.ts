@@ -1,4 +1,4 @@
-import { ViewMode } from './settings';
+import { ViewMode } from './ISettings';
 
 export interface IPlayer {
     initialize(): Promise<void>;
@@ -16,17 +16,33 @@ export interface IPlayer {
 export interface IPlayerState {
     videoId: string;
     timestamp: number;
+    currentTime: number;
     volume: number;
     playbackRate: number;
     isMuted: boolean;
     isPlaying: boolean;
+    error: Error | null;
+    mode: ViewMode;
+    fromUserClick?: boolean;
+    autoplay?: boolean;
+    isPaused: boolean;
+    isStopped: boolean;
+    isLoading: boolean;
+    isError: boolean;
+    containerId: string;
+    height: number;
+    controls?: boolean;
+    loop?: boolean;
 }
 
-export interface IPlayerOptions {
-    videoId: string;
-    mode: ViewMode;
-    timestamp?: number;
-    volume?: number;
-    playbackRate?: number;
-    fromUserClick?: boolean;
+export interface IPlayerControls {
+    play: () => void;
+    pause: () => void;
+    currentTime: (time?: number) => number;
+    duration: () => number;
+    volume: (level?: number) => number;
+    muted: (muted?: boolean) => boolean;
+    playbackRate: (rate?: number) => number;
+    language: (lang: string) => void;
+    dispose: () => void;
 } 

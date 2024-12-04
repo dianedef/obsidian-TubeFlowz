@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { ViewMode, VIEW_MODES } from '../types/settings';
+import { ViewMode, VIEW_MODES } from '../types/ISettings';
 import { eventBus } from '../core/EventBus';
 import { App } from 'obsidian';
 

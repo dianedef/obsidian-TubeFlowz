@@ -5,24 +5,23 @@ import { PlayerView } from './views/PlayerView';
 import PlayerService from './services/player/PlayerService';
 import { PlayerUI } from './views/PlayerUI';
 import { ViewModeService } from './services/viewMode/ViewModeService';
-import { VIEW_MODES, DEFAULT_SETTINGS } from './types/settings';
+import { VIEW_MODES, DEFAULT_SETTINGS } from './types/ISettings';
 import { Hotkeys } from './services/hotkeys/HotkeysService';
 import { TranslationsService } from './services/translations/TranslationsService';
-import { VideoPlayerUI } from './views/VideoPlayerUI';
 import { ViewPlugin, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { registerStyles, unregisterStyles } from './services/styles/StylesService';
 import createDecorations from './services/decorations/DecorationService';
 import { IPlayerUI } from './types/IPlayerUI';
 import { extractVideoId, cleanVideoId } from './utils';
-import { ViewMode } from './types/settings';
+import { ViewMode } from './types/ISettings';
 
 interface ObsidianMenu extends Menu {
-    dom: HTMLElement;
+   dom: HTMLElement;
 }
 
 interface DecorationState {
-    decorations: DecorationSet;
-    settings: SettingsService;
+   decorations: DecorationSet;
+   settings: SettingsService;
 }
 
 export default class TubeFlows extends Plugin {
@@ -41,16 +40,11 @@ export default class TubeFlows extends Plugin {
 
       // Initialisation des services dans le bon ordre
       this.settings = new SettingsService(this);
-      await this.settings.loadSettings();
+      await this.settings.initialize();
 
-      // Attendre que les paramètres soient chargés avant de continuer
-      if (!this.settings.viewHeight) {
-         this.settings.viewHeight = DEFAULT_SETTINGS.viewHeight;
-         await this.settings.save();
-      }
-      
-      const videoPlayer = VideoPlayerUI.getInstance(this.settings) as unknown as IPlayerUI;
-      const playerService = PlayerService.getInstance(this.settings.getSettings());
+      // Initialiser les services
+      const playerService = PlayerService.getInstance(this.app, this.settings.getSettings());
+      const videoPlayer = PlayerUI.getInstance(this.settings, playerService);
       this.viewModeService = new ViewModeService(this, VIEW_MODES.Tab);
 
       // Les services sont initialisés, maintenant on peut configurer les commandes
@@ -76,7 +70,6 @@ export default class TubeFlows extends Plugin {
       
       // registerHotkeys
       this.hotkeys.registerHotkeys();
-
       // registerView
       this.registerView(
          'youtube-player',

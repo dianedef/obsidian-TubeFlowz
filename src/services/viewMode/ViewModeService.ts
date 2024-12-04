@@ -1,5 +1,5 @@
 import { Plugin, WorkspaceLeaf } from 'obsidian';
-import { ViewMode, VIEW_MODES } from '../../types/settings';
+import { ViewMode, VIEW_MODES } from '../../types/ISettings';
 import { PlayerView } from '../../views/PlayerView';
 import { IViewModeService } from '../../types/IViewModeService';
 

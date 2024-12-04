@@ -2,12 +2,12 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 import { IPlayerService } from '../types/IPlayerService';
 import { IPlayerUI } from '../types/IPlayerUI';
 import { saveHeight } from '../utils';
-import { VIEW_MODES } from '../types/settings';
+import { VIEW_MODES } from '../types/ISettings';
 import { SettingsService } from '../services/settings/SettingsService';
 import { ViewModeService } from '../services/viewMode/ViewModeService';
-import { ResizerOptions } from '../types/settings';
-import { PlayerAppError, YouTubeAppError, PlayerErrorCode, YouTubeErrorCode } from '../types/errors';
-import { ViewMode } from '../types/settings';
+import { ResizerOptions } from '../types/ISettings';
+import { PlayerAppError, YouTubeAppError, PlayerErrorCode, YouTubeErrorCode } from '../types/IErrors';
+import { ViewMode } from '../types/ISettings';
 import { IPlayerOptions } from '../types/IPlayer';
 import { MESSAGE_KEYS } from '../i18n/messages';
 
@@ -79,13 +79,11 @@ export class PlayerView extends ItemView {
             this.clearError();
         } catch (error) {
             console.error("Erreur lors de l'ouverture de la vue:", error);
-            if (error instanceof Error) {
-                const playerError = new PlayerAppError(
-                    error.message,
-                    PlayerErrorCode.MEDIA_ERR_DECODE
-                );
-                this.showError(playerError);
-            }
+            const playerError = new PlayerAppError(
+                PlayerErrorCode.MEDIA_ERR_DECODE,
+                MESSAGE_KEYS.INITIALIZATION_ERROR
+            );
+            this.showError(playerError);
         }
     }
 
