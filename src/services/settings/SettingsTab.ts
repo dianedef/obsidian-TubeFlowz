@@ -1,13 +1,16 @@
 import { App, Plugin, PluginSettingTab, Setting, DropdownComponent } from 'obsidian';
 import { SettingsService } from './SettingsService';
 import { PlaybackMode } from '../../types/ISettings';
+import { PlayerService } from '/player/PlayerService';
 
 export class SettingsTab extends PluginSettingTab {
    private Settings: SettingsService;
+   private playerService: PlayerService;
 
-   constructor(app: App, plugin: Plugin, settings: SettingsService) {
+   constructor(app: App, plugin: Plugin, settings: SettingsService, playerService: PlayerService) {
       super(app, plugin);
       this.Settings = settings;
+      this.playerService = playerService;
    }
 
    display(): void {
@@ -68,12 +71,8 @@ export class SettingsTab extends PluginSettingTab {
                this.Settings.showYoutubeRecommendations = value;
                await this.Settings.save();
                
-               // Il faut recharger le player pour que les changements prennent effet
-               if (VideoPlayer?.Player) {
-                  VideoPlayer.Player.src({
-                     type: 'video/youtube',
-                     src: VideoPlayer.Player.currentSrc()
-                  });
+               if (this.playerService.getCurrentPlayer()) {
+                  this.playerService.loadVideo(this.playerService.getCurrentVideoId());
                }
             }));
    }

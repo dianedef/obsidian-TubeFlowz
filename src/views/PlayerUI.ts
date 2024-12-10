@@ -191,7 +191,7 @@ export class PlayerUI implements IPlayerUI {
             techOrder: ['youtube'],
             sources: [{
                type: 'video/youtube',
-               src: `https://www.youtube.com/watch?v=${videoId}`
+               src: videoId
             }],
             language: this.currentLanguage,
             languages: {
@@ -247,7 +247,8 @@ export class PlayerUI implements IPlayerUI {
                playsinline: 1,
                disablekb: 1,
                enablejsapi: 1,
-               origin: window.location.origin
+               origin: window.location.origin,
+               videoId: videoId
             },
             userActions: {
                hotkeys: true
@@ -360,7 +361,7 @@ export class PlayerUI implements IPlayerUI {
       playerContainer.className = 'fallback-player-container';
       
       const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed/${videoId}${timestamp ? `?start=${timestamp}` : ''}`;
+      iframe.src = videoId;
       iframe.style.width = '100%';
       iframe.style.height = '100%';
       iframe.style.border = 'none';
@@ -379,7 +380,7 @@ export class PlayerUI implements IPlayerUI {
          techOrder: ['youtube'],
          sources: [{
                type: 'video/youtube',
-               src: `https://www.youtube.com/watch?v=${videoId}`
+               src: videoId
          }],
          liveTracker: false,
          liveui: false,

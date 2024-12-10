@@ -6,7 +6,7 @@ import { IPlayer } from '../../types/IPlayer';
 import videojs from 'video.js';
 import 'videojs-youtube';
 
-export interface YouTubeOptions {
+export interface IYouTubeOptions {
     iv_load_policy: number;
     modestbranding: number;
     rel: number;
@@ -30,8 +30,6 @@ export class YouTubeService implements IPlayer {
     private currentLang: 'en' | 'fr' = 'en';
     private player: any = null;
     private container: HTMLElement | null = null;
-
-    private constructor(private app: App) {}
 
     public static getInstance(app: App): YouTubeService {
         if (!YouTubeService.instance) {
@@ -58,7 +56,7 @@ export class YouTubeService implements IPlayer {
             playsinline: 1,
             disablekb: 1,
             enablejsapi: 1,
-            origin: window.location.origin
+            origin: window.location.origin,
         };
     }
 
@@ -229,7 +227,7 @@ export class YouTubeService implements IPlayer {
         try {
             await this.player.src({
                 type: 'video/youtube',
-                src: `https://www.youtube.com/watch?v=${videoId}`
+                src: videoId
             });
 
             if (timestamp) {

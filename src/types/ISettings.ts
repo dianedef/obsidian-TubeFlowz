@@ -52,7 +52,7 @@ export enum PlaybackMode {
     Stream = 'stream',
     Download = 'download'
 }
-export interface PluginSettings {
+export interface IPluginSettings {
     language: string;
     lastVideoId: VideoId;
     lastTimestamp: Timestamp;
@@ -80,7 +80,8 @@ export interface PluginSettings {
 // Valeurs par défaut
 export const DEFAULT_SETTINGS: IPluginSettings = {
     language: 'en',
-    lastVideoId: 'dQw4w9WgXcQ' as VideoId,
+    lastVideoId: 'EIHAt93_Vs4' as VideoId,
+    lastValidVideoId: 'jNQXAC9IVRw' as VideoId,
     lastTimestamp: 0 as Timestamp,
     isVideoOpen: false,
     currentMode: 'sidebar',

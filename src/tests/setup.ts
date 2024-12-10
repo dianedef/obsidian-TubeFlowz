@@ -112,44 +112,51 @@ const createVideoJSMock = () => {
 };
 
 // Mock Obsidian App
-const createObsidianMock = () => {
-    const mock = {
+export function createObsidianMock(): App {
+    return {
         workspace: {
             on: vi.fn(),
             off: vi.fn(),
-            getLeaf: vi.fn(),
             getActiveViewOfType: vi.fn(),
-            iterateAllLeaves: vi.fn(),
+            getLeaf: vi.fn(),
+            getLeavesOfType: vi.fn().mockReturnValue([]),
+            activeLeaf: null,
             revealLeaf: vi.fn(),
-            activeLeaf: {
-                view: {
-                    getViewType: vi.fn()
-                }
-            }
+            setActiveLeaf: vi.fn(),
+            iterateAllLeaves: vi.fn()
         },
         vault: {
-            on: sinon.stub(),
-            off: sinon.stub(),
+            on: vi.fn(),
+            off: vi.fn(),
             adapter: {
-                exists: sinon.stub().resolves(true),
-                read: sinon.stub().resolves(''),
-                write: sinon.stub().resolves()
+                exists: vi.fn().mockResolvedValue(true),
+                read: vi.fn().mockResolvedValue(''),
+                write: vi.fn().mockResolvedValue(undefined)
             },
-            getConfig: vi.fn()
+            create: vi.fn(),
+            delete: vi.fn(),
+            getAbstractFileByPath: vi.fn()
         },
-        keymap: {},
-        scope: {},
         metadataCache: {
-            on: sinon.stub(),
-            off: sinon.stub()
+            on: vi.fn(),
+            off: vi.fn(),
+            getFileCache: vi.fn()
         },
         fileManager: {
-            processFrontMatter: sinon.stub()
+            processFrontMatter: vi.fn(),
+            createNewMarkdownFile: vi.fn()
+        },
+        lastEvent: null,
+        keymap: {
+            pushScope: vi.fn(),
+            popScope: vi.fn()
+        },
+        scope: {
+            register: vi.fn(),
+            unregister: vi.fn()
         }
-    };
-
-    return mock as unknown as App;
-};
+    } as unknown as App;
+}
 
 // Créer et exporter les mocks
 export const videojsMock = createVideoJSMock();

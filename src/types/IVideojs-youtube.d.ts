@@ -1,7 +1,7 @@
 import videojs from 'video.js';
 
 declare module 'videojs-youtube' {
-    export interface YouTubeOptions {
+    export interface IYouTubeOptions {
         iv_load_policy: number;
         modestbranding: number;
         rel: number;
@@ -20,7 +20,7 @@ declare module 'videojs-youtube' {
         };
     }
 
-    interface YouTubePlayerOptions {
+    interface IYouTubePlayerOptions {
         youtube?: YouTubeOptions;
     }
 

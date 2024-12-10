@@ -16,7 +16,7 @@ export class Hotkeys {
    private handleCommandError(error: unknown) {
       if (error instanceof CommandError) {
          console.error('[HotkeysService]', error);
-         new Notice(this.translations.translate(`errors.${error.code}`));
+         new Notice(this.translations.t(`errors.${error.code}`));
          throw error;
       }
       throw error;
@@ -26,7 +26,7 @@ export class Hotkeys {
       // Lecture/Pause
       this.plugin.addCommand({
          id: 'youtube-play-pause',
-         name: this.translations.translate('commands.playPause'),
+         name: this.translations.t('commands.playPause'),
          icon: 'play',
          editorCallback: () => {
             try {
@@ -48,7 +48,7 @@ export class Hotkeys {
       // Reculer de 10 secondes
       this.plugin.addCommand({
          id: 'youtube-seek-backward',
-         name: this.translations.translate('commands.seekBackward'),
+         name: this.translations.t('commands.seekBackward'),
          icon: 'arrow-left',
          editorCallback: () => {
             try {
@@ -70,7 +70,7 @@ export class Hotkeys {
       // Avancer de 10 secondes
       this.plugin.addCommand({
          id: 'youtube-seek-forward',
-         name: this.translations.translate('commands.seekForward'),
+         name: this.translations.t('commands.seekForward'),
          icon: 'arrow-right',
          editorCallback: () => {
             try {
@@ -93,7 +93,7 @@ export class Hotkeys {
       // Augmenter la vitesse
       this.plugin.addCommand({
          id: 'youtube-speed-up',
-         name: this.translations.translate('commands.speedUp'),
+         name: this.translations.t('commands.speedUp'),
          icon: 'fast-forward',
          editorCallback: () => {
             try {
@@ -116,7 +116,7 @@ export class Hotkeys {
       // Diminuer la vitesse
       this.plugin.addCommand({
          id: 'youtube-speed-down',
-         name: this.translations.translate('commands.speedDown'),
+         name: this.translations.t('commands.speedDown'),
          icon: 'rewind',
          editorCallback: () => {
             try {
@@ -139,7 +139,7 @@ export class Hotkeys {
       // Réinitialiser la vitesse
       this.plugin.addCommand({
          id: 'youtube-speed-reset',
-         name: this.translations.translate('commands.speedReset'),
+         name: this.translations.t('commands.speedReset'),
          icon: 'refresh-cw',
          editorCallback: () => {
             try {
@@ -157,7 +157,7 @@ export class Hotkeys {
       // Muet/Son
       this.plugin.addCommand({
          id: 'youtube-toggle-mute',
-         name: this.translations.translate('commands.toggleMute'),
+         name: this.translations.t('commands.toggleMute'),
          icon: 'volume-x',
          editorCallback: () => {
             try {
@@ -175,7 +175,7 @@ export class Hotkeys {
       // Vitesse préférée
       this.plugin.addCommand({
          id: 'youtube-set-favorite-speed',
-         name: this.translations.translate('commands.setFavoriteSpeed'),
+         name: this.translations.t('commands.setFavoriteSpeed'),
          icon: 'star',
          editorCallback: () => {
             try {
@@ -194,7 +194,7 @@ export class Hotkeys {
       // Plein écran
       this.plugin.addCommand({
          id: 'youtube-toggle-fullscreen',
-         name: this.translations.translate('commands.toggleFullscreen'),
+         name: this.translations.t('commands.toggleFullscreen'),
          icon: 'maximize',
          editorCallback: () => {
             try {
@@ -213,7 +213,7 @@ export class Hotkeys {
       // Insérer le timestamp
       this.plugin.addCommand({
          id: 'youtube-insert-timestamp',
-         name: this.translations.translate('commands.insertTimestamp'),
+         name: this.translations.t('commands.insertTimestamp'),
          icon: 'clock',
          editorCallback: (editor) => {
             try {

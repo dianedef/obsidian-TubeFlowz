@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
-import { App, WorkspaceLeaf, View } from 'obsidian';
+import { DEFAULT_SETTINGS } from '../../types/ISettings';
+import { VideoId } from '../../types/IBase';
 
 // Mock Obsidian avant les imports
 vi.mock('obsidian', () => ({
@@ -21,21 +22,19 @@ vi.mock('obsidian', () => ({
             this.manifest = manifest;
         }
         registerInterval(id: number) { return id; }
-        registerHoverLinkSource(id: string, info: any) {}
     }
 }));
 
+import PlayerService from '../../services/player/PlayerService';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PlayerView } from '../../views/PlayerView';
-import PlayerService from '../../services/player/PlayerService';
 import { PlayerUI } from '../../views/PlayerUI';
 import { SettingsService } from '../../services/settings/SettingsService';
 import { ViewModeService } from '../../services/viewMode/ViewModeService';
 import { VIEW_MODES } from '../../types/ISettings';
 import { MockPlugin, obsidianMock } from '../setup';
 import { eventBus } from '../../core/EventBus';
-import { PlayerErrorCode } from '../../types/IErrors';
-import { IPlayerState } from '../../types/IPlayer';
+import { IPlayerOptions } from '../../types/IPlayer';
 
 describe('PlayerView Integration Tests', () => {
     let playerView: PlayerView;
@@ -54,13 +53,60 @@ describe('PlayerView Integration Tests', () => {
         document.body.appendChild(containerDiv);
 
         mockLeaf = {
-            view: {},
             id: 'test-leaf',
             containerEl: containerDiv,
-            getViewState: vi.fn(),
-            setViewState: vi.fn(),
+            view: {
+                getViewType: vi.fn(),
+                app: {
+                    workspace: {
+                        on: vi.fn(),
+                        off: vi.fn(),
+                        getActiveViewOfType: vi.fn(),
+                        getLeaf: vi.fn(),
+                        getLeavesOfType: vi.fn().mockReturnValue([])
+                    },
+                    vault: {
+                        on: vi.fn(),
+                        off: vi.fn(),
+                        adapter: {
+                            exists: vi.fn().mockResolvedValue(true),
+                            read: vi.fn().mockResolvedValue(''),
+                            write: vi.fn().mockResolvedValue(undefined)
+                        }
+                    },
+                    metadataCache: {
+                        on: vi.fn(),
+                        off: vi.fn()
+                    },
+                    fileManager: {
+                        processFrontMatter: vi.fn()
+                    },
+                    lastEvent: null,
+                    keymap: {
+                        pushScope: vi.fn(),
+                        popScope: vi.fn()
+                    },
+                    scope: {
+                        register: vi.fn(),
+                        unregister: vi.fn()
+                    }
+                },
+                icon: 'icon',
+                navigation: false
+            },
+            parent: null,
+            openFile: vi.fn(),
+            open: vi.fn(),
             detach: vi.fn(),
-            empty: vi.fn()
+            setViewState: vi.fn(),
+            getViewState: vi.fn(),
+            setPinned: vi.fn(),
+            setEphemeral: vi.fn(),
+            togglePinned: vi.fn(),
+            setDraggedFile: vi.fn(),
+            setGroupMember: vi.fn(),
+            setGroup: vi.fn(),
+            setRoot: vi.fn()
         };
 
         // Add empty and detach methods to containerEl
@@ -110,7 +156,20 @@ describe('PlayerView Integration Tests', () => {
             activeEditor: null,
             activeLeaf: {
                 view: {
-                    getViewType: vi.fn()
+                    getViewType: vi.fn(),
+                    app: {
+                        keymap: {
+                            pushScope: vi.fn(),
+                            popScope: vi.fn()
+                        },
+                        scope: {
+                            register: vi.fn(),
+                            unregister: vi.fn()
+                        }
+                    },
+                    icon: 'icon',
+                    navigation: false,
+                    leaf: {}
                 }
             },
             containerEl: containerDiv
@@ -125,20 +184,20 @@ describe('PlayerView Integration Tests', () => {
         settings = new SettingsService(mockPlugin);
         await settings.initialize();
         
-        // Configurer les settings par défaut
-        settings.lastVideoId = 'dQw4w9WgXcQ';
-        settings.lastTimestamp = 0;
-        settings.volume = 1;
-        settings.isMuted = false;
-        settings.playbackRate = 1;
-        settings.defaultViewMode = VIEW_MODES.Tab;
+        // S'assurer que les settings sont initialisés avec les valeurs par défaut
+        Object.assign(settings.getSettings(), {
+            ...DEFAULT_SETTINGS,
+            currentMode: VIEW_MODES.Tab  // Override spécifique pour le test
+        });
+        await settings.save();
 
-        playerService = PlayerService.getInstance(mockPlugin.app, settings);
+        // Utiliser les settings et non le service
+        playerService = PlayerService.getInstance(mockPlugin.app, settings.getSettings());
         playerUI = PlayerUI.getInstance(settings, playerService);
         viewModeService = new ViewModeService(mockPlugin, VIEW_MODES.Tab);
 
-        playerView = new PlayerView(mockLeaf);
-        containerDiv = playerView.containerEl;
+        playerView = new PlayerView(mockLeaf, playerService, playerUI, settings, viewModeService);
+        containerDiv = playerView.containerEl as HTMLDivElement;
 
         // Assigner les services à la vue
         (playerView as any).playerService = playerService;
@@ -241,29 +300,47 @@ describe('PlayerView Integration Tests', () => {
 
     it('should handle player service interactions', async () => {
         await expect(playerView.onOpen()).resolves.not.toThrow();
-        const videoId = 'test-video-id';
-        const playerState: IPlayerState = {
+        const videoId = 'test-video-id' as VideoId;
+        const playerOptions: IPlayerOptions = {
+            // Configuration de la vidéo
             videoId,
             timestamp: 0,
-            currentTime: 0,
+            
+            // Options d'affichage
+            mode: VIEW_MODES.Tab,
+            height: 360,
+            containerId: 'player-container',
+            
+            // Options de comportement
+            autoplay: false,
+            controls: true,
+            loop: false,
+            isMuted: false,
             volume: 1,
             playbackRate: 1,
-            isMuted: false,
-            isPlaying: false,
-            error: null,
-            mode: VIEW_MODES.Tab,
-            fromUserClick: false,
-            autoplay: false,
-            isPaused: true,
-            isStopped: false,
-            isLoading: false,
-            isError: false,
-            containerId: 'player-container',
-            height: 360,
-            controls: true,
-            loop: false
+            
+            // Options de langue
+            language: 'en',
+            
+            // Options techniques
+            techOrder: ['youtube'],
+            youtube: {
+                iv_load_policy: 3,
+                modestbranding: 1,
+                rel: 0,
+                endscreen: 0,
+                controls: 0,
+                ytControls: 0,
+                preload: 'auto',
+                showinfo: 0,
+                fs: 0,
+                playsinline: 1,
+                disablekb: 1,
+                enablejsapi: 1,
+                origin: window.location.origin
+            }
         };
-        await playerService.loadVideo(playerState);
+        await playerService.loadVideo(playerOptions);
         const state = playerService.getCurrentState();
         expect(state.videoId).toBe(videoId);
     });

@@ -5,17 +5,18 @@ import { saveHeight } from '../utils';
 import { VIEW_MODES } from '../types/ISettings';
 import { SettingsService } from '../services/settings/SettingsService';
 import { ViewModeService } from '../services/viewMode/ViewModeService';
-import { ResizerOptions } from '../types/ISettings';
+import { IResizerOptions } from '../types/ISettings';
 import { PlayerAppError, YouTubeAppError, PlayerErrorCode, YouTubeErrorCode } from '../types/IErrors';
 import { ViewMode } from '../types/ISettings';
-import { IPlayerOptions } from '../types/IPlayer';
-import { MESSAGE_KEYS } from '../i18n/messages';
+import { IPlayerOptions } from '../types/IPlayerOptions';
+import { TranslationsService } from '../services/translations/TranslationsService';
 
 export class PlayerView extends ItemView {
     private playerService: IPlayerService;
     private playerUI: IPlayerUI;
     private settings: SettingsService;
     private viewModeService: ViewModeService;
+    private translations: TranslationsService;
     private currentMode: ViewMode = VIEW_MODES.Tab;
     public viewId: string;
 
@@ -31,6 +32,7 @@ export class PlayerView extends ItemView {
         this.playerUI = playerUI;
         this.settings = settings;
         this.viewModeService = viewModeService;
+        this.translations = new TranslationsService();
         this.viewId = `youtube-player-${Math.random().toString(36).substr(2, 9)}`;
     }
 
@@ -39,7 +41,7 @@ export class PlayerView extends ItemView {
     }
 
     getDisplayText(): string {
-        return 'YouTube Player';
+        return this.translations.t('player.title');
     }
 
     getMode(): ViewMode {
@@ -80,8 +82,8 @@ export class PlayerView extends ItemView {
         } catch (error) {
             console.error("Erreur lors de l'ouverture de la vue:", error);
             const playerError = new PlayerAppError(
-                PlayerErrorCode.MEDIA_ERR_DECODE,
-                MESSAGE_KEYS.INITIALIZATION_ERROR
+                PlayerErrorCode.MEDIA_ERR_ABORTED,
+                this.translations.t('messages.initializationError')
             );
             this.showError(playerError);
         }
@@ -93,7 +95,7 @@ export class PlayerView extends ItemView {
             if (!videoId) {
                 throw new YouTubeAppError(
                     YouTubeErrorCode.INVALID_PARAMETER,
-                    MESSAGE_KEYS.VIDEO_ID_MISSING
+                    this.translations.t('messages.videoIdMissing')
                 );
             }
 
@@ -110,7 +112,7 @@ export class PlayerView extends ItemView {
                     if (!sideLeaf) {
                         throw new PlayerAppError(
                             PlayerErrorCode.MEDIA_ERR_ABORTED,
-                            MESSAGE_KEYS.SIDEBAR_CREATE_ERROR
+                            this.translations.t('messages.sidebarCreateError')
                         );
                     }
                     leaf = sideLeaf;
@@ -121,7 +123,7 @@ export class PlayerView extends ItemView {
                     if (!activeLeaf) {
                         throw new PlayerAppError(
                             PlayerErrorCode.MEDIA_ERR_ABORTED,
-                            MESSAGE_KEYS.SIDEBAR_CREATE_ERROR
+                            this.translations.t('messages.sidebarCreateError')
                         );
                     }
                     leaf = activeLeaf;
@@ -148,7 +150,7 @@ export class PlayerView extends ItemView {
             } else {
                 const playerError = new PlayerAppError(
                     PlayerErrorCode.MEDIA_ERR_DECODE,
-                    MESSAGE_KEYS.VIDEO_LOAD_ERROR
+                    this.translations.t('messages.videoLoadError')
                 );
                 this.showError(playerError);
             }
@@ -177,7 +179,21 @@ export class PlayerView extends ItemView {
     }
 
     async closePreviousVideos(): Promise<void> {
-        await this.playerService.dispose();
+        try {
+            if (this.playerService) {
+                await this.playerService.dispose();
+            }
+            if (this.playerUI) {
+                this.playerUI.dispose();
+            }
+            this.containerEl.empty();
+        } catch (error) {
+            console.error("Erreur lors de la fermeture des vidéos précédentes:", error);
+            throw new PlayerAppError(
+                PlayerErrorCode.MEDIA_ERR_ABORTED,
+                this.translations.t('messages.initializationError')
+            );
+        }
     }
 
     private createResizer(options: ResizerOptions) {
@@ -229,7 +245,7 @@ export class PlayerView extends ItemView {
                     console.error("Erreur lors du redimensionnement:", error);
                     const playerError = new PlayerAppError(
                         PlayerErrorCode.MEDIA_ERR_ABORTED,
-                        MESSAGE_KEYS.RESIZE_ERROR
+                        this.translations.t('messages.resizeError')
                     );
                     this.showError(playerError);
                 }

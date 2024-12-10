@@ -1,10 +1,10 @@
-import { App, Plugin } from 'obsidian';
-import { PluginSettings, DEFAULT_SETTINGS, ViewMode, PlaybackMode, PlaybackRate, Volume, createVolume, createPlaybackRate } from '../../types/ISettings';
+import { Plugin } from 'obsidian';
+import { IPluginSettings, DEFAULT_SETTINGS, ViewMode, PlaybackMode, PlaybackRate, Volume, createVolume, createPlaybackRate } from '../../types/ISettings';
 import { VideoId,createVideoId, Timestamp } from '../../types/IBase';
 
 export class SettingsService {
     private plugin: Plugin;
-    private settings: PluginSettings;
+    private settings: IPluginSettings;
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
@@ -19,7 +19,7 @@ export class SettingsService {
         return this.plugin;
     }
 
-    public getSettings(): PluginSettings {
+    public getSettings(): IPluginSettings {
         return this.settings;
     }
 

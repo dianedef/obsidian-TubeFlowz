@@ -50,24 +50,24 @@ export interface IAppEvent<T extends AppEventPayload> {
 
 // Types pour les événements vidéo
 export interface IEventMap {
-   'video:stateChange': (state: IPlayerState) => void;
-   'video:load': (videoId: string) => Promise<void>;
-   'video:play': () => void;
-   'video:pause': () => void;
-   'video:ended': () => void;
-   'video:timeUpdate': (time: number) => void;
-   'video:ready': (player: IVideoJsPlayer) => void;
-   'video:volumeChange': (payload: IVolumeChangePayload) => void;
-   'video:rateChange': (rate: PlaybackRate) => void;
-   'video:qualityChange': (quality: string) => void;
-   'video:error': (error: IPlayerErrorPayload) => void;
-   'view:resize': (height: number) => void;
-   'view:modeChange': (mode: ViewMode) => void;
-   'playlist:update': () => void;
-   'playlist:add': (videoId: string) => void;
-   'playlist:remove': (videoId: string) => void;
-   'settings:update': () => void;
-   'settings:save': () => void;
+   'video:stateChange': (state: IPlayerState) => void | Promise<void>;
+   'video:load': (videoId: string) => void | Promise<void>;
+   'video:play': () => void | Promise<void>;
+   'video:pause': () => void | Promise<void>;
+   'video:ended': () => void | Promise<void>;
+   'video:timeUpdate': (time: number) => void | Promise<void>;
+   'video:ready': (player: IVideoJsPlayer) => void | Promise<void>;
+   'video:volumeChange': (payload: IVolumeChangePayload) => void | Promise<void>;
+   'video:rateChange': (rate: PlaybackRate) => void | Promise<void>;
+   'video:qualityChange': (quality: string) => void | Promise<void>;
+   'video:error': (error: IPlayerErrorPayload) => void | Promise<void>;
+   'view:resize': (height: number) => void | Promise<void>;
+   'view:modeChange': (mode: ViewMode) => void | Promise<void>;
+   'playlist:update': () => void | Promise<void>;
+   'playlist:add': (videoId: string) => void | Promise<void>;
+   'playlist:remove': (videoId: string) => void | Promise<void>;
+   'settings:update': () => void | Promise<void>;
+   'settings:save': () => void | Promise<void>;
 }
 
 export interface IVolumeChangePayload {
@@ -80,3 +80,7 @@ export interface IPlayerErrorPayload {
    message: string;
    type: string;
 } 
+
+export type EventCallback<T> = T extends (...args: infer P) => void | Promise<void> 
+    ? (...args: P) => void | Promise<void> 
+    : never;

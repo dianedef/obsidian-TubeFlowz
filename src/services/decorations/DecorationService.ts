@@ -1,6 +1,6 @@
 import { EditorView } from '@codemirror/view';
 import { Decoration, WidgetType } from '@codemirror/view';
-import { ViewMode, VIEW_MODES } from '../../types/ISettings';
+import { VIEW_MODES } from '../../types/ISettings';
 import { extractVideoId, cleanVideoId, type CleanVideoId } from '../../utils';
 import { SettingsService } from '../settings/SettingsService';
 import PlayerService from '../player/PlayerService';
@@ -78,17 +78,35 @@ export class DecorationForUrl extends WidgetType {
       sparkle.addEventListener('click', async (e: MouseEvent) => {
          e.preventDefault();
          e.stopPropagation();
-         const playerService = PlayerService.getInstance(this.settings.getSettings());
+         const playerService = PlayerService.getInstance(this.settings.getPlugin().app, this.settings.getSettings());
          if (!playerService) {
-            console.error("PlayerService non initialisé");
+            console.error("PlayerService non disponible");
             return;
          }
-         await playerService.loadVideo({
-            videoId: this.videoId,
-            mode: this.settings.currentMode || VIEW_MODES.Sidebar,
-            timestamp: this.timestamp,
-            fromUserClick: true
-         });
+
+         try {
+            await playerService.loadVideo({
+               videoId: this.videoId,
+               mode: this.settings.currentMode || VIEW_MODES.Sidebar,
+               timestamp: this.timestamp,
+               currentTime: this.timestamp,
+               volume: 1,
+               playbackRate: 1,
+               isMuted: false,
+               isPlaying: false,
+               error: null,
+               isPaused: true,
+               isStopped: false,
+               isLoading: false,
+               isError: false,
+               containerId: '',
+               height: 0,
+               controls: true,
+               loop: false
+            });
+         } catch (error) {
+            console.error("Erreur lors du chargement de la vidéo:", error);
+         }
       });
       
       return sparkle;

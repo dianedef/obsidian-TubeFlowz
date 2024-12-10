@@ -11,6 +11,8 @@
 		"video.js": "^8.0.0",
 		"videojs-youtube": "^3.0.0"
 	},
-	"license": "Copyright © 2024. All rights reserved."
-
+	"license": "Copyright © 2024. All rights reserved.",
+	"permissions": [
+		"embed-youtube"
+	]
 }

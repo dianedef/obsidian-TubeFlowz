@@ -4,20 +4,20 @@ import {
     PlayerErrorCode,
     CacheErrorCode,
     ConfigErrorCode,
-    type BaseError,
-    type YouTubeError,
-    type PlayerError,
-    type CacheError,
-    type ConfigError
+    type IBaseError,
+    type IYouTubeError,
+    type IPlayerError,
+    type ICacheError,
+    type IConfigError
 } from '../../types/IErrors';
 
 // Classe de base abstraite pour toutes les erreurs
-abstract class BaseAppError extends Error implements BaseError {
+abstract class BaseAppError extends Error implements IBaseError {
     readonly timestamp: number;
 
     constructor(
+        readonly code: AppErrorCode | YouTubeErrorCode | PlayerErrorCode | CacheErrorCode | ConfigErrorCode,
         message: string,
-        readonly code: AppErrorCode,
         readonly details?: Record<string, unknown>
     ) {
         super(message);
@@ -27,32 +27,30 @@ abstract class BaseAppError extends Error implements BaseError {
 }
 
 // Classe pour les erreurs YouTube
-export class YouTubeAppError extends BaseAppError implements YouTubeError {
+export class YouTubeAppError extends BaseAppError implements IYouTubeError {
     constructor(
-        message: string,
         readonly code: YouTubeErrorCode,
-        readonly videoId?: string,
-        readonly playerState?: number,
+        message: string,
         details?: Record<string, unknown>
     ) {
-        super(message, AppErrorCode.API, details);
+        super(code, message, details);
     }
 
     static fromErrorCode(code: YouTubeErrorCode, videoId?: string): YouTubeAppError {
         const messages: Record<YouTubeErrorCode, string> = {
-            [YouTubeErrorCode.INVALID_PARAMETER]: 'Paramètre invalide pour la vidéo YouTube',
-            [YouTubeErrorCode.HTML5_ERROR]: 'Erreur HTML5 lors de la lecture',
-            [YouTubeErrorCode.VIDEO_NOT_FOUND]: 'Vidéo YouTube non trouvée',
-            [YouTubeErrorCode.VIDEO_NOT_EMBEDDABLE]: 'La vidéo ne peut pas être intégrée',
-            [YouTubeErrorCode.VIDEO_REMOVED]: 'La vidéo a été supprimée'
+            [YouTubeErrorCode.INVALID_PARAMETER]: 'error.youtube.invalidParameter',
+            [YouTubeErrorCode.HTML5_ERROR]: 'error.youtube.html5Error',
+            [YouTubeErrorCode.VIDEO_NOT_FOUND]: 'error.youtube.videoNotFound',
+            [YouTubeErrorCode.VIDEO_NOT_EMBEDDABLE]: 'error.youtube.notEmbeddable',
+            [YouTubeErrorCode.VIDEO_REMOVED]: 'error.youtube.videoRemoved'
         };
 
-        return new YouTubeAppError(messages[code], code, videoId);
+        return new YouTubeAppError(code, messages[code]);
     }
 }
 
 // Classe pour les erreurs du lecteur
-export class PlayerAppError extends BaseAppError implements PlayerError {
+export class PlayerAppError extends BaseAppError implements IPlayerError {
     constructor(
         message: string,
         readonly code: PlayerErrorCode,
@@ -60,24 +58,24 @@ export class PlayerAppError extends BaseAppError implements PlayerError {
         readonly currentTime?: number,
         details?: Record<string, unknown>
     ) {
-        super(message, AppErrorCode.INITIALIZATION, details);
+        super(code, message, details);
     }
 
     static fromErrorCode(code: PlayerErrorCode, currentTime?: number): PlayerAppError {
         const messages: Record<PlayerErrorCode, string> = {
-            [PlayerErrorCode.MEDIA_ERR_ABORTED]: 'La lecture a été interrompue',
-            [PlayerErrorCode.MEDIA_ERR_NETWORK]: 'Erreur réseau lors de la lecture',
-            [PlayerErrorCode.MEDIA_ERR_DECODE]: 'Erreur de décodage du média',
-            [PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'Source de média non supporté',
-            [PlayerErrorCode.MEDIA_ERR_ENCRYPTED]: 'Le média est crypté'
+            [PlayerErrorCode.MEDIA_ERR_ABORTED]: 'error.player.aborted',
+            [PlayerErrorCode.MEDIA_ERR_NETWORK]: 'error.player.network',
+            [PlayerErrorCode.MEDIA_ERR_DECODE]: 'error.player.decode',
+            [PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'error.player.notSupported',
+            [PlayerErrorCode.MEDIA_ERR_ENCRYPTED]: 'error.player.encrypted'
         };
 
-        return new PlayerAppError(messages[code], code, undefined, currentTime);
+        return new PlayerAppError(code, messages[code]);
     }
 }
 
 // Classe pour les erreurs de cache
-export class CacheAppError extends BaseAppError implements CacheError {
+export class CacheAppError extends BaseAppError implements ICacheError {
     constructor(
         message: string,
         readonly code: CacheErrorCode,
@@ -85,23 +83,24 @@ export class CacheAppError extends BaseAppError implements CacheError {
         readonly size?: number,
         details?: Record<string, unknown>
     ) {
-        super(message, AppErrorCode.INITIALIZATION, details);
+        super(code, message, details);
     }
 
     static fromErrorCode(code: CacheErrorCode, key?: string, size?: number): CacheAppError {
         const messages: Record<CacheErrorCode, string> = {
-            [CacheErrorCode.STORAGE_FULL]: 'Le stockage est plein',
-            [CacheErrorCode.INVALID_DATA]: 'Données invalides dans le cache',
-            [CacheErrorCode.EXPIRED]: 'Les données du cache ont expiré',
-            [CacheErrorCode.CORRUPTED]: 'Les données du cache sont corrompues'
+            [CacheErrorCode.STORAGE_FULL]: 'error.cache.storageFull',
+            [CacheErrorCode.INVALID_DATA]: 'error.cache.invalidData',
+            [CacheErrorCode.EXPIRED]: 'error.cache.expired',
+            [CacheErrorCode.CORRUPTED]: 'error.cache.corrupted',
+            [CacheErrorCode.NOT_FOUND]: 'error.cache.notFound'
         };
 
-        return new CacheAppError(messages[code], code, key, size);
+        return new CacheAppError(code, messages[code]);
     }
 }
 
 // Classe pour les erreurs de configuration
-export class ConfigAppError extends BaseAppError implements ConfigError {
+export class ConfigAppError extends BaseAppError implements IConfigError {
     constructor(
         message: string,
         readonly code: ConfigErrorCode,
@@ -110,7 +109,7 @@ export class ConfigAppError extends BaseAppError implements ConfigError {
         readonly receivedType?: string,
         details?: Record<string, unknown>
     ) {
-        super(message, AppErrorCode.INVALID_PARAMETER, details);
+        super(code, message, details);
     }
 
     static fromErrorCode(
@@ -120,13 +119,15 @@ export class ConfigAppError extends BaseAppError implements ConfigError {
         receivedType?: string
     ): ConfigAppError {
         const messages: Record<ConfigErrorCode, string> = {
-            [ConfigErrorCode.INVALID_SETTINGS]: 'Configuration invalide',
-            [ConfigErrorCode.MISSING_REQUIRED]: 'Paramètre requis manquant',
-            [ConfigErrorCode.TYPE_MISMATCH]: 'Type de paramètre incorrect',
-            [ConfigErrorCode.VALIDATION_FAILED]: 'Échec de la validation'
+            [ConfigErrorCode.INVALID_SETTINGS]: 'error.config.invalidSettings',
+            [ConfigErrorCode.MISSING_REQUIRED]: 'error.config.missingRequired',
+            [ConfigErrorCode.TYPE_MISMATCH]: 'error.config.typeMismatch',
+            [ConfigErrorCode.VALIDATION_FAILED]: 'error.config.validationFailed',
+            [ConfigErrorCode.INITIALIZATION]: 'error.config.initialization',
+            [ConfigErrorCode.INVALID_PARAMETER]: 'error.config.invalidParameter'
         };
 
-        return new ConfigAppError(messages[code], code, setting, expectedType, receivedType);
+        return new ConfigAppError(code, messages[code]);
     }
 }
 
