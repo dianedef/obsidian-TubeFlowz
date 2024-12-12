@@ -1,198 +1,176 @@
-import { App, Plugin, Menu, WorkspaceLeaf } from 'obsidian';
-import { SettingsService } from './services/SettingsService';
-import { SettingsTab } from './services/SettingsTab';
-import { PlayerView } from './views/PlayerView';
-import PlayerService from './services/PlayerService';
-import { PlayerUI } from './views/PlayerUI';
-import { ViewModeService } from './services/ViewModeService';
-import { VIEW_MODES } from './types/ISettings';
-import { ViewMode } from './types/ISettings';
-import { Hotkeys } from './services/HotkeysService';
-import { TranslationsService } from './services/TranslationsService';
-import { ViewPlugin, DecorationSet, ViewUpdate } from '@codemirror/view';
-import { registerStyles, unregisterStyles } from './services/StylesService';
-import createDecorations from './services/DecorationService';
-import { EventBus } from './services/EventBus';
+import { Plugin, addIcon, Menu, WorkspaceLeaf, ItemView } from 'obsidian';
 
-interface ObsidianMenu extends Menu {
-   dom: HTMLElement;
-}
+// Type pour les modes d'affichage
+export type ViewMode = 'tab' | 'sidebar' | 'overlay';
 
-interface DecorationState {
-   decorations: DecorationSet;
-   settings: SettingsService;
-   viewModeService: ViewModeService;
-}
+// Définition de l'icône YouTube (en SVG)
+const YOUTUBE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+   <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+</svg>`;
 
-export default class TubeFlows extends Plugin {
-   private settings!: SettingsService;
-   private viewModeService!: ViewModeService;
-   private hotkeys!: Hotkeys;
-   private playerService!: PlayerService;
-   private playerUI!: PlayerUI;
-   private eventBus: EventBus = EventBus.getInstance();
-   private translationsService!: TranslationsService;
-
-   constructor(app: App, manifest: any) {
-      super(app, manifest);
+export class YouTubeView extends ItemView {
+   constructor(leaf: WorkspaceLeaf) {
+      super(leaf);
    }
+
+   getViewType(): string {
+      return "youtube-player";
+   }
+
+   getDisplayText(): string {
+      return "YouTube Player";
+   }
+
+   async onOpen() {
+      const container = this.containerEl;
+      container.empty();
+      
+      const contentEl = container.createDiv({ cls: 'youtube-player-container' });
+      contentEl.createEl('h4', { text: 'YouTube Player' });
+      
+      // Créer le conteneur pour le player
+      const playerEl = contentEl.createDiv({ cls: 'youtube-player-embed' });
+      playerEl.style.cssText = `
+         width: 100%;
+         height: 60vh;
+         background: var(--background-secondary);
+         display: flex;
+         align-items: center;
+         justify-content: center;
+      `;
+      
+      playerEl.createSpan({ text: 'Prêt à lire une vidéo YouTube' });
+   }
+}
+
+export class ViewModeService {
+   private currentView: YouTubeView | null = null;
+   private currentMode: ViewMode | null = null;
+   private activeLeaf: WorkspaceLeaf | null = null;
+
+   constructor(private plugin: Plugin) {}
+
+   private async closeCurrentView() {
+      if (this.currentView) {
+         await this.currentView.leaf.detach();
+         this.currentView = null;
+         this.activeLeaf = null;
+      }
+   }
+
+   private getLeafForMode(mode: ViewMode): WorkspaceLeaf {
+      const workspace = this.plugin.app.workspace;
+      
+      switch (mode) {
+         case 'sidebar':
+            return workspace.getRightLeaf(true);
+         case 'overlay':
+            const activeLeaf = workspace.activeLeaf;
+            if (activeLeaf) {
+               // Créer un split horizontal au-dessus de la feuille active
+               return workspace.createLeafBySplit(activeLeaf, 'horizontal', true);
+            }
+            return workspace.getLeaf('split');
+         case 'tab':
+         default:
+            return workspace.getLeaf('split');
+      }
+   }
+
+   async setView(mode: ViewMode) {
+      // Si le même mode est sélectionné et qu'une vue existe déjà, ne rien faire
+      if (mode === this.currentMode && this.currentView && this.activeLeaf) {
+         return;
+      }
+
+      // Fermer la vue existante
+      await this.closeCurrentView();
+
+      // Créer la nouvelle vue
+      const leaf = this.getLeafForMode(mode);
+      await leaf.setViewState({
+         type: 'youtube-player',
+         active: true,
+         state: { mode: mode }
+      });
+
+      this.currentView = leaf.view as YouTubeView;
+      this.currentMode = mode;
+      this.activeLeaf = leaf;
+      this.plugin.app.workspace.revealLeaf(leaf);
+   }
+
+   getActiveLeaf(): WorkspaceLeaf | null {
+      return this.activeLeaf;
+   }
+}
+
+export default class YoutubeReaderPlugin extends Plugin {
+   private viewModeService: ViewModeService;
 
    async onload() {
-      try {
-         console.log("[main dans onload] Chargement du plugin YouTubeFlow");
+      // Enregistrer la vue YouTube
+      this.registerView(
+         "youtube-player",
+         (leaf) => new YouTubeView(leaf)
+      );
 
-// Initialisation des services de base
-         this.settings = new SettingsService(this);
-// Attendre que les settings soient chargés
-         await this.settings.initialize();
-         console.log("[main dans onload] Settings initialisés:", this.settings.getSettings());
+      this.viewModeService = new ViewModeService(this);
+      
+      // Ajouter le bouton dans la barre latérale
+      addIcon('youtube', YOUTUBE_ICON);
+      const ribbonIcon = this.addRibbonIcon('youtube', 'YouTube Reader', () => {});
 
-// Initialiser le service de traduction
-         const locale = document.documentElement.lang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
-         TranslationsService.initialize(locale);
-         this.translationsService = TranslationsService.getInstance();
-
-// Initialiser PlayerService
-         this.playerService = PlayerService.getInstance(this.settings.getSettings());
+      // Gestion du menu au survol
+      ribbonIcon.addEventListener('mouseenter', () => {
+         const menu = new Menu();
          
-// Créer l'instance de PlayerUI
-         this.playerUI = PlayerUI.getInstance(this.settings);
-
-// Initialiser ViewModeService
-         this.viewModeService = new ViewModeService(
-            this,
-            this.playerService,
-            this.settings,
-            VIEW_MODES.Tab
-         );
-
-// Gérer les erreurs de chargement de vidéo
-         this.eventBus.on('video:error', (error) => {
-            console.error("[main dans onload] Erreur lors du chargement de la vidéo:", error);
-         });
-
-// Initialiser les raccourcis
-         this.hotkeys = new Hotkeys(
-            this,
-            this.settings,
-            this.playerService,
-            this.translationsService
-         );
-
-// registerHotkeys
-         this.hotkeys.registerHotkeys();
-
-// registerView
-         this.registerView(
-            'youtube-player',
-            (leaf: WorkspaceLeaf) => new PlayerView(
-               leaf,
-               this.playerService,
-               this.playerUI,
-            )
-         );
-
-         this.app.workspace.onLayoutReady(() => {
-            this.eventBus.emit('plugin:layout-ready');
-            this.registerEvent(
-               this.app.workspace.on('layout-change', () => {
-                  const hasYouTubeView = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
-                  if (!hasYouTubeView && this.settings.isVideoOpen) {
-                     this.settings.isVideoOpen = false;
-                     this.settings.save();
-                  }
-               })
-            );
-         });
-
-// Ajouter un seul bouton dans la sidebar qui ouvre un menu au survol
-         const ribbonIcon = this.addRibbonIcon('video', 'YouTube Flow', () => {
-            // Le click ne fait rien, tout est géré au survol
-         });
-
-// Gestion du menu au survol
-         ribbonIcon.addEventListener('mouseenter', () => {
-            const menu = new Menu();
-            
-            const createMenuItem = (title: string, icon: string, mode: ViewMode) => {
-               menu.addItem((item) => {
-                  item.setTitle(title)
-                     .setIcon(icon)
-                     .onClick(async () => {
-                        await this.viewModeService.createView(mode);
-                     });
-               });
-            };
-
-            createMenuItem("YouTube Tab", "tab", "tab");
-            createMenuItem("YouTube Sidebar", "layout-sidebar-right", "sidebar");
-            createMenuItem("YouTube Overlay", "layout-top", "overlay");
-
-            const iconRect = ribbonIcon.getBoundingClientRect();
-            menu.showAtPosition({ 
-               x: iconRect.left, 
-               y: iconRect.top - 10
+         const createMenuItem = (title: string, icon: string, mode: ViewMode) => {
+            menu.addItem((item) => {
+               item.setTitle(title)
+                  .setIcon(icon)
+                  .onClick(async () => {
+                     await this.viewModeService.setView(mode);
+                  });
             });
+         };
 
-            // Gérer la fermeture du menu
-            const handleMouseLeave = (e: MouseEvent) => {
-               const target = e.relatedTarget as Node;
-               const isOverIcon = ribbonIcon.contains(target);
-               const menuDom = (menu as ObsidianMenu).dom;
-               const isOverMenu = menuDom && menuDom.contains(target);
-               
-               if (!isOverIcon && !isOverMenu) {
-                  menu.hide();
-                  ribbonIcon.removeEventListener('mouseleave', handleMouseLeave);
-                  if (menuDom) {
-                     menuDom.removeEventListener('mouseleave', handleMouseLeave);
-                  }
-               }
-            };
+         createMenuItem("YouTube Tab", "tab", "tab");
+         createMenuItem("YouTube Sidebar", "layout-sidebar-right", "sidebar");
+         createMenuItem("YouTube Overlay", "layout-top", "overlay");
 
-            ribbonIcon.addEventListener('mouseleave', handleMouseLeave);
-            const menuDom = (menu as ObsidianMenu).dom;
-            if (menuDom) {
-               menuDom.addEventListener('mouseleave', handleMouseLeave);
-            }
+         const iconRect = ribbonIcon.getBoundingClientRect();
+         menu.showAtPosition({ 
+            x: iconRect.left, 
+            y: iconRect.top - 10
          });
 
-// SettingsTab
-         this.addSettingTab(new SettingsTab(this.app, this, this.settings, this.playerService));
-
-// Créer la "décoration" des liens YouTube dans les fichiers Markdown
-         this.registerEditorExtension([
-            ViewPlugin.define<DecorationState>(view => ({
-               decorations: createDecorations(view),
-               settings: this.settings,
-               viewModeService: this.viewModeService,
-               update(update: ViewUpdate) {
-                  if (update.docChanged || update.viewportChanged) {
-                     this.decorations = createDecorations(update.view);
-                  }
+         // Gérer la fermeture du menu
+         const handleMouseLeave = (e: MouseEvent) => {
+            const target = e.relatedTarget as Node;
+            const menuDom = (menu as any).dom;
+            const isOverIcon = ribbonIcon.contains(target);
+            const isOverMenu = menuDom && menuDom.contains(target);
+            
+            if (!isOverIcon && !isOverMenu) {
+               menu.hide();
+               ribbonIcon.removeEventListener('mouseleave', handleMouseLeave);
+               if (menuDom) {
+                  menuDom.removeEventListener('mouseleave', handleMouseLeave);
                }
-            }), {
-               decorations: v => v.decorations
-            })
-         ]);
-         
-// registerStyles
-         registerStyles();
+            }
+         };
 
-         this.eventBus.emit('plugin:loaded');
-      } catch (error) {
-         console.error("[main dans onload] Erreur lors du chargement du plugin:", error);
-      }
+         ribbonIcon.addEventListener('mouseleave', handleMouseLeave);
+         const menuDom = (menu as any).dom;
+         if (menuDom) {
+            menuDom.addEventListener('mouseleave', handleMouseLeave);
+         }
+      });
    }
 
-   async onunload() {
-      try {
-         this.eventBus.emit('plugin:unloading');
-         await this.viewModeService.closeView();
-         unregisterStyles();
-         this.eventBus.emit('plugin:unloaded');
-      } catch (error) {
-         console.warn("[main dans onunload] Erreur lors du déchargement:", error);
-      }
+   onunload() {
+      // Nettoyage lors de la désactivation du plugin
+      this.app.workspace.detachLeavesOfType("youtube-player");
    }
 }

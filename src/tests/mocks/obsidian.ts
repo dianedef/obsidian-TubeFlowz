@@ -1,62 +1,68 @@
-// Mock pour le package Obsidian
-export class App {
-    workspace = {
-        getActiveViewOfType: () => null,
-        on: () => ({ unsubscribe: () => {} }),
-        off: () => {}
-    };
-    vault = {
-        getConfig: () => ({}),
-        setConfig: () => {}
-    };
-}
+import { vi } from 'vitest';
 
-export class Component {
-    registerEvent() {}
-    unload() {}
-}
-
-export class Plugin extends Component {
-    app: App;
-    manifest: any;
-
-    constructor(app: App, manifest: any) {
-        super();
-        this.app = app;
-        this.manifest = manifest;
+// Mock des types et classes d'Obsidian
+export class Plugin {
+    app: any;
+    constructor() {
+        this.app = {
+            workspace: {
+                activeLeaf: null,
+                getRightLeaf: vi.fn(),
+                getLeaf: vi.fn(),
+                createLeafBySplit: vi.fn(),
+                revealLeaf: vi.fn(),
+                getLeavesOfType: vi.fn(),
+                getActiveViewOfType: vi.fn(),
+                on: vi.fn(),
+                off: vi.fn()
+            }
+        };
     }
 }
 
-export class MarkdownView {
-    app: App;
-    file: any;
+export class WorkspaceLeaf {
+    view: any;
+    parent: any;
+    
+    constructor() {
+        this.view = null;
+        this.parent = null;
+    }
 
+    getViewState() {
+        return {
+            type: 'youtube-player',
+            state: {}
+        };
+    }
+
+    setViewState(state: any) {
+        return Promise.resolve();
+    }
+
+    detach() {
+        return Promise.resolve();
+    }
+}
+
+export class ItemView {
+    leaf: any;
     constructor(leaf: any) {
-        this.app = leaf.app;
-        this.file = leaf.file;
+        this.leaf = leaf;
     }
+    onOpen() {}
+    onClose() {}
 }
 
-export class Notice {
-    constructor(message: string, timeout?: number) {
-        console.log(`[Notice] ${message}`);
+export class Menu {
+    addItem() {
+        return this;
     }
+    showAtPosition() {}
 }
 
-export class Modal {
-    app: App;
-    constructor(app: App) {
-        this.app = app;
-    }
-    open() {}
-    close() {}
-}
+export const addIcon = vi.fn();
 
-export class Setting {
-    constructor(containerEl: HTMLElement) {}
-    setName(name: string) { return this; }
-    setDesc(desc: string) { return this; }
-    addText(cb: (text: any) => any) { return this; }
-    addToggle(cb: (toggle: any) => any) { return this; }
-    addDropdown(cb: (dropdown: any) => any) { return this; }
-} 
+// Types nécessaires
+export type WorkspaceSplit = any;
+export type App = any; 
