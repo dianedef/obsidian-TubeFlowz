@@ -39,20 +39,28 @@ export default class TubeFlows extends Plugin {
 
    async onload() {
       try {
-         console.log("Chargement du plugin YouTubeFlow");
+         console.log("[main] Chargement du plugin YouTubeFlow");
 
 // Initialisation des services de base
          this.settings = new SettingsService(this);
+// Attendre que les settings soient chargés
          await this.settings.initialize();
+         console.log("[main] Settings initialisés:", this.settings.getSettings());
 
+// Initialiser le service de traduction
+         const locale = document.documentElement.lang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+         console.log("[main] Langue détectée:", locale);
+         TranslationsService.initialize(locale);
          this.translationsService = TranslationsService.getInstance();
+         console.log("[main] Langue actuelle:", this.settings.getSettings().language);
 
-// Initialiser PlayerService sans container
+// Initialiser PlayerService
          this.playerService = PlayerService.getInstance(this.settings.getSettings());
+         
 // Créer l'instance de PlayerUI
          this.playerUI = PlayerUI.getInstance(this.settings);
 
-// Initialiser ViewModeService avec PlayerService
+// Initialiser ViewModeService
          this.viewModeService = new ViewModeService(
             this,
             this.playerService,
@@ -60,21 +68,22 @@ export default class TubeFlows extends Plugin {
             VIEW_MODES.Tab
          );
 
-// Gérer les erreurs de chargement de vidéo à un seul endroit
+// Gérer les erreurs de chargement de vidéo
          this.eventBus.on('video:error', (error) => {
-            console.error("Erreur lors du chargement de la vidéo:", error);
+            console.error("[main] Erreur lors du chargement de la vidéo:", error);
          });
 
-// Initialiser les raccourcis avec le service approprié
+// Initialiser les raccourcis
          this.hotkeys = new Hotkeys(
             this,
             this.settings,
-            this.playerUI,
+            this.playerService,
             this.translationsService
          );
-      
+
 // registerHotkeys
          this.hotkeys.registerHotkeys();
+
 // registerView
          this.registerView(
             'youtube-player',
@@ -174,7 +183,7 @@ export default class TubeFlows extends Plugin {
 
          this.eventBus.emit('plugin:loaded');
       } catch (error) {
-         console.error("Erreur lors du chargement du plugin:", error);
+         console.error("[main] Erreur lors du chargement du plugin:", error);
       }
    }
 
@@ -185,7 +194,7 @@ export default class TubeFlows extends Plugin {
          unregisterStyles();
          this.eventBus.emit('plugin:unloaded');
       } catch (error) {
-         console.warn("Erreur lors du déchargement:", error);
+         console.warn("[main] Erreur lors du déchargement:", error);
       }
    }
 }

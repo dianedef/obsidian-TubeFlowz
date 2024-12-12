@@ -20,6 +20,7 @@ export class ViewModeService implements IViewModeService {
     private settings: SettingsService;
     private translations: TranslationsService;
     private cleanupFunctions: (() => void)[];
+    private isCreatingView: boolean = false;
 
     /**
      * Crée une instance du service de gestion des modes de vue
@@ -38,6 +39,7 @@ export class ViewModeService implements IViewModeService {
         this.settings = settings;
         this.currentMode = initialMode;
         this.translations = TranslationsService.getInstance();
+        this.cleanupFunctions = [];
 
         // Écouter les événements
         this.cleanupFunctions = [
@@ -99,27 +101,43 @@ export class ViewModeService implements IViewModeService {
             eventBus.emit('video:load', '');
             return this.activeView;
         }
+        if (this.isCreatingView) {
+            console.log('[ViewModeService] Création de vue déjà en cours, on ignore');
+            return this.activeView!;
+        }
 
-        const leaf = this.getLeafForMode(mode);
-        
-        // Configure l'état de la vue
-        await leaf.setViewState({
-            type: 'youtube-player',
-            active: true,
-            state: {
-                mode: mode,
-                player: this.playerService
+        try {
+            this.isCreatingView = true;
+
+            if (this.activeView) {
+                console.log('[ViewModeService] Vue active existe déjà');
+                return this.activeView;
             }
-        });
 
-        // Révèle la vue dans l'interface
-        this.plugin.app.workspace.revealLeaf(leaf);
-        const view = leaf.view as PlayerView;
-        this.activeView = view;
+            const leaf = this.getLeafForMode(mode);
+            
+            await leaf.setViewState({
+                type: 'youtube-player',
+                active: true,
+                state: {
+                    mode: mode,
+                    player: this.playerService
+                }
+            });
 
-        eventBus.emit('view:ready');
-        
-        return view;
+            this.plugin.app.workspace.revealLeaf(leaf);
+            const view = leaf.view as PlayerView;
+            this.activeView = view;
+
+            // N'émettre view:ready qu'une seule fois
+            if (view) {
+                eventBus.emit('view:ready');
+            }
+            
+            return view;
+        } finally {
+            this.isCreatingView = false;
+        }
     }
 
     /**
@@ -177,16 +195,20 @@ export class ViewModeService implements IViewModeService {
     }
 
     private registerLayoutEvents(): void {
-        // Surveiller la fermeture manuelle des vues
+        let layoutChangeTimeout: NodeJS.Timeout;
+        
         this.plugin.registerEvent(
             this.plugin.app.workspace.on('layout-change', () => {
-                const hasYouTubeView = this.plugin.app.workspace.getLeavesOfType('youtube-player').length > 0;
-                
-                if (!hasYouTubeView && this.activeView) {
-                    // La vue a été fermée manuellement
-                    this.activeView = null;
-                    eventBus.emit('view:close');
-                }
+                // Debounce les événements de layout-change
+                clearTimeout(layoutChangeTimeout);
+                layoutChangeTimeout = setTimeout(() => {
+                    const hasYouTubeView = this.plugin.app.workspace.getLeavesOfType('youtube-player').length > 0;
+                    
+                    if (!hasYouTubeView && this.activeView) {
+                        this.activeView = null;
+                        eventBus.emit('view:close');
+                    }
+                }, 100); // Attendre 100ms avant de traiter le changement
             })
         );
     }

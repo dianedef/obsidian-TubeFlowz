@@ -1,7 +1,7 @@
 import { Plugin, Notice } from 'obsidian';
 import { SettingsService } from './SettingsService';
 import { TranslationsService } from './TranslationsService';
-import { PlayerUI } from '../views/PlayerUI';
+import { PlayerService } from './PlayerService';
 import { CommandError, CommandErrorCode } from '../types/IErrors';
 import { PlaybackRate } from '../types';
 
@@ -9,7 +9,7 @@ export class Hotkeys {
    constructor(
       private plugin: Plugin,
       private settings: SettingsService,
-      private playerUI: PlayerUI,
+      private playerService: PlayerService,
       private translations: TranslationsService
    ) {}
 
@@ -30,13 +30,13 @@ export class Hotkeys {
          icon: 'play',
          editorCallback: () => {
             try {
-               if (!this.playerUI?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               if (this.playerUI.Player.paused()) {
-                  this.playerUI.Player.play();
+               if (this.playerService.isPaused()) {
+                  this.playerService.play();
                } else {
-                  this.playerUI.Player.pause();
+                  this.playerService.pause();
                }
             } catch (error) {
                this.handleCommandError(error);
@@ -52,14 +52,14 @@ export class Hotkeys {
          icon: 'arrow-left',
          editorCallback: () => {
             try {
-               if (!this.playerUI?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const currentTime = this.playerUI.Player.currentTime();
+               const currentTime = this.playerService.getCurrentTime();
                if (typeof currentTime !== 'number') {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get current time');
                }
-               this.playerUI.Player.currentTime(Math.max(0, currentTime - 10));
+               this.playerService.seekTo(Math.max(0, currentTime - 10));
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -74,15 +74,15 @@ export class Hotkeys {
          icon: 'arrow-right',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const currentTime = this.videoPlayer.Player.currentTime();
-               const duration = this.videoPlayer.Player.duration();
+               const currentTime = this.playerService.getCurrentTime();
+               const duration = this.playerService.getDuration();
                if (typeof currentTime !== 'number' || typeof duration !== 'number') {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get current time or duration');
                }
-               this.videoPlayer.Player.currentTime(Math.min(duration, currentTime + 10));
+               this.playerService.seekTo(Math.min(duration, currentTime + 10));
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -97,15 +97,15 @@ export class Hotkeys {
          icon: 'fast-forward',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const currentRate = this.videoPlayer.Player.playbackRate();
+               const currentRate = this.playerService.getPlaybackRate();
                if (typeof currentRate !== 'number') {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get current playback rate');
                }
                const newRate = Math.min(16, currentRate + 0.25) as PlaybackRate;
-               this.videoPlayer.Player.playbackRate(newRate);
+               this.playerService.setPlaybackRate(newRate);
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -120,15 +120,15 @@ export class Hotkeys {
          icon: 'rewind',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const currentRate = this.videoPlayer.Player.playbackRate();
+               const currentRate = this.playerService.getPlaybackRate();
                if (typeof currentRate !== 'number') {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get current playback rate');
                }
                const newRate = Math.max(0.25, currentRate - 0.25) as PlaybackRate;
-               this.videoPlayer.Player.playbackRate(newRate);
+               this.playerService.setPlaybackRate(newRate);
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -143,10 +143,10 @@ export class Hotkeys {
          icon: 'refresh-cw',
          editorCallback: () => {
             try {
-               if (!this.videoPlayer?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               this.videoPlayer.Player.playbackRate(1);
+               this.playerService.setPlaybackRate(1);
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -161,10 +161,10 @@ export class Hotkeys {
          icon: 'volume-x',
          editorCallback: () => {
             try {
-               if (!this.playerUI?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               this.playerUI.Player.muted(!this.playerUI.Player.muted());
+               this.playerService.toggleMute();
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -179,11 +179,11 @@ export class Hotkeys {
          icon: 'star',
          editorCallback: () => {
             try {
-               if (!this.playerUI?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
                const favoriteSpeed = this.settings.getSettings().favoriteSpeed;
-               this.playerUI.Player.playbackRate(favoriteSpeed);
+               this.playerService.setPlaybackRate(favoriteSpeed);
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -198,11 +198,10 @@ export class Hotkeys {
          icon: 'maximize',
          editorCallback: () => {
             try {
-               if (!this.playerUI?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const isFullscreen = this.playerUI.Player.isFullscreen();
-               this.playerUI.Player.requestFullscreen(!isFullscreen);
+               this.playerService.toggleFullscreen();
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -217,10 +216,10 @@ export class Hotkeys {
          icon: 'clock',
          editorCallback: (editor) => {
             try {
-               if (!this.playerUI?.Player) {
+               if (!this.playerService?.isReady()) {
                   throw new CommandError(CommandErrorCode.NO_PLAYER, 'No video player available');
                }
-               const currentTime = this.playerUI.Player.currentTime();
+               const currentTime = this.playerService.getCurrentTime();
                if (typeof currentTime !== 'number') {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get current time');
                }
@@ -229,7 +228,7 @@ export class Hotkeys {
                // Arrondir les secondes pour le lien YouTube
                const youtubeSeconds = Math.floor(currentTime);
                // Récupérer l'ID de la vidéo actuelle
-               const videoId = this.playerUI.getCurrentVideoId();
+               const videoId = this.playerService.getCurrentVideoId();
                if (!videoId) {
                   throw new CommandError(CommandErrorCode.INVALID_STATE, 'Cannot get video ID');
                }

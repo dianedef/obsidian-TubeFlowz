@@ -226,14 +226,4 @@ export class SettingsService {
             throw error;
         }
     }
-
-    getCurrentLanguage(): string {
-        const htmlLang = document.documentElement.lang;
-        const newLang = htmlLang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
-        if (this.settings.language !== newLang) {
-            this.settings.language = newLang;
-            this.save();
-        }
-        return newLang;
-    }
 } 

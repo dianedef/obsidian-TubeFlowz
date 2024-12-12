@@ -1,16 +1,19 @@
 import { App, Plugin, PluginSettingTab, Setting, DropdownComponent } from 'obsidian';
 import { SettingsService } from './SettingsService';
-import { PlaybackMode } from '../types/ISettings';
+import { PlaybackMode, ViewMode } from '../types/ISettings';
 import PlayerService from './PlayerService';
+import { TranslationsService } from './TranslationsService';
 
 export class SettingsTab extends PluginSettingTab {
-   private Settings: SettingsService;
+   private settings: SettingsService;
    private playerService: PlayerService;
+   private translations: TranslationsService;
 
    constructor(app: App, plugin: Plugin, settings: SettingsService, playerService: PlayerService) {
       super(app, plugin);
-      this.Settings = settings;
+      this.settings = settings;
       this.playerService = playerService;
+      this.translations = TranslationsService.getInstance();
    }
 
    display(): void {
@@ -19,57 +22,56 @@ export class SettingsTab extends PluginSettingTab {
       
       // Créer le menu de sélection du mode d'affichage par défaut
       new Setting(containerEl)
-         .setName('Mode d\'affichage par défaut')
-         .setDesc('Choisissez comment les vidéos s\'ouvriront par défaut')
+         .setName(this.translations.t('settings.defaultViewMode'))
+         .setDesc(this.translations.t('settings.defaultViewModeDesc'))
          .addDropdown((dropdown: DropdownComponent) => dropdown
-            .addOption('tab', 'Onglet')
-            .addOption('sidebar', 'Barre latérale')
-            .addOption('overlay', 'Superposition')
-            .setValue(this.Settings.currentMode)
+            .addOption('tab', this.translations.t('settings.tab'))
+            .addOption('sidebar', this.translations.t('settings.sidebar'))
+            .addOption('overlay', this.translations.t('settings.overlay'))
+            .setValue(this.settings.getSettings().currentMode)
             .onChange(async (value: string) => {
-               this.Settings.currentMode = value as VideoMode;
-               await this.Settings.save();
+               this.settings.getSettings().currentMode = value as ViewMode;
+               await this.settings.save();
             }));
 
       // Setting pour le mode de lecture
       new Setting(containerEl)
-         .setName('Mode de lecture')
-         .setDesc('Choisir entre streaming ou téléchargement')
+         .setName(this.translations.t('settings.playbackMode'))
+         .setDesc(this.translations.t('settings.playbackModeDesc'))
          .addDropdown((dropdown: DropdownComponent) => dropdown
-            .addOption('stream', 'Streaming')
-            .addOption('download', 'Téléchargement')
-            .setValue(this.Settings.playbackMode)
+            .addOption('stream', this.translations.t('settings.stream'))
+            .addOption('download', this.translations.t('settings.download'))
+            .setValue(this.settings.getSettings().playbackMode)
             .onChange(async (value: string) => {
-               this.Settings.playbackMode = value as PlaybackMode;
-               await this.Settings.save();
+               this.settings.getSettings().playbackMode = value as PlaybackMode;
+               await this.settings.save();
             }));
 
       // Setting pour la vitesse favorite
       new Setting(containerEl)
-         .setName('Vitesse de lecture favorite')
-         .setDesc('Définir la vitesse qui sera utilisée avec le raccourci Ctrl+4')
+         .setName(this.translations.t('settings.favoriteSpeed'))
+         .setDesc(this.translations.t('settings.favoriteSpeedDesc'))
          .addDropdown((dropdown: DropdownComponent) => {
-            // Ajouter les options de vitesse courantes
             const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 8, 10, 16];
             speeds.forEach(speed => {
                dropdown.addOption(speed.toString(), `${speed}x`);
             });
             return dropdown
-               .setValue(this.Settings.favoriteSpeed.toString())
+               .setValue(this.settings.getSettings().favoriteSpeed.toString())
                .onChange(async (value: string) => {
-                  this.Settings.favoriteSpeed = parseFloat(value);
-                  await this.Settings.save();
+                  this.settings.getSettings().favoriteSpeed = parseFloat(value);
+                  await this.settings.save();
                });
          });
 
       new Setting(containerEl)
-         .setName('Recommandations YouTube')
-         .setDesc('Afficher les recommandations YouTube à la fin des vidéos')
+         .setName(this.translations.t('settings.showRecommendations'))
+         .setDesc(this.translations.t('settings.showRecommendationsDesc'))
          .addToggle(toggle => toggle
-            .setValue(this.Settings.showYoutubeRecommendations)
+            .setValue(this.settings.getSettings().showYoutubeRecommendations)
             .onChange(async (value) => {
-               this.Settings.showYoutubeRecommendations = value;
-               await this.Settings.save();
+               this.settings.getSettings().showYoutubeRecommendations = value;
+               await this.settings.save();
             }));
    }
 } 

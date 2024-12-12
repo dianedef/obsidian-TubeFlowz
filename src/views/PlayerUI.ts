@@ -34,7 +34,6 @@ export class PlayerUI implements IPlayerUI {
       settings: SettingsService
    ) {
       this.settings = settings;
-      this.currentLanguage = settings.getCurrentLanguage();
       
       this.resizeHandle = document.createElement('div');
       this.resizeHandle.className = 'resize-handle';
@@ -55,11 +54,6 @@ export class PlayerUI implements IPlayerUI {
          PlayerUI.instance.dispose();
          PlayerUI.instance = null;
       }
-   }
-
-// Mettre à jour la méthode pour utiliser les settings
-   getObsidianLanguage(): string {
-      return this.settings.getCurrentLanguage();
    }
 
 // Mettre à jour initializePlayer pour initialiser l'observateur de langue
