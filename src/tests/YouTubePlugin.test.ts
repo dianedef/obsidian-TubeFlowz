@@ -1,31 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-// Mock d'Obsidian avant les imports
-const mockMenu = {
-    dom: document.createElement('div'),
-    addItem: vi.fn().mockReturnThis(),
-    showAtPosition: vi.fn().mockReturnThis(),
-    showAtMouseEvent: vi.fn().mockReturnThis(),
-    hide: vi.fn().mockReturnThis()
-};
-
-vi.mock('obsidian', () => ({
-    Menu: vi.fn(() => mockMenu),
-    Plugin: vi.fn().mockImplementation(() => ({
-        app: {
-            workspace: {
-                detachLeavesOfType: vi.fn()
-            }
-        }
-    }))
-}));
-
-import { Menu } from 'obsidian';
+import { Menu, Plugin } from 'obsidian';
 import YouTubePlugin from '../main';
 
 describe('YouTubePlugin', () => {
     let plugin: YouTubePlugin;
     let mockRibbonIcon: HTMLElement;
+    let mockMenu: Menu;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -41,6 +21,12 @@ describe('YouTubePlugin', () => {
             });
             return mockRibbonIcon;
         });
+
+        // Mock du menu
+        mockMenu = new Menu();
+        vi.spyOn(Menu.prototype, 'addItem').mockReturnThis();
+        vi.spyOn(Menu.prototype, 'showAtPosition').mockReturnThis();
+        vi.spyOn(Menu.prototype, 'hide').mockReturnThis();
     });
 
     describe('Menu', () => {
@@ -59,7 +45,7 @@ describe('YouTubePlugin', () => {
             mockRibbonIcon.dispatchEvent(new MouseEvent('mouseenter'));
 
             // Vérifie que le menu a été créé avec les trois options
-            expect(mockMenu.addItem).toHaveBeenCalledTimes(3);
+            expect(Menu.prototype.addItem).toHaveBeenCalledTimes(3);
         });
 
         it('devrait fermer le menu quand la souris quitte la zone', async () => {
@@ -76,7 +62,7 @@ describe('YouTubePlugin', () => {
             }));
 
             // Vérifie que le menu a été caché
-            expect(mockMenu.hide).toHaveBeenCalled();
+            expect(Menu.prototype.hide).toHaveBeenCalled();
         });
 
         it('devrait garder le menu ouvert si la souris passe de l\'icône au menu', async () => {
@@ -93,7 +79,7 @@ describe('YouTubePlugin', () => {
             }));
 
             // Vérifie que le menu n'a pas été caché
-            expect(mockMenu.hide).not.toHaveBeenCalled();
+            expect(Menu.prototype.hide).not.toHaveBeenCalled();
         });
     });
 

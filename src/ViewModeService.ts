@@ -6,37 +6,65 @@ export class ViewModeService {
    private currentView: YouTubeView | null = null;
    private currentMode: ViewMode | null = null;
    private activeLeaf: WorkspaceLeaf | null = null;
+   private leafId: string | null = null;
 
-   constructor(private plugin: Plugin) {}
+   constructor(private plugin: Plugin) {
+      // Nettoyer les anciennes leafs au démarrage
+      this.cleanupOrphanedLeaves();
+   }
+
+   private cleanupOrphanedLeaves() {
+      const leaves = this.plugin.app.workspace.getLeavesOfType("youtube-player");
+      leaves.forEach(leaf => {
+         if (leaf.view instanceof YouTubeView) {
+            leaf.detach();
+         }
+      });
+   }
 
    private async closeCurrentView() {
       if (this.currentView) {
-         this.currentView.leaf.detach();
+         const leaves = this.plugin.app.workspace.getLeavesOfType("youtube-player");
+         leaves.forEach(leaf => {
+            if (leaf.view instanceof YouTubeView) {
+               leaf.detach();
+            }
+         });
          this.currentView = null;
          this.activeLeaf = null;
+         this.leafId = null;
       }
    }
 
    private getLeafForMode(mode: ViewMode): WorkspaceLeaf {
       const workspace = this.plugin.app.workspace;
       
-      // Vérifier si une vue YouTube existe déjà
-      const activeView = workspace.getActiveViewOfType(YouTubeView);
-      if (activeView) {
-         activeView.leaf.detach();
-      }
+      // Fermer toutes les vues YouTube existantes
+      const existingLeaves = workspace.getLeavesOfType("youtube-player");
+      existingLeaves.forEach(leaf => {
+         if (leaf.view instanceof YouTubeView) {
+            leaf.detach();
+         }
+      });
       
+      let leaf: WorkspaceLeaf;
       switch (mode) {
          case 'sidebar':
-               return workspace.getRightLeaf(false) ?? workspace.getLeaf('split');
+            leaf = workspace.getRightLeaf(false) ?? workspace.getLeaf('split');
+            break;
          case 'overlay':
-               const activeLeaf = workspace.getMostRecentLeaf() ?? workspace.getLeaf('split');
-               return workspace.createLeafBySplit(activeLeaf, 'horizontal', true);
-               
+            const activeLeaf = workspace.getMostRecentLeaf() ?? workspace.getLeaf('split');
+            leaf = workspace.createLeafBySplit(activeLeaf, 'horizontal', true);
+            break;
          case 'tab':
          default:
-               return workspace.getLeaf('split');
+            leaf = workspace.getLeaf('split');
+            break;
       }
+
+      // Générer et sauvegarder un nouvel ID pour la leaf
+      this.leafId = leaf.id;
+      return leaf;
    }
 
    async setView(mode: ViewMode) {
@@ -50,7 +78,10 @@ export class ViewModeService {
       await leaf.setViewState({
          type: 'youtube-player',
          active: true,
-         state: { mode: mode }
+         state: { 
+            mode: mode,
+            leafId: this.leafId
+         }
       });
 
       this.currentView = leaf.view as YouTubeView;
@@ -61,5 +92,9 @@ export class ViewModeService {
 
    getActiveLeaf(): WorkspaceLeaf | null {
       return this.activeLeaf;
+   }
+
+   getCurrentLeafId(): string | null {
+      return this.leafId;
    }
 } 
