@@ -43,8 +43,8 @@ export type ViewMode = 'sidebar' | 'overlay' | 'tab';
 
 export const VIEW_MODES = {
     Sidebar: 'sidebar' as ViewMode,
-    Tab: 'tab' as ViewMode,
-    Overlay: 'overlay' as ViewMode
+    Overlay: 'overlay' as ViewMode,
+    Tab: 'tab' as ViewMode
 } as const;
 
 // Mode de lecture
@@ -84,7 +84,7 @@ export const DEFAULT_SETTINGS: IPluginSettings = {
     lastValidVideoId: 'jNQXAC9IVRw' as VideoId,
     lastTimestamp: 0 as Timestamp,
     isVideoOpen: false,
-    currentMode: 'sidebar',
+    currentMode: VIEW_MODES.Tab,
     isChangingMode: false,
     activeLeafId: null,
     overlayLeafId: null,

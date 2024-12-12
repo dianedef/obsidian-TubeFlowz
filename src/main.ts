@@ -1,4 +1,4 @@
-import { App, Plugin, Notice, Menu, WorkspaceLeaf } from 'obsidian';
+import { App, Plugin, Menu, WorkspaceLeaf } from 'obsidian';
 import { SettingsService } from './services/settings/SettingsService';
 import { SettingsTab } from './services/settings/SettingsTab';
 import { PlayerView } from './views/PlayerView';
@@ -11,7 +11,6 @@ import { TranslationsService } from './services/translations/TranslationsService
 import { ViewPlugin, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { registerStyles, unregisterStyles } from './services/styles/StylesService';
 import createDecorations from './services/decorations/DecorationService';
-import { extractVideoId, cleanVideoId } from './utils';
 import { ViewMode } from './types/ISettings';
 import { EventBus } from './core/EventBus';
 
@@ -37,16 +36,20 @@ export default class TubeFlows extends Plugin {
    }
 
    async onload() {
-      console.log("Chargemennnnnnnt du plugin YouTubeFlow");
+      console.log("Chargement du plugin YouTubeFlow");
 
       // Initialisation des services dans le bon ordre
       this.settings = new SettingsService(this);
       await this.settings.initialize();
 
       // Initialiser les services
-      this.playerService = PlayerService.getInstance(this.app, this.settings.getSettings());
+      this.playerService = PlayerService.getInstance(this.settings.getSettings());
       const videoPlayer = PlayerUI.getInstance(this.settings, this.playerService);
-      this.viewModeService = new ViewModeService(this, VIEW_MODES.Tab);
+      this.viewModeService = new ViewModeService(
+         this, 
+         this.playerService,
+         VIEW_MODES.Tab
+      );
 
       // Les services sont initialisés, maintenant on peut configurer les commandes
       this.addCommand({
@@ -83,6 +86,7 @@ export default class TubeFlows extends Plugin {
       );
 
       this.app.workspace.onLayoutReady(() => {
+         this.eventBus.emit('plugin:layout-ready');
          this.registerEvent(
             this.app.workspace.on('layout-change', () => {
                const hasYouTubeView = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
@@ -148,7 +152,7 @@ export default class TubeFlows extends Plugin {
       });
 
       // SettingsTab
-      this.addSettingTab(new SettingsTab(this.app, this, this.settings));
+      this.addSettingTab(new SettingsTab(this.app, this, this.settings, this.playerService));
 
       // Créer la "décoration" des liens YouTube dans les fichiers Markdown
       this.registerEditorExtension([
@@ -173,7 +177,7 @@ export default class TubeFlows extends Plugin {
          id: 'open-youtube-sidebar',
          name: 'Ouvrir le lien YouTube en barre latérale',
          callback: async () => {
-            await this.handleYouTubeLink(this.settings.lastVideoId, VIEW_MODES.Sidebar);
+            await this.viewModeService.createView(VIEW_MODES.Sidebar);
          }
       });
 
@@ -181,7 +185,7 @@ export default class TubeFlows extends Plugin {
          id: 'open-youtube-tab',
          name: 'Ouvrir le lien YouTube en onglet',
          callback: async () => {
-            await this.handleYouTubeLink(this.settings.lastVideoId, VIEW_MODES.Tab);
+            await this.viewModeService.createView(VIEW_MODES.Tab);
          }
       });
 
@@ -189,45 +193,19 @@ export default class TubeFlows extends Plugin {
          id: 'open-youtube-overlay',
          name: 'Ouvrir le lien YouTube en superposition',
          callback: async () => {
-            await this.handleYouTubeLink(this.settings.lastVideoId, VIEW_MODES.Overlay);
+            await this.viewModeService.createView(VIEW_MODES.Overlay);
          }
       });
 
-      // Ajouter les boutons de mode dans le ribbon
-      this.addRibbonIcon('layout-sidebar', 'Mode Sidebar', () => {
-         this.handleYouTubeLink(this.settings.lastVideoId, VIEW_MODES.Sidebar);
-      });
-
-      this.addRibbonIcon('layout-template', 'Mode Tab', () => {
-         this.handleYouTubeLink(this.settings.lastVideoId, VIEW_MODES.Tab);
-      });
-
-      this.addRibbonIcon('layout-cards', 'Mode Overlay', () => {
-         this.handleYouTubeLink(this.settings.lastVideoId, VIEW_MODES.Overlay);
-      });
-   }
-
-   // handleYouTubeLink
-   async handleYouTubeLink(url: string, mode: ViewMode = VIEW_MODES.Sidebar) {
-      try {
-         const videoId = cleanVideoId(extractVideoId(url));
-         if (!videoId) {
-            new Notice(this.translationsService.t('errors.invalid_video_id'));
-            return;
-         }
-         
-         this.eventBus.emit('video:load', videoId, mode);
-         
-      } catch (error) {
-         console.error('[TubeFlows] Error handling YouTube link:', error);
-         new Notice(this.translationsService.t('errors.generic_error'));
-      }
+      this.eventBus.emit('plugin:loaded');
    }
 
    async onunload() {
       try {
+         this.eventBus.emit('plugin:unloading');
          await this.viewModeService.closeView();
          unregisterStyles();
+         this.eventBus.emit('plugin:unloaded');
       } catch (error) {
          console.warn("Erreur lors du déchargement:", error);
       }

@@ -1,10 +1,10 @@
-import { App } from 'obsidian';
 import { eventBus } from '../../core/EventBus';
 import { YouTubeErrorCode, PlayerErrorCode, YouTubeAppError, PlayerAppError } from '../../types/IErrors';
 import { MessageKey } from '../../i18n/messages';
 import { IPlayer } from '../../types/IPlayer';
 import videojs from 'video.js';
 import 'videojs-youtube';
+import { PlaybackRate } from '../../types/IBase';
 
 export interface IYouTubeOptions {
     iv_load_policy: number;
@@ -31,9 +31,9 @@ export class YouTubeService implements IPlayer {
     private player: any = null;
     private container: HTMLElement | null = null;
 
-    public static getInstance(app: App): YouTubeService {
+    public static getInstance(): YouTubeService {
         if (!YouTubeService.instance) {
-            YouTubeService.instance = new YouTubeService(app);
+            YouTubeService.instance = new YouTubeService();
         }
         return YouTubeService.instance;
     }
@@ -42,7 +42,7 @@ export class YouTubeService implements IPlayer {
         this.currentLang = lang;
     }
 
-    public getYouTubeOptions(showRecommendations: boolean = false): YouTubeOptions {
+    public getYouTubeOptions(showRecommendations: boolean = false): IYouTubeOptions {
         return {
             iv_load_policy: 3,
             modestbranding: 1,
@@ -177,7 +177,8 @@ export class YouTubeService implements IPlayer {
                 const errorType = this.getErrorType(error.code);
                 eventBus.emit('video:error', {
                     code: String(error.code),
-                    type: errorType
+                    type: errorType,
+                    message: messageKey
                 });
             }
         });
@@ -196,7 +197,7 @@ export class YouTubeService implements IPlayer {
         });
 
         this.player.on('timeupdate', () => {
-            eventBus.emit('video:timeupdate', this.getCurrentTime());
+            eventBus.emit('video:timeUpdate', this.getCurrentTime());
         });
 
         this.player.on('volumechange', () => {
@@ -287,7 +288,7 @@ export class YouTubeService implements IPlayer {
         }
     }
 
-    public setPlaybackRate(rate: number): void {
+    public setPlaybackRate(rate: PlaybackRate): void {
         if (this.player) {
             this.player.playbackRate(rate);
             eventBus.emit('video:rateChange', rate);
