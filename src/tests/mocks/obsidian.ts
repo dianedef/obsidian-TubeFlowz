@@ -44,6 +44,56 @@ export class WorkspaceLeaf {
     }
 }
 
+// Mock des méthodes DOM d'Obsidian
+HTMLElement.prototype.empty = function() {
+    while (this.firstChild) {
+        this.removeChild(this.firstChild);
+    }
+};
+
+HTMLElement.prototype.createDiv = function({ cls }: { cls: string }) {
+    const div = document.createElement('div');
+    div.className = cls;
+    this.appendChild(div);
+    return div;
+};
+
+HTMLElement.prototype.createEl = function(tag: string, { text }: { text: string }) {
+    const el = document.createElement(tag);
+    el.textContent = text;
+    this.appendChild(el);
+    return el;
+};
+
+HTMLElement.prototype.createSpan = function({ text }: { text: string }) {
+    const span = document.createElement('span');
+    span.textContent = text;
+    this.appendChild(span);
+    return span;
+};
+
+export class ItemView {
+    leaf: WorkspaceLeaf;
+    containerEl: HTMLElement;
+
+    constructor(leaf: WorkspaceLeaf) {
+        this.leaf = leaf;
+        this.containerEl = document.createElement('div');
+    }
+
+    getViewType(): string {
+        return 'youtube-player';
+    }
+
+    onOpen() {
+        return Promise.resolve();
+    }
+
+    onClose() {
+        return Promise.resolve();
+    }
+}
+
 export class Plugin {
     app: any;
     private leaves: Map<string, WorkspaceLeaf>;
@@ -81,6 +131,7 @@ export class Plugin {
             revealLeaf: vi.fn(),
             getLeavesOfType: vi.fn().mockReturnValue([]),
             getActiveViewOfType: vi.fn(),
+            detachLeavesOfType: vi.fn(),
             on: vi.fn(),
             off: vi.fn()
         };
@@ -90,31 +141,20 @@ export class Plugin {
         };
     }
 
+    // Méthodes de base du Plugin
+    addRibbonIcon(icon: string, title: string, callback: (evt: MouseEvent) => any): HTMLElement {
+        const el = document.createElement('div');
+        el.addEventListener('click', callback);
+        return el;
+    }
+
+    registerView(type: string, viewCreator: (leaf: WorkspaceLeaf) => any) {
+        return;
+    }
+
     // Méthode utilitaire pour les tests
     getLeaves(): Map<string, WorkspaceLeaf> {
         return this.leaves;
-    }
-}
-
-export class ItemView {
-    leaf: WorkspaceLeaf;
-    containerEl: HTMLElement;
-
-    constructor(leaf: WorkspaceLeaf) {
-        this.leaf = leaf;
-        this.containerEl = document.createElement('div');
-    }
-
-    getViewType(): string {
-        return 'youtube-player';
-    }
-
-    onOpen() {
-        return Promise.resolve();
-    }
-
-    onClose() {
-        return Promise.resolve();
     }
 }
 
@@ -138,6 +178,7 @@ export class Menu {
     }
 
     showAtPosition(position: { x: number, y: number }) {}
+    showAtMouseEvent(event: MouseEvent) {}
     hide() {}
 }
 

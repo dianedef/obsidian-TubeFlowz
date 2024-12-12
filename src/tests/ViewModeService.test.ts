@@ -1,19 +1,28 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Plugin, WorkspaceLeaf } from 'obsidian';
-import { ViewModeService, ViewMode } from '../main';
+import { ViewModeService } from '../ViewModeService';
+import { ViewMode } from '../types';
 
 describe('ViewModeService', () => {
     let plugin: Plugin;
     let viewModeService: ViewModeService;
     let mockWorkspace: any;
+    let activeLeaf: WorkspaceLeaf;
 
     beforeEach(() => {
         // Reset des mocks
         vi.clearAllMocks();
         
+        // Création de la feuille active
+        activeLeaf = new WorkspaceLeaf();
+        
         // Setup du plugin et du service
         plugin = new Plugin();
         mockWorkspace = plugin.app.workspace;
+
+        // Mock de getMostRecentLeaf
+        mockWorkspace.getMostRecentLeaf = vi.fn().mockReturnValue(activeLeaf);
+        
         viewModeService = new ViewModeService(plugin);
     });
 
@@ -37,14 +46,14 @@ describe('ViewModeService', () => {
         });
 
         it('devrait créer un split horizontal en mode overlay', async () => {
-            // Créer d'abord une feuille active
-            const activeLeaf = new WorkspaceLeaf();
+            // Mock de la vue active
             mockWorkspace.getActiveViewOfType.mockReturnValue({ leaf: activeLeaf });
 
             // Créer la vue overlay
             await viewModeService.setView('overlay');
             const overlayLeaf = (plugin as any).getLeaves().get('overlay');
             
+            expect(mockWorkspace.getMostRecentLeaf).toHaveBeenCalled();
             expect(mockWorkspace.createLeafBySplit).toHaveBeenCalledWith(
                 activeLeaf,
                 'horizontal',
