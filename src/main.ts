@@ -39,13 +39,13 @@ export default class TubeFlows extends Plugin {
 
    async onload() {
       try {
-         console.log("[main] Chargement du plugin YouTubeFlow");
+         console.log("[main dans onload] Chargement du plugin YouTubeFlow");
 
 // Initialisation des services de base
          this.settings = new SettingsService(this);
 // Attendre que les settings soient chargés
          await this.settings.initialize();
-         console.log("[main] Settings initialisés:", this.settings.getSettings());
+         console.log("[main dans onload] Settings initialisés:", this.settings.getSettings());
 
 // Initialiser le service de traduction
          const locale = document.documentElement.lang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
@@ -68,7 +68,7 @@ export default class TubeFlows extends Plugin {
 
 // Gérer les erreurs de chargement de vidéo
          this.eventBus.on('video:error', (error) => {
-            console.error("[main] Erreur lors du chargement de la vidéo:", error);
+            console.error("[main dans onload] Erreur lors du chargement de la vidéo:", error);
          });
 
 // Initialiser les raccourcis
@@ -181,7 +181,7 @@ export default class TubeFlows extends Plugin {
 
          this.eventBus.emit('plugin:loaded');
       } catch (error) {
-         console.error("[main] Erreur lors du chargement du plugin:", error);
+         console.error("[main dans onload] Erreur lors du chargement du plugin:", error);
       }
    }
 
@@ -192,7 +192,7 @@ export default class TubeFlows extends Plugin {
          unregisterStyles();
          this.eventBus.emit('plugin:unloaded');
       } catch (error) {
-         console.warn("[main] Erreur lors du déchargement:", error);
+         console.warn("[main dans onunload] Erreur lors du déchargement:", error);
       }
    }
 }

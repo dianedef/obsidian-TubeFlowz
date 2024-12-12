@@ -16,6 +16,7 @@ export async function saveHeight(height: number, mode: ViewMode, plugin: Plugin)
         settings.viewHeight = height;
     }
     await plugin.saveData(settings);
+    console.log("[dimensions dans saveHeight] Hauteur sauvegardée:", height, "pour le mode", mode);
 }
 
 /**
@@ -33,5 +34,6 @@ export function getHeight(mode: ViewMode, settings: PluginSettings): number {
         ? settings.overlayHeight ?? defaultHeight
         : settings.viewHeight ?? defaultHeight;
 
+    console.log("[dimensions dans getHeight] Hauteur récupérée:", height, "pour le mode", mode);
     return Math.min(Math.max(height, 20), 90);
 } 

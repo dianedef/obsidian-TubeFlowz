@@ -60,7 +60,7 @@ export class PlayerView extends ItemView {
      */
     public async onOpen(): Promise<void> {
         try {
-            console.log('[PlayerView] Début onOpen');
+            console.log('[PlayerView dans onOpen] Début onOpen');
             
             const cleanup = eventBus.on('view:ready', () => {
                 this.playerUI.initializePlayer(this.containerEl);
@@ -68,12 +68,12 @@ export class PlayerView extends ItemView {
             });
             
             // Initialiser le player directement
-            console.log('[PlayerView] Initialisation du player UI');
+            console.log('[PlayerView dans onOpen] Initialisation du player UI');
             await this.playerUI.initializePlayer(this.containerEl);
             
-            console.log('[PlayerView] Fin onOpen avec succès');
+            console.log('[PlayerView dans onOpen] Fin onOpen avec succès');
         } catch (error) {
-            console.error('[PlayerView] Erreur lors de l\'ouverture:', error);
+            console.error('[PlayerView dans onOpen] Erreur lors de l\'ouverture:', error);
             this.handleError(error as Error);
             throw error;
         }
@@ -93,13 +93,13 @@ export class PlayerView extends ItemView {
             this.playerUI?.dispose();
             this.containerEl.empty();
         } catch (error) {
-            console.error('Erreur lors de la fermeture de la vue:', error);
+            console.error('[PlayerView dans onClose] Erreur lors de la fermeture de la vue:', error);
             throw error;
         }
     }
 
     private handleError(error: Error): void {
-        console.error("Erreur:", error);
+        console.error("[PlayerView dans handleError] Erreur:", error);
         const playerError = new PlayerAppError(
             PlayerErrorCode.MEDIA_ERR_ABORTED,
             'messages.initializationError' as TranslationKey,

@@ -17,7 +17,6 @@ export class PlayerUI implements IPlayerUI {
    private settings: SettingsService;
 
    hasVideoJS: boolean = false;
-   currentLanguage: string;
    container: HTMLElement | null = null;
    resizeObserver: ResizeObserver | null = null;
    playbackRateButton: IControlBarComponent | null = null;
@@ -53,13 +52,14 @@ export class PlayerUI implements IPlayerUI {
       if (PlayerUI.instance) {
          PlayerUI.instance.dispose();
          PlayerUI.instance = null;
+         console.log("[PlayerUI dans destroyInstance] Instance détruite");
       }
    }
 
 // Mettre à jour initializePlayer pour initialiser l'observateur de langue
    async initializePlayer(container: HTMLElement): Promise<IVideoJsPlayer | HTMLElement> {
       if (this.Player) {
-         console.log("[PlayerUI] Player déjà initialisé, réutilisation de l'instance existante");
+         console.log("[PlayerUI dans initializePlayer] Player déjà initialisé, réutilisation de l'instance existante");
          return this.Player;
       }
 
@@ -91,10 +91,10 @@ export class PlayerUI implements IPlayerUI {
          // Ajouter le conteneur dans .view-content
          viewContent.appendChild(mainContainer);
          
-         console.log("[PlayerUI] Création du player VideoJS");
+         console.log("[PlayerUI dans initializePlayer] Création du player VideoJS");
          
          const lastVideoId = this.settings.getSettings().lastVideoId;
-         console.log("[PlayerUI] Initialisation avec videoId:", lastVideoId);
+         console.log("[PlayerUI dans initializePlayer] Initialisation avec videoId:", lastVideoId);
 
          // Configuration du player avec les types corrects
          const options: IVideoJsOptions = {
@@ -103,7 +103,6 @@ export class PlayerUI implements IPlayerUI {
                type: 'video/youtube',
                src: `https://www.youtube.com/watch?v=${lastVideoId}`
             }],
-            language: this.currentLanguage,
             languages: {
                fr: {
                   "Play": "Lecture",
@@ -169,20 +168,22 @@ export class PlayerUI implements IPlayerUI {
             }
          };
 
+         console.log("[PlayerUI dans initializePlayer] Options du player:", options);
+
          // Créer le player avec le bon élément
          this.Player = videojs(video, options) as IVideoJsPlayer;
 
          if (!this.Player) {
-            console.error("[PlayerUI] Échec de création de l'interface");
+            console.error("[PlayerUI dans initializePlayer] Échec de création de l'interface");
             return this.createFallbackPlayer(this.settings.getSettings().lastVideoId, container);
          }
 
-         console.log("[PlayerUI] Interface créée avec succès");
+         console.log("[PlayerUI dans initializePlayer] Interface créée avec succès");
 
          // Attendre que le player soit prêt
          await new Promise<void>((resolve) => {
             this.Player!.ready(() => {
-               console.log("[PlayerUI] Interface prête");
+               console.log("[PlayerUI dans initializePlayer] Interface prête");
                resolve();
             });
          });
@@ -201,6 +202,7 @@ export class PlayerUI implements IPlayerUI {
                   }
                }
             }
+            console.log("[PlayerUI dans initializePlayer] Vitesse de lecture mise à jour:", newRate);
          });
 
 // Après l'initialisation du player
@@ -213,7 +215,7 @@ export class PlayerUI implements IPlayerUI {
          eventBus.emit('player:init');
          return this.Player;
       } catch (error) {
-         console.error("[PlayerUI] Erreur lors de l'initialisation de l'interface:", error);
+         console.error("[PlayerUI dans initializePlayer] Erreur lors de l'initialisation de l'interface:", error);
          throw new PlayerAppError(
             PlayerErrorCode.MEDIA_ERR_ABORTED,
             ERROR_MESSAGE_KEYS.MEDIA_ERR_ABORTED
@@ -258,10 +260,11 @@ export class PlayerUI implements IPlayerUI {
             y: rect.bottom
          });
       });
+      console.log("[PlayerUI dans initializeCustomControls] Menu ajouté");
    }
 
    createFallbackPlayer(videoId: VideoId, container: HTMLElement): HTMLElement {
-      console.log("Utilisation du lecteur de secours pour", videoId);
+      console.log("[PlayerUI dans createFallbackPlayer] Utilisation du lecteur de secours pour", videoId);
       container.innerHTML = '';
       
       const playerContainer = document.createElement('div');
@@ -278,6 +281,7 @@ export class PlayerUI implements IPlayerUI {
       
       // Ajouter la poignée de redimensionnement même pour le fallback
       this.addResizeHandle(container);
+      console.log("[PlayerUI dans createFallbackPlayer] Poignée de redimensionnement ajoutée", this.resizeHandle);
       
       return playerContainer;
    }
@@ -307,8 +311,6 @@ export class PlayerUI implements IPlayerUI {
                ]
          },
          
-         // Configuration de la langue
-         language: this.currentLanguage,
          languages: {
                en: {
                   "Play": "Play",
@@ -386,6 +388,7 @@ export class PlayerUI implements IPlayerUI {
       const resizeHandle = document.createElement('div');
       resizeHandle.className = 'resize-handle';
       container.appendChild(resizeHandle);
+      console.log("[PlayerUI dans addResizeHandle] Poignée de redimensionnement ajoutée", resizeHandle);
 
       // Ajouter les gestionnaires d'événements avec le bon type
       resizeHandle.addEventListener('mousedown', (e: Event) => {

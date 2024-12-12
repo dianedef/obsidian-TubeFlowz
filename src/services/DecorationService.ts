@@ -80,6 +80,7 @@ export class DecorationForUrl extends WidgetType {
       
       sparkle.addEventListener('click', () => {
          try {
+            console.log("[DecorationForUrl dans toDOM] Emitting video:load event with videoId:", toVideoId(this.videoId));
             eventBus.emit('video:load', toVideoId(this.videoId));
          } catch (error) {
             console.error("Erreur lors du chargement de la vidéo:", 

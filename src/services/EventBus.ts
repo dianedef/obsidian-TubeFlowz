@@ -29,6 +29,7 @@ export class EventBus {
         if (this.debug) {
             console.log(`[EventBus] Subscribed to ${String(event)}`);
         }
+        console.log("[EventBus dans on] this.handlers:", this.handlers);
 
         return () => {
             this.handlers.get(event)?.delete(handler);
@@ -39,7 +40,7 @@ export class EventBus {
         if (this.debug) {
             console.log(`[EventBus] Emitting ${String(event)}`, ...args);
         }
-
+        console.log("[EventBus dans emit] this.handlers:", this.handlers);
         this.handlers.get(event)?.forEach(callback => {
             try {
                 callback(...args);

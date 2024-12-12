@@ -84,7 +84,7 @@ export class ViewModeService implements IViewModeService {
             await this.createView(mode);
             this.currentMode = mode;
         } catch (error) {
-            console.error('[ViewModeService] Erreur lors du changement de mode:', error);
+            console.error('[ViewModeService dans setMode] Erreur lors du changement de mode:', error);
             throw error;
         }
     }
@@ -95,14 +95,14 @@ export class ViewModeService implements IViewModeService {
      * @returns {Promise<PlayerView>} La vue créée
      */
     async createView(mode: ViewMode): Promise<PlayerView> {
-        console.log('[ViewModeService] createView appelé avec mode:', mode);
+        console.log('[ViewModeService dans createView] createView appelé avec mode:', mode);
         if (this.activeView) {
-            console.log('[ViewModeService] activeView existe déjà, on envoie vers le playerService');
+            console.log('[ViewModeService dans createView] activeView existe déjà, on envoie vers le playerService');
             eventBus.emit('video:load', '');
             return this.activeView;
         }
         if (this.isCreatingView) {
-            console.log('[ViewModeService] Création de vue déjà en cours, on ignore');
+            console.log('[ViewModeService dans createView] Création de vue déjà en cours, on ignore');
             return this.activeView!;
         }
 
@@ -110,7 +110,7 @@ export class ViewModeService implements IViewModeService {
             this.isCreatingView = true;
 
             if (this.activeView) {
-                console.log('[ViewModeService] Vue active existe déjà');
+                console.log('[ViewModeService dans createView] Vue active existe déjà');
                 return this.activeView;
             }
 
@@ -148,15 +148,15 @@ export class ViewModeService implements IViewModeService {
      * @throws {PlayerAppError} Si la création de la feuille échoue
      */
     private getLeafForMode(mode: ViewMode): WorkspaceLeaf {
-        console.log('[ViewModeService] getLeafForMode appelé avec mode:', mode);
-        console.log('[ViewModeService] this.plugin:', this.plugin);
-        console.log('[ViewModeService] this:', this);
+        console.log('[ViewModeService dans getLeafForMode] getLeafForMode appelé avec mode:', mode);
+        console.log('[ViewModeService dans getLeafForMode] this.plugin:', this.plugin);
+        console.log('[ViewModeService dans getLeafForMode] this:', this);
 
         switch (mode) {
             case VIEW_MODES.Sidebar:
-                console.log('[ViewModeService] Tentative création rightLeaf');
+                console.log('[ViewModeService dans getLeafForMode] Tentative création rightLeaf');
                 const rightLeaf = this.plugin?.app?.workspace.getRightLeaf(true);
-                console.log('[ViewModeService] rightLeaf créé:', rightLeaf);
+                console.log('[ViewModeService dans getLeafForMode] rightLeaf créé:', rightLeaf);
                 
                 if (!rightLeaf) throw new PlayerAppError(
                     PlayerErrorCode.MEDIA_ERR_ABORTED,
@@ -186,6 +186,7 @@ export class ViewModeService implements IViewModeService {
                 this.settings.isVideoOpen = false;
                 await this.settings.save();
             }
+            console.log('[ViewModeService dans closeView] Sauvegarde de l\'état avant de fermer');
 
             // Fermer la vue
             const leaves = this.plugin.app.workspace.getLeavesOfType('youtube-player');
@@ -201,6 +202,7 @@ export class ViewModeService implements IViewModeService {
             this.plugin.app.workspace.on('layout-change', () => {
                 // Debounce les événements de layout-change
                 clearTimeout(layoutChangeTimeout);
+                console.log('[ViewModeService dans registerLayoutEvents] Début du debounce');
                 layoutChangeTimeout = setTimeout(() => {
                     const hasYouTubeView = this.plugin.app.workspace.getLeavesOfType('youtube-player').length > 0;
                     

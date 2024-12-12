@@ -6,7 +6,6 @@ import { TranslationsService } from './TranslationsService';
 
 export class SettingsTab extends PluginSettingTab {
    private settings: SettingsService;
-   private playerService: PlayerService;
    private translations: TranslationsService;
 
    constructor(app: App, plugin: Plugin, settings: SettingsService, playerService: PlayerService) {
