@@ -10,6 +10,21 @@ vue nexiste pas
    > clic décorateur
       > emit video:load, this.videoId
 
+Settings (lastVideoId)
+      ↓
+createInitialState()
+      ↓
+IPlayerState.videoId
+      ↓
+handleLoadVideo(options)
+      ↙          ↘
+loadVideo()    PlayerUI.getPlayerConfig()
+      ↓               ↓
+player.src()    sources[{src: videoId}]
+      ↓               ↓
+getCurrentVideoId()   VideoJS Player
+
+
 
 
 createView(mode)

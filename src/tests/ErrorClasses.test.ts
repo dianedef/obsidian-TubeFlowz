@@ -4,27 +4,32 @@ import {
     PlayerAppError,
     CacheAppError,
     ConfigAppError,
-    createError
-} from '../core/errors/ErrorClasses';
-import {
+    createError,
     YouTubeErrorCode,
     PlayerErrorCode,
     CacheErrorCode,
     ConfigErrorCode
-} from '../types/IErrors';
+} from "../types/IErrors";
+import { TranslationsService } from '../services/TranslationsService';
 
 describe('Error Classes', () => {
+    beforeAll(() => {
+        TranslationsService.initialize('fr');
+    });
+
     describe('YouTubeAppError', () => {
         it('should create YouTube error with constructor', () => {
             const error = new YouTubeAppError(
-                'Test error',
                 YouTubeErrorCode.VIDEO_NOT_FOUND,
-                'abc123'
+                'error.youtube.videoNotFound',
+                'abc123',
+                0,
+                'fr'
             );
 
             expect(error).toBeInstanceOf(Error);
             expect(error).toBeInstanceOf(YouTubeAppError);
-            expect(error.message).toBe('Test error');
+            expect(error.message).toBe('Vidéo YouTube non trouvée');
             expect(error.code).toBe(YouTubeErrorCode.VIDEO_NOT_FOUND);
             expect(error.videoId).toBe('abc123');
             expect(error.timestamp).toBeTypeOf('number');
@@ -43,15 +48,16 @@ describe('Error Classes', () => {
     describe('PlayerAppError', () => {
         it('should create Player error with constructor', () => {
             const error = new PlayerAppError(
-                'Test error',
                 PlayerErrorCode.MEDIA_ERR_NETWORK,
+                'error.player.network',
                 undefined,
-                123.45
+                123.45,
+                'fr'
             );
 
             expect(error).toBeInstanceOf(Error);
             expect(error).toBeInstanceOf(PlayerAppError);
-            expect(error.message).toBe('Test error');
+            expect(error.message).toBe('Erreur réseau lors de la lecture');
             expect(error.code).toBe(PlayerErrorCode.MEDIA_ERR_NETWORK);
             expect(error.currentTime).toBe(123.45);
             expect(error.timestamp).toBeTypeOf('number');
@@ -70,15 +76,16 @@ describe('Error Classes', () => {
     describe('CacheAppError', () => {
         it('should create Cache error with constructor', () => {
             const error = new CacheAppError(
-                'Test error',
                 CacheErrorCode.STORAGE_FULL,
+                'error.cache.storageFull',
                 'testKey',
-                1024
+                1024,
+                'fr'
             );
 
             expect(error).toBeInstanceOf(Error);
             expect(error).toBeInstanceOf(CacheAppError);
-            expect(error.message).toBe('Test error');
+            expect(error.message).toBe('Stockage plein');
             expect(error.code).toBe(CacheErrorCode.STORAGE_FULL);
             expect(error.key).toBe('testKey');
             expect(error.size).toBe(1024);
@@ -92,23 +99,24 @@ describe('Error Classes', () => {
             expect(error.code).toBe(CacheErrorCode.STORAGE_FULL);
             expect(error.key).toBe('testKey');
             expect(error.size).toBe(1024);
-            expect(error.message).toBe('Le stockage est plein');
+            expect(error.message).toBe('Stockage plein');
         });
     });
 
     describe('ConfigAppError', () => {
         it('should create Config error with constructor', () => {
             const error = new ConfigAppError(
-                'Test error',
                 ConfigErrorCode.TYPE_MISMATCH,
+                'error.config.typeMismatch',
                 'volume',
                 'number',
-                'string'
+                'string',
+                'fr'
             );
 
             expect(error).toBeInstanceOf(Error);
             expect(error).toBeInstanceOf(ConfigAppError);
-            expect(error.message).toBe('Test error');
+            expect(error.message).toBe('Type incompatible');
             expect(error.code).toBe(ConfigErrorCode.TYPE_MISMATCH);
             expect(error.setting).toBe('volume');
             expect(error.expectedType).toBe('number');
@@ -129,22 +137,7 @@ describe('Error Classes', () => {
             expect(error.setting).toBe('volume');
             expect(error.expectedType).toBe('number');
             expect(error.receivedType).toBe('string');
-            expect(error.message).toBe('Type de paramètre incorrect');
-        });
-    });
-
-    describe('Error Details', () => {
-        it('should handle additional details in errors', () => {
-            const details = { additionalInfo: 'test info' };
-            const error = new YouTubeAppError(
-                'Test error',
-                YouTubeErrorCode.VIDEO_NOT_FOUND,
-                'abc123',
-                0,
-                details
-            );
-
-            expect(error.details).toEqual(details);
+            expect(error.message).toBe('Type incompatible');
         });
     });
 }); 

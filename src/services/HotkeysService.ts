@@ -1,7 +1,7 @@
 import { Plugin, Notice } from 'obsidian';
 import { SettingsService } from './SettingsService';
 import { TranslationsService } from './TranslationsService';
-import { PlayerService } from './PlayerService';
+import PlayerService from './PlayerService';
 import { CommandError, CommandErrorCode } from '../types/IErrors';
 import { PlaybackRate } from '../types';
 

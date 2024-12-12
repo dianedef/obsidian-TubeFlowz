@@ -169,13 +169,22 @@ export class YouTubeService implements IPlayer {
         this.player.on('error', () => {
             const error = player.error();
             if (error) {
-                const messageKey = this.getErrorMessageKey(error.code);
-                const errorType = this.getErrorType(error.code);
-                eventBus.emit('video:error', {
-                    code: String(error.code),
-                    type: errorType,
-                    message: messageKey
-                });
+                let youtubeError;
+                if (error.code === 1150) {
+                    youtubeError = this.createYouTubeError(
+                        YouTubeErrorCode.PLAYBACK_DISABLED,
+                        'error.youtube.playbackDisabled'
+                    );
+                } else {
+                    const messageKey = this.getErrorMessageKey(error.code);
+                    const errorType = this.getErrorType(error.code);
+                    youtubeError = {
+                        code: String(error.code),
+                        type: errorType,
+                        message: messageKey
+                    };
+                }
+                eventBus.emit('video:error', youtubeError);
             }
         });
 

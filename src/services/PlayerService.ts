@@ -399,4 +399,8 @@ export default class PlayerService implements IPlayerService {
     public getCurrentVideoId(): string {
         return this.player?.currentSrc() || '';
     }
+
+    public isReady(): boolean {
+        return this.isInitialized && this.player !== null;
+    }
 }

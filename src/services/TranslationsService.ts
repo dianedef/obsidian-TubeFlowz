@@ -8,6 +8,7 @@ export type TranslationKey =
     | 'error.youtube.videoNotFound'
     | 'error.youtube.notEmbeddable'
     | 'error.youtube.videoRemoved'
+    | 'error.youtube.playbackDisabled'
     // Player errors
     | 'error.player.aborted'
     | 'error.player.network'
@@ -110,6 +111,7 @@ export const translations: { [lang: string]: Record<TranslationKey, string> } = 
         'error.youtube.videoRemoved': 'Video has been removed',
         'error.youtube.invalidParameter': 'Invalid parameter',
         'error.youtube.html5Error': 'HTML5 playback error',
+        'error.youtube.playbackDisabled': 'Playback on other websites has been disabled by the video owner',
         // Player errors
         'error.player.aborted': 'Playback aborted',
         'error.player.network': 'Network error',
@@ -173,6 +175,7 @@ export const translations: { [lang: string]: Record<TranslationKey, string> } = 
         'error.youtube.videoRemoved': 'La vidéo a été supprimée',
         'error.youtube.invalidParameter': 'Paramètre invalide',
         'error.youtube.html5Error': 'Erreur HTML5 lors de la lecture',
+        'error.youtube.playbackDisabled': 'La lecture sur d\'autres sites a été désactivée par le propriétaire de la vidéo',
         // Player errors
         'error.player.aborted': 'Lecture interrompue',
         'error.player.network': 'Erreur réseau lors de la lecture',
@@ -251,6 +254,10 @@ export class TranslationsService {
             throw new Error('TranslationsService must be initialized before use');
         }
         return this.instance;
+    }
+
+    setLanguage(lang: string): void {
+        this.currentLang = lang;
     }
 
     t(key: TranslationKey): string {

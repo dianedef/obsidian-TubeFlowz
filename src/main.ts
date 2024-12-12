@@ -49,10 +49,8 @@ export default class TubeFlows extends Plugin {
 
 // Initialiser le service de traduction
          const locale = document.documentElement.lang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
-         console.log("[main] Langue détectée:", locale);
          TranslationsService.initialize(locale);
          this.translationsService = TranslationsService.getInstance();
-         console.log("[main] Langue actuelle:", this.settings.getSettings().language);
 
 // Initialiser PlayerService
          this.playerService = PlayerService.getInstance(this.settings.getSettings());

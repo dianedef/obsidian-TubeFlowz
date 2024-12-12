@@ -10,4 +10,7 @@ export interface IPlayerService {
    getCurrentVideoId(): string;
    
    handleLoadVideo(options: Partial<IPlayerState>): Promise<void>;
+   
+   // État du player
+   isReady(): boolean;
 } 

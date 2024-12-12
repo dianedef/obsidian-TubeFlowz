@@ -38,8 +38,10 @@ export abstract class AppBaseError extends Error implements IBaseError {
         readonly code: AppErrorCode | YouTubeErrorCode | PlayerErrorCode | CacheErrorCode | ConfigErrorCode,
         messageKey: TranslationKey,
         details?: Record<string, unknown>,
+        lang: string = 'en'
     ) {
         const translationService = TranslationsService.getInstance();
+        translationService.setLanguage(lang);
         super(translationService.t(messageKey));
         this.timestamp = Date.now();
         this.details = details;
@@ -49,11 +51,12 @@ export abstract class AppBaseError extends Error implements IBaseError {
 
 // Interface et classe pour les erreurs YouTube
 export enum YouTubeErrorCode {
-    VIDEO_NOT_FOUND = 'VIDEO_NOT_FOUND',
-    VIDEO_NOT_EMBEDDABLE = 'VIDEO_NOT_EMBEDDABLE',
-    VIDEO_REMOVED = 'VIDEO_REMOVED',
-    INVALID_PARAMETER = 'INVALID_PARAMETER',
-    HTML5_ERROR = 'HTML5_ERROR'
+    VIDEO_NOT_FOUND = 100,
+    VIDEO_NOT_EMBEDDABLE = 101,
+    VIDEO_REMOVED = 150,
+    PLAYBACK_DISABLED = 1150,
+    INVALID_PARAMETER = 2,
+    HTML5_ERROR = 5
 }
 
 export interface IYouTubeError extends IBaseError {
@@ -68,19 +71,20 @@ export class YouTubeAppError extends AppBaseError implements IYouTubeError {
         messageKey: TranslationKey,
         public readonly videoId?: string,
         public readonly playerState?: number,
+        lang: string = 'en'
     ) {
-        super(code, messageKey, { videoId, playerState });
+        super(code, messageKey, { videoId, playerState }, lang);
         this.name = 'YouTubeError';
     }
 }
 
 // Interface et classe pour les erreurs de lecture vidéo
 export enum PlayerErrorCode {
-    MEDIA_ERR_ABORTED = 'MEDIA_ERR_ABORTED',
-    MEDIA_ERR_NETWORK = 'MEDIA_ERR_NETWORK',
-    MEDIA_ERR_DECODE = 'MEDIA_ERR_DECODE',
-    MEDIA_ERR_SRC_NOT_SUPPORTED = 'MEDIA_ERR_SRC_NOT_SUPPORTED',
-    MEDIA_ERR_ENCRYPTED = 'MEDIA_ERR_ENCRYPTED'
+    MEDIA_ERR_ABORTED = 1,
+    MEDIA_ERR_NETWORK = 2,
+    MEDIA_ERR_DECODE = 3,
+    MEDIA_ERR_SRC_NOT_SUPPORTED = 4,
+    MEDIA_ERR_ENCRYPTED = 5
 }
 
 export interface IPlayerError extends IBaseError {
@@ -95,8 +99,9 @@ export class PlayerAppError extends AppBaseError implements IPlayerError {
         messageKey: TranslationKey,
         public readonly mediaError?: MediaError,
         public readonly currentTime?: number,
+        lang: string = 'en'
     ) {
-        super(code, messageKey, { mediaError, currentTime });
+        super(code, messageKey, { mediaError, currentTime }, lang);
         this.name = 'PlayerError';
     }
 }
@@ -122,8 +127,9 @@ export class CacheAppError extends AppBaseError implements ICacheError {
         messageKey: TranslationKey,
         public readonly key?: string,
         public readonly size?: number,
+        lang: string = 'en'
     ) {
-        super(code, messageKey, { key, size });
+        super(code, messageKey, { key, size }, lang);
         this.name = 'CacheError';
     }
 }
@@ -152,8 +158,9 @@ export class ConfigAppError extends AppBaseError implements IConfigError {
         public readonly setting?: string,
         public readonly expectedType?: string,
         public readonly receivedType?: string,
+        lang: string = 'en'
     ) {
-        super(code, messageKey, { setting, expectedType, receivedType });
+        super(code, messageKey, { setting, expectedType, receivedType }, lang);
         this.name = 'ConfigError';
     }
 }
@@ -195,4 +202,35 @@ export class CommandError extends Error {
     }
 }
 
-export type MessageKey = keyof typeof ERROR_MESSAGE_KEYS; 
+export type MessageKey = keyof typeof ERROR_MESSAGE_KEYS;
+
+// Factory pour créer les erreurs
+export const createError = {
+    youtube: (code: YouTubeErrorCode, videoId?: string, playerState?: number, lang: string = 'fr') => {
+        const messageKeyMap: Record<YouTubeErrorCode, TranslationKey> = {
+            [YouTubeErrorCode.VIDEO_NOT_FOUND]: 'error.youtube.videoNotFound',
+            [YouTubeErrorCode.VIDEO_NOT_EMBEDDABLE]: 'error.youtube.notEmbeddable',
+            [YouTubeErrorCode.VIDEO_REMOVED]: 'error.youtube.videoRemoved',
+            [YouTubeErrorCode.PLAYBACK_DISABLED]: 'error.youtube.playbackDisabled',
+            [YouTubeErrorCode.INVALID_PARAMETER]: 'error.youtube.invalidParameter',
+            [YouTubeErrorCode.HTML5_ERROR]: 'error.youtube.html5Error'
+        };
+        return new YouTubeAppError(code, messageKeyMap[code], videoId, playerState, lang);
+    },
+    player: (code: PlayerErrorCode, currentTime?: number, lang: string = 'fr') => {
+        const messageKeyMap: Record<PlayerErrorCode, TranslationKey> = {
+            [PlayerErrorCode.MEDIA_ERR_ABORTED]: 'error.player.aborted',
+            [PlayerErrorCode.MEDIA_ERR_NETWORK]: 'error.player.network',
+            [PlayerErrorCode.MEDIA_ERR_DECODE]: 'error.player.decode',
+            [PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'error.player.notSupported',
+            [PlayerErrorCode.MEDIA_ERR_ENCRYPTED]: 'error.player.encrypted'
+        };
+        return new PlayerAppError(code, messageKeyMap[code], undefined, currentTime, lang);
+    },
+    cache: (code: CacheErrorCode, key?: string, size?: number, lang: string = 'fr') => {
+        return new CacheAppError(code, ERROR_MESSAGE_KEYS[code], key, size, lang);
+    },
+    config: (code: ConfigErrorCode, setting?: string, expectedType?: string, receivedType?: string, lang: string = 'fr') => {
+        return new ConfigAppError(code, ERROR_MESSAGE_KEYS[code], setting, expectedType, receivedType, lang);
+    }
+}; 
