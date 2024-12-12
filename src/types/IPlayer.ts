@@ -1,88 +1,61 @@
 import { ViewMode } from './ISettings';
+import { IEventMap } from './IEvents';
 import { VideoId } from './IBase';
+import { IPluginSettings } from './ISettings';
+import { DEFAULT_SETTINGS } from './ISettings';
+import { IVideoJsOptions } from 'video.js';
 
 export interface IPlayer {
-    initialize(): Promise<void>;
-    loadVideo(videoId: string, timestamp?: number): Promise<void>;
+    // Core
+    initialize(container: HTMLElement): Promise<void>;
     dispose(): Promise<void>;
-    getCurrentTime(): number;
-    getDuration(): number;
-    play(): void;
-    pause(): void;
-    setVolume(volume: number): void;
-    setPlaybackRate(rate: number): void;
-    seekTo(time: number): void;
+    
+    // Video
+    handleLoadVideo(options: Partial<IPlayerState>): Promise<void>;
+    
+    // Controls
+    play(): Promise<void>;
+    pause(): Promise<void>;
+    seekTo(time: number): Promise<void>;
+    
+    // State
+    getState(): IPlayerState;
+    
+    // Events
+    on<K extends keyof IEventMap>(event: K, callback: (data: IEventMap[K]) => void): void;
+    off<K extends keyof IEventMap>(event: K, callback: (data: IEventMap[K]) => void): void;
 }
 
 export interface IPlayerState {
-    // État de la vidéo en cours
-    videoId: string;
+    // Configuration de la vidéo
+    videoId: VideoId;
     timestamp: number;
     currentTime: number;
     duration: number;
     
-    // État des contrôles
+    // Contrôles de lecture
     volume: number;
     playbackRate: number;
     isMuted: boolean;
     isPlaying: boolean;
     isPaused: boolean;
+    autoplay: boolean;
+    loop: boolean;
+    controls: boolean;
     
-    // État de l'interface
+    // Options d'affichage
     mode: ViewMode;
     height: number;
     containerId: string;
     
-    // État des erreurs et chargement
+    // Options VideoJS
+    videoJsOptions?: Partial<IVideoJsOptions>;
+    fromUserClick?: boolean;
+    
+    // État d'erreur
     error: Error | null;
     isError: boolean;
     isLoading: boolean;
-}
-
-export interface IPlayerOptions {
-    // Configuration de la vidéo
-    videoId: VideoId;
-    timestamp?: number;
-    
-    // Options d'affichage
-    mode?: ViewMode;
-    height?: number;
-    containerId?: string;
-    
-    // Options de comportement
-    fromUserClick?: boolean;
-    autoplay?: boolean;
-    controls?: boolean;
-    loop?: boolean;
-    isMuted?: boolean;
-    volume?: number;
-    playbackRate?: number;
-    
-    // Options de langue
-    language?: string;
-    languages?: {
-        [key: string]: {
-            [key: string]: string;
-        };
-    };
-    
-    // Options techniques
-    techOrder?: string[];
-    youtube?: {
-        iv_load_policy: number;
-        modestbranding: number;
-        rel: number;
-        endscreen: number;
-        controls: number;
-        ytControls: number;
-        preload: string;
-        showinfo: number;
-        fs: number;
-        playsinline: number;
-        disablekb: number;
-        enablejsapi: number;
-        origin: string;
-    };
 }
 
 export interface IPlayerControls {
@@ -95,4 +68,27 @@ export interface IPlayerControls {
     playbackRate: (rate?: number) => number;
     language: (lang: string) => void;
     dispose: () => void;
+} 
+
+export function createInitialState(settings: IPluginSettings): IPlayerState {
+    return {
+        videoId: settings.lastVideoId || DEFAULT_SETTINGS.lastVideoId,
+        timestamp: settings.lastTimestamp || DEFAULT_SETTINGS.lastTimestamp,
+        currentTime: settings.lastTimestamp || DEFAULT_SETTINGS.lastTimestamp,
+        duration: 0,
+        volume: settings.volume || DEFAULT_SETTINGS.volume,
+        playbackRate: settings.playbackRate || DEFAULT_SETTINGS.playbackRate,
+        isMuted: settings.isMuted || DEFAULT_SETTINGS.isMuted,
+        isPlaying: settings.isPlaying || DEFAULT_SETTINGS.isPlaying,
+        isPaused: !settings.isPlaying,
+        mode: settings.currentMode || DEFAULT_SETTINGS.currentMode,
+        height: settings.viewHeight || DEFAULT_SETTINGS.viewHeight,
+        containerId: '',
+        error: null,
+        isError: false,
+        isLoading: false,
+        loop: false,
+        autoplay: false,
+        controls: true
+    };
 } 

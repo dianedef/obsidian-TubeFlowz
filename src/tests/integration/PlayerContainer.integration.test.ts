@@ -25,15 +25,15 @@ vi.mock('obsidian', () => ({
     }
 }));
 
-import PlayerService from '../../services/player/PlayerService';
+import PlayerService from '../../services/PlayerService';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PlayerView } from '../../views/PlayerView';
 import { PlayerUI } from '../../views/PlayerUI';
 import { SettingsService } from '../../services/settings/SettingsService';
-import { ViewModeService } from '../../services/viewMode/ViewModeService';
+import { ViewModeService } from '../../services/ViewModeService';
 import { VIEW_MODES } from '../../types/ISettings';
 import { MockPlugin, obsidianMock } from '../setup';
-import { eventBus } from '../../core/EventBus';
+import { eventBus } from '../../services/EventBus';
 import { IPlayerOptions } from '../../types/IPlayer';
 
 describe('PlayerView Integration Tests', () => {

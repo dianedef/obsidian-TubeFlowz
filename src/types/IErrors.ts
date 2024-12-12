@@ -1,4 +1,4 @@
-import { getErrorMessage, MessageKey } from '../i18n/messages';
+import { type TranslationKey, TranslationsService, ERROR_MESSAGE_KEYS } from '../services/TranslationsService';
 
 // Codes d'erreur génériques de l'application
 export enum AppErrorCode {
@@ -36,11 +36,11 @@ export abstract class AppBaseError extends Error implements IBaseError {
 
     constructor(
         readonly code: AppErrorCode | YouTubeErrorCode | PlayerErrorCode | CacheErrorCode | ConfigErrorCode,
-        messageKey: MessageKey,
+        messageKey: TranslationKey,
         details?: Record<string, unknown>,
-        lang: 'en' | 'fr' = 'en'
     ) {
-        super(getErrorMessage(messageKey, lang));
+        const translationService = TranslationsService.getInstance();
+        super(translationService.t(messageKey));
         this.timestamp = Date.now();
         this.details = details;
         Object.setPrototypeOf(this, new.target.prototype);
@@ -49,11 +49,11 @@ export abstract class AppBaseError extends Error implements IBaseError {
 
 // Interface et classe pour les erreurs YouTube
 export enum YouTubeErrorCode {
-    INVALID_PARAMETER = 2,
-    HTML5_ERROR = 5,
-    VIDEO_NOT_FOUND = 100,
-    VIDEO_NOT_EMBEDDABLE = 101,
-    VIDEO_REMOVED = 150
+    VIDEO_NOT_FOUND = 'VIDEO_NOT_FOUND',
+    VIDEO_NOT_EMBEDDABLE = 'VIDEO_NOT_EMBEDDABLE',
+    VIDEO_REMOVED = 'VIDEO_REMOVED',
+    INVALID_PARAMETER = 'INVALID_PARAMETER',
+    HTML5_ERROR = 'HTML5_ERROR'
 }
 
 export interface IYouTubeError extends IBaseError {
@@ -65,23 +65,22 @@ export interface IYouTubeError extends IBaseError {
 export class YouTubeAppError extends AppBaseError implements IYouTubeError {
     constructor(
         readonly code: YouTubeErrorCode,
-        messageKey: MessageKey,
+        messageKey: TranslationKey,
         public readonly videoId?: string,
         public readonly playerState?: number,
-        lang: 'en' | 'fr' = 'en'
     ) {
-        super(code, messageKey, { videoId, playerState }, lang);
+        super(code, messageKey, { videoId, playerState });
         this.name = 'YouTubeError';
     }
 }
 
 // Interface et classe pour les erreurs de lecture vidéo
 export enum PlayerErrorCode {
-    MEDIA_ERR_ABORTED = 1,
-    MEDIA_ERR_NETWORK = 2,
-    MEDIA_ERR_DECODE = 3,
-    MEDIA_ERR_SRC_NOT_SUPPORTED = 4,
-    MEDIA_ERR_ENCRYPTED = 5
+    MEDIA_ERR_ABORTED = 'MEDIA_ERR_ABORTED',
+    MEDIA_ERR_NETWORK = 'MEDIA_ERR_NETWORK',
+    MEDIA_ERR_DECODE = 'MEDIA_ERR_DECODE',
+    MEDIA_ERR_SRC_NOT_SUPPORTED = 'MEDIA_ERR_SRC_NOT_SUPPORTED',
+    MEDIA_ERR_ENCRYPTED = 'MEDIA_ERR_ENCRYPTED'
 }
 
 export interface IPlayerError extends IBaseError {
@@ -93,12 +92,11 @@ export interface IPlayerError extends IBaseError {
 export class PlayerAppError extends AppBaseError implements IPlayerError {
     constructor(
         readonly code: PlayerErrorCode,
-        messageKey: MessageKey,
+        messageKey: TranslationKey,
         public readonly mediaError?: MediaError,
         public readonly currentTime?: number,
-        lang: 'en' | 'fr' = 'en'
     ) {
-        super(code, messageKey, { mediaError, currentTime }, lang);
+        super(code, messageKey, { mediaError, currentTime });
         this.name = 'PlayerError';
     }
 }
@@ -121,12 +119,11 @@ export interface ICacheError extends IBaseError {
 export class CacheAppError extends AppBaseError implements ICacheError {
     constructor(
         readonly code: CacheErrorCode,
-        messageKey: MessageKey,
+        messageKey: TranslationKey,
         public readonly key?: string,
         public readonly size?: number,
-        lang: 'en' | 'fr' = 'en'
     ) {
-        super(code, messageKey, { key, size }, lang);
+        super(code, messageKey, { key, size });
         this.name = 'CacheError';
     }
 }
@@ -151,13 +148,12 @@ export interface IConfigError extends IBaseError {
 export class ConfigAppError extends AppBaseError implements IConfigError {
     constructor(
         readonly code: ConfigErrorCode,
-        messageKey: MessageKey,
+        messageKey: TranslationKey,
         public readonly setting?: string,
         public readonly expectedType?: string,
         public readonly receivedType?: string,
-        lang: 'en' | 'fr' = 'en'
     ) {
-        super(code, messageKey, { setting, expectedType, receivedType }, lang);
+        super(code, messageKey, { setting, expectedType, receivedType });
         this.name = 'ConfigError';
     }
 }
@@ -197,4 +193,6 @@ export class CommandError extends Error {
         super(message);
         this.name = 'CommandError';
     }
-} 
+}
+
+export type MessageKey = keyof typeof ERROR_MESSAGE_KEYS; 

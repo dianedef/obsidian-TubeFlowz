@@ -1,19 +1,17 @@
 import { ViewMode } from './ISettings';
-import { IPlayerState, IPlayerOptions } from './IPlayer';
-
+import { IPlayerState } from './IPlayer';
+import { IVideoJsPlayer } from 'video.js';
 export interface IPlayerUI {
-    render(container: HTMLElement): void;
+    initializePlayer(
+        container: HTMLElement
+    ): Promise<IVideoJsPlayer | HTMLElement>;
     update(state: IPlayerState): void;
-    show(): void;
-    hide(): void;
     destroy(): void;
     /**
      * Nettoie les ressources de l'interface utilisateur
      */
     dispose(): void;
 }
-
-
 
 export interface IPlayerControls {
     createControlsContainer(): HTMLElement;
@@ -26,6 +24,5 @@ export interface IPlayerView {
     getDisplayText(): string;
     getMode(): ViewMode;
     setMode(mode: ViewMode): void;
-    displayVideo(options: IPlayerOptions): Promise<void>;
     closePreviousVideos(): Promise<void>;
 } 

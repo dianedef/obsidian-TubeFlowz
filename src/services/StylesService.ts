@@ -1,5 +1,3 @@
-import { App } from 'obsidian';
-
 export function registerStyles() {
     const styleEl = document.createElement('style');
     styleEl.id = 'youtube-player-styles';

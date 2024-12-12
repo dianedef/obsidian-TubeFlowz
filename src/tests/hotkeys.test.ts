@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
-import { Hotkeys } from '../services/hotkeys/HotkeysService';
+import { Hotkeys } from '../services/HotkeysService';
 import { CommandError, CommandErrorCode } from '../types/IErrors';
 
 // Mock Obsidian

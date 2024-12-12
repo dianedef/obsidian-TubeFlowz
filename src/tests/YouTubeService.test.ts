@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { YouTubeService } from '../services/youtube/YouTubeService';
-import { eventBus } from '../core/EventBus';
+import { YouTubeService } from '../services/YouTubeService';
+import { eventBus } from '../services/EventBus';
 import { createVolume, createPlaybackRate } from '../types/ISettings';
 import { videojsMock, obsidianMock } from './setup';
 import type { VideoJsPlayer, MethodCall } from './setup';

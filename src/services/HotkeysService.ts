@@ -1,9 +1,9 @@
 import { Plugin, Notice } from 'obsidian';
-import { SettingsService } from '../settings/SettingsService';
-import { TranslationsService } from '../translations/TranslationsService';
-import { PlayerUI } from '../../views/PlayerUI';
-import { CommandError, CommandErrorCode } from '../../types/IErrors';
-import { PlaybackRate } from '../../types';
+import { SettingsService } from './SettingsService';
+import { TranslationsService } from './TranslationsService';
+import { PlayerUI } from '../views/PlayerUI';
+import { CommandError, CommandErrorCode } from '../types/IErrors';
+import { PlaybackRate } from '../types';
 
 export class Hotkeys {
    constructor(

@@ -1,6 +1,6 @@
-import { PluginSettings } from './ISettings';
+import { IPluginSettings } from './ISettings';
 
 export interface ISettingsService {
-    getSettings(): Readonly<PluginSettings>;
+    getSettings(): Readonly<IPluginSettings>;
     save(): Promise<void>;
 } 

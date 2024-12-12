@@ -80,8 +80,7 @@ export interface IPluginSettings {
 // Valeurs par défaut
 export const DEFAULT_SETTINGS: IPluginSettings = {
     language: 'en',
-    lastVideoId: 'EIHAt93_Vs4' as VideoId,
-    lastValidVideoId: 'jNQXAC9IVRw' as VideoId,
+    lastVideoId: 'jNQXAC9IVRw' as VideoId,
     lastTimestamp: 0 as Timestamp,
     isVideoOpen: false,
     currentMode: VIEW_MODES.Tab,

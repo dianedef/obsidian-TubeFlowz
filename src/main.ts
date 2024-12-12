@@ -1,18 +1,18 @@
 import { App, Plugin, Menu, WorkspaceLeaf } from 'obsidian';
-import { SettingsService } from './services/settings/SettingsService';
-import { SettingsTab } from './services/settings/SettingsTab';
+import { SettingsService } from './services/SettingsService';
+import { SettingsTab } from './services/SettingsTab';
 import { PlayerView } from './views/PlayerView';
-import PlayerService from './services/player/PlayerService';
+import PlayerService from './services/PlayerService';
 import { PlayerUI } from './views/PlayerUI';
-import { ViewModeService } from './services/viewMode/ViewModeService';
+import { ViewModeService } from './services/ViewModeService';
 import { VIEW_MODES } from './types/ISettings';
-import { Hotkeys } from './services/hotkeys/HotkeysService';
-import { TranslationsService } from './services/translations/TranslationsService';
-import { ViewPlugin, DecorationSet, ViewUpdate } from '@codemirror/view';
-import { registerStyles, unregisterStyles } from './services/styles/StylesService';
-import createDecorations from './services/decorations/DecorationService';
 import { ViewMode } from './types/ISettings';
-import { EventBus } from './core/EventBus';
+import { Hotkeys } from './services/HotkeysService';
+import { TranslationsService } from './services/TranslationsService';
+import { ViewPlugin, DecorationSet, ViewUpdate } from '@codemirror/view';
+import { registerStyles, unregisterStyles } from './services/StylesService';
+import createDecorations from './services/DecorationService';
+import { EventBus } from './services/EventBus';
 
 interface ObsidianMenu extends Menu {
    dom: HTMLElement;
@@ -21,6 +21,7 @@ interface ObsidianMenu extends Menu {
 interface DecorationState {
    decorations: DecorationSet;
    settings: SettingsService;
+   viewModeService: ViewModeService;
 }
 
 export default class TubeFlows extends Plugin {
@@ -28,6 +29,7 @@ export default class TubeFlows extends Plugin {
    private viewModeService!: ViewModeService;
    private hotkeys!: Hotkeys;
    private playerService!: PlayerService;
+   private playerUI!: PlayerUI;
    private eventBus: EventBus = EventBus.getInstance();
    private translationsService!: TranslationsService;
 
@@ -36,168 +38,144 @@ export default class TubeFlows extends Plugin {
    }
 
    async onload() {
-      console.log("Chargement du plugin YouTubeFlow");
+      try {
+         console.log("Chargement du plugin YouTubeFlow");
 
-      // Initialisation des services dans le bon ordre
-      this.settings = new SettingsService(this);
-      await this.settings.initialize();
+// Initialisation des services de base
+         this.settings = new SettingsService(this);
+         await this.settings.initialize();
 
-      // Initialiser les services
-      this.playerService = PlayerService.getInstance(this.settings.getSettings());
-      const videoPlayer = PlayerUI.getInstance(this.settings, this.playerService);
-      this.viewModeService = new ViewModeService(
-         this, 
-         this.playerService,
-         VIEW_MODES.Tab
-      );
+         this.translationsService = TranslationsService.getInstance();
 
-      // Les services sont initialisés, maintenant on peut configurer les commandes
-      this.addCommand({
-         id: 'open-youtube-video',
-         name: 'Ouvrir une vidéo YouTube',
-         callback: () => {
-            this.viewModeService.createView(VIEW_MODES.Tab);
-         }
-      });
+// Initialiser PlayerService sans container
+         this.playerService = PlayerService.getInstance(this.settings.getSettings());
+// Créer l'instance de PlayerUI
+         this.playerUI = PlayerUI.getInstance(this.settings);
 
-      // Initialiser le service de traduction
-      this.translationsService = new TranslationsService();
-      
-      // Initialiser les raccourcis avec le service approprié
-      this.hotkeys = new Hotkeys(
-         this,
-         this.settings,
-         videoPlayer,
-         this.translationsService
-      );
-      
-      // registerHotkeys
-      this.hotkeys.registerHotkeys();
-      // registerView
-      this.registerView(
-         'youtube-player',
-         (leaf: WorkspaceLeaf) => new PlayerView(
-            leaf,
+// Initialiser ViewModeService avec PlayerService
+         this.viewModeService = new ViewModeService(
+            this,
             this.playerService,
-            videoPlayer,
             this.settings,
-            this.viewModeService
-         )
-      );
-
-      this.app.workspace.onLayoutReady(() => {
-         this.eventBus.emit('plugin:layout-ready');
-         this.registerEvent(
-            this.app.workspace.on('layout-change', () => {
-               const hasYouTubeView = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
-               if (!hasYouTubeView && this.settings.isVideoOpen) {
-                  this.settings.isVideoOpen = false;
-                  this.settings.save();
-               }
-            })
+            VIEW_MODES.Tab
          );
-      });
 
-      // Ajouter un seul bouton dans la sidebar qui ouvre un menu au survol
-      const ribbonIcon = this.addRibbonIcon('video', 'YouTube Flow', () => {
-         // Le click ne fait rien, tout est géré au survol
-      });
-
-      // Gestion du menu au survol
-      ribbonIcon.addEventListener('mouseenter', () => {
-         const menu = new Menu();
-         
-         const createMenuItem = (title: string, icon: string, mode: ViewMode) => {
-            menu.addItem((item) => {
-               item.setTitle(title)
-                  .setIcon(icon)
-                  .onClick(async () => {
-                     await this.viewModeService.closeView();
-                     await this.viewModeService.createView(mode);
-                  });
-            });
-         };
-
-         createMenuItem("YouTube Tab", "tab", "tab");
-         createMenuItem("YouTube Sidebar", "layout-sidebar-right", "sidebar");
-         createMenuItem("YouTube Overlay", "layout-top", "overlay");
-
-         const iconRect = ribbonIcon.getBoundingClientRect();
-         menu.showAtPosition({ 
-            x: iconRect.left, 
-            y: iconRect.top - 10
+// Gérer les erreurs de chargement de vidéo à un seul endroit
+         this.eventBus.on('video:error', (error) => {
+            console.error("Erreur lors du chargement de la vidéo:", error);
          });
 
-         // Gérer la fermeture du menu
-         const handleMouseLeave = (e: MouseEvent) => {
-            const target = e.relatedTarget as Node;
-            const isOverIcon = ribbonIcon.contains(target);
-            const menuDom = (menu as ObsidianMenu).dom;
-            const isOverMenu = menuDom && menuDom.contains(target);
-            
-            if (!isOverIcon && !isOverMenu) {
-               menu.hide();
-               ribbonIcon.removeEventListener('mouseleave', handleMouseLeave);
-               if (menuDom) {
-                  menuDom.removeEventListener('mouseleave', handleMouseLeave);
-               }
-            }
-         };
-
-         ribbonIcon.addEventListener('mouseleave', handleMouseLeave);
-         const menuDom = (menu as ObsidianMenu).dom;
-         if (menuDom) {
-            menuDom.addEventListener('mouseleave', handleMouseLeave);
-         }
-      });
-
-      // SettingsTab
-      this.addSettingTab(new SettingsTab(this.app, this, this.settings, this.playerService));
-
-      // Créer la "décoration" des liens YouTube dans les fichiers Markdown
-      this.registerEditorExtension([
-         ViewPlugin.define<DecorationState>(view => ({
-            decorations: createDecorations(view, this.settings),
-            settings: this.settings,
-            update(update: ViewUpdate) {
-               if (update.docChanged || update.viewportChanged) {
-                  this.decorations = createDecorations(update.view, this.settings);
-               }
-            }
-         }), {
-            decorations: v => v.decorations
-         })
-      ]);
+// Initialiser les raccourcis avec le service approprié
+         this.hotkeys = new Hotkeys(
+            this,
+            this.settings,
+            this.playerUI,
+            this.translationsService
+         );
       
-      // registerStyles
-      registerStyles();
+// registerHotkeys
+         this.hotkeys.registerHotkeys();
+// registerView
+         this.registerView(
+            'youtube-player',
+            (leaf: WorkspaceLeaf) => new PlayerView(
+               leaf,
+               this.playerService,
+               this.playerUI,
+            )
+         );
 
-      // addCommands
-      this.addCommand({
-         id: 'open-youtube-sidebar',
-         name: 'Ouvrir le lien YouTube en barre latérale',
-         callback: async () => {
-            await this.viewModeService.createView(VIEW_MODES.Sidebar);
-         }
-      });
+         this.app.workspace.onLayoutReady(() => {
+            this.eventBus.emit('plugin:layout-ready');
+            this.registerEvent(
+               this.app.workspace.on('layout-change', () => {
+                  const hasYouTubeView = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
+                  if (!hasYouTubeView && this.settings.isVideoOpen) {
+                     this.settings.isVideoOpen = false;
+                     this.settings.save();
+                  }
+               })
+            );
+         });
 
-      this.addCommand({
-         id: 'open-youtube-tab',
-         name: 'Ouvrir le lien YouTube en onglet',
-         callback: async () => {
-            await this.viewModeService.createView(VIEW_MODES.Tab);
-         }
-      });
+// Ajouter un seul bouton dans la sidebar qui ouvre un menu au survol
+         const ribbonIcon = this.addRibbonIcon('video', 'YouTube Flow', () => {
+            // Le click ne fait rien, tout est géré au survol
+         });
 
-      this.addCommand({
-         id: 'open-youtube-overlay',
-         name: 'Ouvrir le lien YouTube en superposition',
-         callback: async () => {
-            await this.viewModeService.createView(VIEW_MODES.Overlay);
-         }
-      });
+// Gestion du menu au survol
+         ribbonIcon.addEventListener('mouseenter', () => {
+            const menu = new Menu();
+            
+            const createMenuItem = (title: string, icon: string, mode: ViewMode) => {
+               menu.addItem((item) => {
+                  item.setTitle(title)
+                     .setIcon(icon)
+                     .onClick(async () => {
+                        await this.viewModeService.createView(mode);
+                     });
+               });
+            };
 
-      this.eventBus.emit('plugin:loaded');
+            createMenuItem("YouTube Tab", "tab", "tab");
+            createMenuItem("YouTube Sidebar", "layout-sidebar-right", "sidebar");
+            createMenuItem("YouTube Overlay", "layout-top", "overlay");
+
+            const iconRect = ribbonIcon.getBoundingClientRect();
+            menu.showAtPosition({ 
+               x: iconRect.left, 
+               y: iconRect.top - 10
+            });
+
+            // Gérer la fermeture du menu
+            const handleMouseLeave = (e: MouseEvent) => {
+               const target = e.relatedTarget as Node;
+               const isOverIcon = ribbonIcon.contains(target);
+               const menuDom = (menu as ObsidianMenu).dom;
+               const isOverMenu = menuDom && menuDom.contains(target);
+               
+               if (!isOverIcon && !isOverMenu) {
+                  menu.hide();
+                  ribbonIcon.removeEventListener('mouseleave', handleMouseLeave);
+                  if (menuDom) {
+                     menuDom.removeEventListener('mouseleave', handleMouseLeave);
+                  }
+               }
+            };
+
+            ribbonIcon.addEventListener('mouseleave', handleMouseLeave);
+            const menuDom = (menu as ObsidianMenu).dom;
+            if (menuDom) {
+               menuDom.addEventListener('mouseleave', handleMouseLeave);
+            }
+         });
+
+// SettingsTab
+         this.addSettingTab(new SettingsTab(this.app, this, this.settings, this.playerService));
+
+// Créer la "décoration" des liens YouTube dans les fichiers Markdown
+         this.registerEditorExtension([
+            ViewPlugin.define<DecorationState>(view => ({
+               decorations: createDecorations(view),
+               settings: this.settings,
+               viewModeService: this.viewModeService,
+               update(update: ViewUpdate) {
+                  if (update.docChanged || update.viewportChanged) {
+                     this.decorations = createDecorations(update.view);
+                  }
+               }
+            }), {
+               decorations: v => v.decorations
+            })
+         ]);
+         
+// registerStyles
+         registerStyles();
+
+         this.eventBus.emit('plugin:loaded');
+      } catch (error) {
+         console.error("Erreur lors du chargement du plugin:", error);
+      }
    }
 
    async onunload() {

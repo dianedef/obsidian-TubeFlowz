@@ -1,11 +1,12 @@
 import { EditorView } from '@codemirror/view';
 import { Decoration, WidgetType } from '@codemirror/view';
-import { VIEW_MODES } from '../../types/ISettings';
-import { extractVideoId, cleanVideoId, type CleanVideoId } from '../../utils';
-import { SettingsService } from '../settings/SettingsService';
-import PlayerService from '../player/PlayerService';
+import { extractVideoId, cleanVideoId, type CleanVideoId } from '../utils';
+import { toVideoId } from '../utils/utils';
+import { eventBus } from './EventBus';
 
-export default function createDecorations(view: EditorView, settings: SettingsService) {
+export default function createDecorations(
+   view: EditorView, 
+) {
    const decorations = [];
    const doc = view.state.doc;
    
@@ -34,7 +35,9 @@ export default function createDecorations(view: EditorView, settings: SettingsSe
             }).range(startPos, endPos));
             
             decorations.push(Decoration.widget({
-               widget: new DecorationForUrl(cleanedId, settings),
+               widget: new DecorationForUrl(
+                  cleanedId, 
+               ),
                side: 1
             }).range(endPos));
          }
@@ -48,13 +51,12 @@ export default function createDecorations(view: EditorView, settings: SettingsSe
 
 export class DecorationForUrl extends WidgetType {
    private videoId: CleanVideoId;
-   private timestamp: number = 0;
-   private settings: SettingsService;
 
-   constructor(videoId: CleanVideoId, settings: SettingsService) {
+   constructor(
+      videoId: CleanVideoId, 
+   ) {
       super();
       this.videoId = videoId;
-      this.settings = settings;
    }
       
    toDOM(): HTMLElement {
@@ -75,37 +77,13 @@ export class DecorationForUrl extends WidgetType {
          display: inline-block;
       `;
       
-      sparkle.addEventListener('click', async (e: MouseEvent) => {
-         e.preventDefault();
-         e.stopPropagation();
-         const playerService = PlayerService.getInstance(this.settings.getPlugin().app, this.settings.getSettings());
-         if (!playerService) {
-            console.error("PlayerService non disponible");
-            return;
-         }
-
+      
+      sparkle.addEventListener('click', () => {
          try {
-            await playerService.loadVideo({
-               videoId: this.videoId,
-               mode: this.settings.currentMode || VIEW_MODES.Sidebar,
-               timestamp: this.timestamp,
-               currentTime: this.timestamp,
-               volume: 1,
-               playbackRate: 1,
-               isMuted: false,
-               isPlaying: false,
-               error: null,
-               isPaused: true,
-               isStopped: false,
-               isLoading: false,
-               isError: false,
-               containerId: '',
-               height: 0,
-               controls: true,
-               loop: false
-            });
+            eventBus.emit('video:load', toVideoId(this.videoId));
          } catch (error) {
-            console.error("Erreur lors du chargement de la vidéo:", error);
+            console.error("Erreur lors du chargement de la vidéo:", 
+            error);
          }
       });
       

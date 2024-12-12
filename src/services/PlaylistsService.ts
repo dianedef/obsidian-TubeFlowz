@@ -1,8 +1,8 @@
 import { App } from 'obsidian';
-import { createError } from '../../core/errors/ErrorClasses';
-import { ConfigErrorCode, CacheErrorCode } from '../../types/IErrors';
-import { eventBus } from '../../core/EventBus';
-import { cleanVideoId, type CleanVideoId } from '../../utils';
+import { createError } from '../utils/ErrorClasses';
+import { ConfigErrorCode, CacheErrorCode } from '../types/IErrors';
+import { eventBus } from './EventBus';
+import { cleanVideoId, type CleanVideoId } from '../utils';
 
 interface PlaylistItem {
     videoId: CleanVideoId;

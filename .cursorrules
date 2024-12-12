@@ -1,3 +1,61 @@
+vue existe
+   > clic menu
+      > closeView
+      > createView(mode)
+   > clic décorateur
+      > emit video:load, this.videoId
+vue nexiste pas
+   > clic menu
+      > createView(mode)
+   > clic décorateur
+      > emit video:load, this.videoId
+
+
+
+createView(mode)
+   > vue existe
+      > emit video:load, ''
+   > vue nexiste pas
+      > emit view:ready
+
+
+PlayerUI
+      > emit player:init
+
+     this.viewId = `youtube-player-${Math.random().toString(36).slice(2, 11)}`;
+
+Oui, il existe plusieurs outils pour visualiser les flux de données dans le code :
+
+1. **VSCode Extensions** :
+   - "Code Map" : Crée des diagrammes de flux de données
+   - "Dependency Cruiser" : Visualise les dépendances entre fichiers
+   - "CodeFlow" : Montre le flux d'exécution du code
+
+2. **Outils de Visualisation** :
+   - **Mermaid.js** : Permet de créer des diagrammes de flux directement dans le markdown
+   - **PlantUML** : Similaire à Mermaid, plus complet mais plus complexe
+
+3. **Outils d'Analyse Statique** :
+   - **Madge** : Génère des graphes de dépendances
+   - **TypeScript Dependency Graph** : Spécifique à TypeScript
+
+Par exemple, avec Mermaid.js, on pourrait visualiser le flux de notre videoId comme ça :
+
+```mermaid
+graph LR
+    A[URL YouTube] --> B[extractVideoId]
+    B --> C[cleanVideoId]
+    C --> D[DecorationForUrl constructor]
+    D --> E[this.videoId]
+    E --> F[toVideoId]
+    F --> G[playerService.loadVideo]
+```
+
+Voulez-vous que je vous montre comment mettre en place un de ces outils pour notre projet ?
+
+
+
+
 PlayerView : La vue Obsidian elle-même
 ViewModeService : Gère la création/fermeture des vues et leur mode
 PlayerUI : Gère l'interface utilisateur du lecteur

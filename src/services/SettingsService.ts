@@ -1,6 +1,7 @@
 import { Plugin } from 'obsidian';
-import { IPluginSettings, DEFAULT_SETTINGS, ViewMode, PlaybackMode, PlaybackRate, Volume, createVolume, createPlaybackRate } from '../../types/ISettings';
-import { VideoId,createVideoId, Timestamp } from '../../types/IBase';
+import { IPluginSettings, DEFAULT_SETTINGS, ViewMode, PlaybackMode, PlaybackRate, Volume, createVolume, createPlaybackRate } from '../types/ISettings';
+import { VideoId,createVideoId, Timestamp } from '../types/IBase';
+import { eventBus } from '../services/EventBus';
 
 export class SettingsService {
     private plugin: Plugin;
@@ -9,6 +10,10 @@ export class SettingsService {
     constructor(plugin: Plugin) {
         this.plugin = plugin;
         this.settings = Object.assign({}, DEFAULT_SETTINGS);
+        eventBus.on('view:resize', (height: number) => {
+            this.settings.viewHeight = height;
+            this.save();
+        });
     }
 
     public async initialize(): Promise<void> {

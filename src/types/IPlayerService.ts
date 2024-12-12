@@ -1,24 +1,13 @@
-import { IPlayerState, IPlayerOptions } from './IPlayer';
+import { IPlayerState } from './IPlayer';
 
 export interface IPlayerService {
+   isInitialized: boolean;
    // Gestion du cycle de vie
    initialize(container: HTMLElement): Promise<void>;
    dispose(): Promise<void>;
    
-   // Contrôles du player
-   play(): Promise<void>;
-   pause(): Promise<void>;
-   seekTo(time: number): Promise<void>;
-   setVolume(volume: number): Promise<void>;
-   setPlaybackRate(rate: number): Promise<void>;
-   getCurrentTime(): Promise<number>;
+   getCurrentTime(): number;
+   getCurrentVideoId(): string;
    
-   // Gestion de l'état
-   getState(): IPlayerState;
-   setState(state: Partial<IPlayerState>): Promise<void>;
-   loadVideo(options: IPlayerOptions): Promise<void>;
-   
-   // Événements
-   on(event: string, callback: (state: IPlayerState) => void): void;
-   off(event: string, callback: (state: IPlayerState) => void): void;
+   handleLoadVideo(options: Partial<IPlayerState>): Promise<void>;
 } 

@@ -1,10 +1,9 @@
-import { eventBus } from '../../core/EventBus';
-import { YouTubeErrorCode, PlayerErrorCode, YouTubeAppError, PlayerAppError } from '../../types/IErrors';
-import { MessageKey } from '../../i18n/messages';
-import { IPlayer } from '../../types/IPlayer';
+import { eventBus } from './EventBus';
+import { YouTubeErrorCode, PlayerErrorCode, YouTubeAppError, PlayerAppError, MessageKey } from '../types/IErrors';
+import { IPlayer } from '../types/IPlayer';
 import videojs from 'video.js';
 import 'videojs-youtube';
-import { PlaybackRate } from '../../types/IBase';
+import { PlaybackRate } from '../types/IBase';
 
 export interface IYouTubeOptions {
     iv_load_policy: number;
@@ -105,7 +104,6 @@ export class YouTubeService implements IPlayer {
             messageKey,
             videoId,
             undefined,
-            this.currentLang
         );
     }
 
@@ -129,7 +127,6 @@ export class YouTubeService implements IPlayer {
                 'MEDIA_ERR_ABORTED',
                 undefined,
                 undefined,
-                this.currentLang
             );
         }
 
@@ -160,7 +157,6 @@ export class YouTubeService implements IPlayer {
                 'MEDIA_ERR_ABORTED',
                 undefined,
                 undefined,
-                this.currentLang
             );
         }
     }
@@ -188,14 +184,6 @@ export class YouTubeService implements IPlayer {
             this.handleQualityChange(height);
         });
 
-        this.player.on('play', () => {
-            eventBus.emit('video:play');
-        });
-
-        this.player.on('pause', () => {
-            eventBus.emit('video:pause');
-        });
-
         this.player.on('timeupdate', () => {
             eventBus.emit('video:timeUpdate', this.getCurrentTime());
         });
@@ -212,40 +200,6 @@ export class YouTubeService implements IPlayer {
                 }
             }
         });
-    }
-
-    public async loadVideo(videoId: string, timestamp?: number): Promise<void> {
-        if (!this.player) {
-            throw new PlayerAppError(
-                PlayerErrorCode.MEDIA_ERR_ABORTED,
-                'MEDIA_ERR_ABORTED',
-                undefined,
-                undefined,
-                this.currentLang
-            );
-        }
-
-        try {
-            await this.player.src({
-                type: 'video/youtube',
-                src: videoId
-            });
-
-            if (timestamp) {
-                this.player.currentTime(timestamp);
-            }
-
-            eventBus.emit('video:load', videoId);
-        } catch (error) {
-            console.error('[YouTubeService] Load video error:', error);
-            throw new PlayerAppError(
-                PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED,
-                'MEDIA_ERR_SRC_NOT_SUPPORTED',
-                undefined,
-                undefined,
-                this.currentLang
-            );
-        }
     }
 
     public destroy(): void {

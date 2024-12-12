@@ -1,6 +1,7 @@
 import { ViewMode, VIEW_MODES } from '../types/ISettings';
-import { PluginSettings, DEFAULT_SETTINGS, Volume, PlaybackRate } from '../types/ISettings';
+import { IPluginSettings, DEFAULT_SETTINGS, Volume, PlaybackRate } from '../types/ISettings';
 import { Plugin } from 'obsidian';
+import { VideoId } from '../types/IBase';
 
 export type CleanVideoId = string & { _brand: 'CleanVideoId' };
 
@@ -42,7 +43,7 @@ export function extractVideoId(url: string): string | null {
  * @param plugin Le plugin Obsidian
  */
 export async function saveHeight(height: number, mode: ViewMode, plugin: Plugin): Promise<void> {
-    const settings = await plugin.loadData() as PluginSettings;
+    const settings = await plugin.loadData() as IPluginSettings;
     if (mode === VIEW_MODES.Overlay) {
         settings.overlayHeight = height;
     } else {
@@ -57,7 +58,7 @@ export async function saveHeight(height: number, mode: ViewMode, plugin: Plugin)
  * @param settings Les paramètres du plugin
  * @returns La hauteur en pourcentage
  */
-export function getHeight(mode: ViewMode, settings: PluginSettings): number {
+export function getHeight(mode: ViewMode, settings: IPluginSettings): number {
     // Utiliser les valeurs par défaut si non définies
     const defaultHeight = mode === VIEW_MODES.Overlay 
         ? DEFAULT_SETTINGS.overlayHeight 
@@ -92,3 +93,11 @@ export function createPlaybackRate(value: number): PlaybackRate {
     return validValue as PlaybackRate;
 }
 
+export const toVideoId = (cleanId: CleanVideoId): VideoId => cleanId as unknown as VideoId; 
+
+export const formatTimestamp = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}

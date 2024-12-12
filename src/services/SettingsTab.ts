@@ -1,7 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting, DropdownComponent } from 'obsidian';
 import { SettingsService } from './SettingsService';
-import { PlaybackMode } from '../../types/ISettings';
-import { PlayerService } from '/player/PlayerService';
+import { PlaybackMode } from '../types/ISettings';
+import PlayerService from './PlayerService';
 
 export class SettingsTab extends PluginSettingTab {
    private Settings: SettingsService;
@@ -70,10 +70,6 @@ export class SettingsTab extends PluginSettingTab {
             .onChange(async (value) => {
                this.Settings.showYoutubeRecommendations = value;
                await this.Settings.save();
-               
-               if (this.playerService.getCurrentPlayer()) {
-                  this.playerService.loadVideo(this.playerService.getCurrentVideoId());
-               }
             }));
    }
 } 

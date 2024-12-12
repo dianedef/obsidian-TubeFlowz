@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { YouTubeService } from '../../services/youtube/YouTubeService';
-import { eventBus } from '../../core/EventBus';
+import { YouTubeService } from '../../services/YouTubeService';
+import { eventBus } from '../../services/EventBus';
 import { Volume, PlaybackRate, createVolume, createPlaybackRate } from '../../types/ISettings';
 import { videojsMock, obsidianMock } from '../setup';
 import type { VideoJsPlayer, MethodCall } from '../setup';
@@ -44,10 +44,9 @@ describe('EventBus Integration Tests', () => {
         };
         
         eventBus.on('video:load', handler);
-        await service.loadVideo(videoId);
+        await service.handleLoadVideo(videoId);
         
         expect(receivedVideoId).toBe(videoId);
-        eventBus.off('video:load', handler);
     });
 
     it('should propagate playback rate changes', async () => {
@@ -63,7 +62,6 @@ describe('EventBus Integration Tests', () => {
         service.setPlaybackRate(createPlaybackRate(rawRate));
 
         expect(receivedRate).toBe(rawRate);
-        eventBus.off('video:rateChange', handler);
     });
 
     it('should handle multiple event subscriptions', async () => {
