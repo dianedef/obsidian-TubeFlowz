@@ -6,13 +6,19 @@ import { eventBus } from '../services/EventBus';
 export class SettingsService {
     private plugin: Plugin;
     private settings: IPluginSettings;
+    private resizeTimeout: NodeJS.Timeout | null = null;
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
         this.settings = Object.assign({}, DEFAULT_SETTINGS);
         eventBus.on('view:resize', (height: number) => {
-            this.settings.viewHeight = height;
-            this.save();
+            if (this.resizeTimeout) {
+                clearTimeout(this.resizeTimeout);
+            }
+            this.resizeTimeout = setTimeout(() => {
+                this.settings.viewHeight = height;
+                this.save();
+            }, 250); // Debounce de 250ms
         });
     }
 

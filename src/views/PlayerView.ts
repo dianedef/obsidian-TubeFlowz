@@ -62,12 +62,13 @@ export class PlayerView extends ItemView {
         try {
             console.log('[PlayerView dans onOpen] Début onOpen');
             
-            const cleanup = eventBus.on('view:ready', () => {
-                this.playerUI.initializePlayer(this.containerEl);
-                cleanup();
-            });
+            // Vérifier si le player est déjà initialisé
+            if (this.playerUI.Player) {
+                console.log('[PlayerView dans onOpen] Player déjà initialisé, on ignore');
+                return;
+            }
             
-            // Initialiser le player directement
+            // Initialiser le player une seule fois
             console.log('[PlayerView dans onOpen] Initialisation du player UI');
             await this.playerUI.initializePlayer(this.containerEl);
             

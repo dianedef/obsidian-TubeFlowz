@@ -182,134 +182,76 @@ export default class PlayerService implements IPlayerService {
         });
     }
 
-    private async initializePlayer(container: HTMLElement, videoId: string): Promise<void> {
-        try {
-            if (!container) {
-                throw new PlayerAppError(
-                    PlayerErrorCode.MEDIA_ERR_ABORTED,
-                    ERROR_MESSAGE_KEYS.CONTAINER_NOT_INITIALIZED
-                );
-            }
-
-            // Créer l'élément vidéo
-            const video = document.createElement('video');
-            video.className = 'video-js vjs-default-skin';
-            container.appendChild(video);
-
-            // Configuration du player
-            const options: IVideoJsOptions = {
-                techOrder: ['youtube'],
-                sources: [{
-                    type: 'video/youtube',
-                    src: `https://www.youtube.com/watch?v=${videoId}`
-                }],
-                youtube: this.youtubeService.getYouTubeOptions(this.settings.showYoutubeRecommendations),
-                controls: true,
-                fluid: true,
-                language: this.settings.language
-            };
-
-            try {
-                // Tentative d'initialisation du player principal
-                this.player = videojs(video, options);
-                
-                await new Promise<void>((resolve, reject) => {
-                    this.player.ready(() => {
-                        this.setupPlayerEvents();
-                        resolve();
-                    });
-
-                    // Timeout de sécurité
-                    setTimeout(() => {
-                        reject(new Error('Player initialization timeout'));
-                    }, 10000);
-                });
-
-            } catch (error) {
-                console.error('[PlayerService] Erreur d\'initialisation du player principal:', error);
-                // Création du fallback player
-                this.createFallbackPlayer(container, videoId);
-            }
-
-            eventBus.emit('player:init');
-        } catch (error) {
-            console.error('[PlayerService] Erreur fatale lors de l\'initialisation:', error);
-            throw error;
-        }
-    }
-
-    private createFallbackPlayer(container: HTMLElement, videoId: string): void {
-        console.log('[PlayerService] Utilisation du lecteur de secours pour:', videoId);
-        
-        // Nettoyer le container
-        container.innerHTML = '';
-        
-        // Créer le fallback player
-        const fallbackContainer = document.createElement('div');
-        fallbackContainer.className = 'fallback-player-container';
-        
-        const iframe = document.createElement('iframe');
-        iframe.src = `https://www.youtube.com/embed/${videoId}`;
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
-        
-        fallbackContainer.appendChild(iframe);
-        container.appendChild(fallbackContainer);
-        
-        // Mettre à jour l'état
-        this.currentState = {
-            ...this.currentState,
-            videoId,
-            isError: false,
-            isLoading: false
-        };
-        
-        this.emitStateUpdate();
-    }
-
     public async handleLoadVideo(options: Partial<IPlayerState>): Promise<void> {
         try {
+            if (!this.player) {
+                // Attendre que la vue soit prête avant de charger la vidéo
+                await new Promise<void>((resolve) => {
+                    const cleanup = eventBus.on('player:init', () => {
+                        this.setupVideoJS();
+                        cleanup();
+                        resolve();
+                    });
+                });
+            }
+
+            // Vérifier si le videoId est toujours manquant
             if (!options.videoId) {
                 console.warn('VideoId manquant');
                 throw new YouTubeAppError(
-                    YouTubeErrorCode.INVALID_PARAMETER,
-                    ERROR_MESSAGE_KEYS.INVALID_PARAMETER
+                YouTubeErrorCode.INVALID_PARAMETER,
+                ERROR_MESSAGE_KEYS.INVALID_PARAMETER
+                );
+            }
+            console.log("Initialisation du player avec videoId:", options.videoId);
+            // Vérifier si videojs est disponible
+            if (typeof videojs !== 'function') {
+                throw new PlayerAppError(
+                PlayerErrorCode.MEDIA_ERR_SRC_NOT_SUPPORTED,
+                ERROR_MESSAGE_KEYS.MEDIA_ERR_SRC_NOT_SUPPORTED
                 );
             }
 
-            if (!this.player) {
-                // Initialisation initiale
-                await this.initializePlayer(this.container!, options.videoId);
-            } else {
-                // Tentative de chargement avec le player existant
-                try {
-                    await new Promise<void>((resolve, reject) => {
-                        this.player.src({
-                            type: 'video/youtube',
-                            src: `https://www.youtube.com/watch?v=${options.videoId}`
-                        });
 
-                        this.player.one('loadeddata', () => resolve());
-                        this.player.one('error', (e: any) => reject(e));
-                    });
-                } catch (error) {
-                    // En cas d'erreur, on réinitialise avec le fallback
-                    console.error('[PlayerService] Erreur de chargement, passage au fallback:', error);
-                    this.destroy();
-                    await this.initializePlayer(this.container!, options.videoId);
-                }
-            }
-
-            // Mise à jour de l'état
-            this.currentState = {
-                ...this.currentState,
-                ...options,
+            await this.loadVideo({
+                videoId: options.videoId as VideoId,
+                timestamp: 0,
+                currentTime: 0,
+                duration: 0,
+                isPlaying: false,
+                isPaused: true,
+                isLoading: false,
                 isError: false,
-                isLoading: false
-            };
-
-            this.emitStateUpdate();
+                error: null,
+                mode: this.settings.currentMode,
+                height: this.settings.viewHeight,
+                containerId: this.currentState.containerId,
+                autoplay: false,
+                controls: true,
+                loop: false,
+                isMuted: this.currentState.isMuted,
+                volume: this.currentState.volume,
+                playbackRate: this.currentState.playbackRate,
+                videoJsOptions: {
+                    language: this.settings.language,
+                    techOrder: ['youtube'],
+                    youtube: {
+                        iv_load_policy: 3,
+                        modestbranding: 1,
+                        rel: this.settings.showYoutubeRecommendations ? 1 : 0,
+                        endscreen: this.settings.showYoutubeRecommendations ? 1 : 0,
+                        controls: 0,
+                        ytControls: 0,
+                        preload: 'auto',
+                        showinfo: 0,
+                        fs: 0,
+                        playsinline: 1,
+                        disablekb: 1,
+                        enablejsapi: 1,
+                        origin: window.location.origin
+                    }
+                }
+            });
         } catch (error) {
             console.error('[PlayerService] Erreur lors du chargement:', error);
             throw error;

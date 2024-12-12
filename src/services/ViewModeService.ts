@@ -21,6 +21,7 @@ export class ViewModeService implements IViewModeService {
     private translations: TranslationsService;
     private cleanupFunctions: (() => void)[];
     private isCreatingView: boolean = false;
+    private initializationTimeout: NodeJS.Timeout | null = null;
 
     /**
      * Crée une instance du service de gestion des modes de vue
@@ -41,15 +42,24 @@ export class ViewModeService implements IViewModeService {
         this.translations = TranslationsService.getInstance();
         this.cleanupFunctions = [];
 
-        // Écouter les événements
-        this.cleanupFunctions = [
-            eventBus.on('view:close', () => this.closeView()),
-            // autres événements...
-        ];
+        this.initializationTimeout = setTimeout(() => {
+            // Écouter les événements
+            this.cleanupFunctions = [
+                eventBus.on('view:close', () => this.closeView()),
+                // autres événements...
+            ];
 
-        // Surveiller les changements de layout
-        this.plugin.app.workspace.onLayoutReady(() => {
-            this.registerLayoutEvents();
+            // Surveiller les changements de layout
+            this.plugin.app.workspace.onLayoutReady(() => {
+                this.registerLayoutEvents();
+            });
+        }, 1000); // Attendre 1 seconde avant l'initialisation
+
+        // Ajouter le nettoyage du timeout
+        this.cleanupFunctions.push(() => {
+            if (this.initializationTimeout) {
+                clearTimeout(this.initializationTimeout);
+            }
         });
     }
 

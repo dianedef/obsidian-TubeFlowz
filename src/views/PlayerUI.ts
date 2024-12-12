@@ -64,7 +64,7 @@ export class PlayerUI implements IPlayerUI {
       }
 
       try {
-         // Trouver le conteneur .view-content d'Obsidian
+// Trouver le conteneur .view-content d'Obsidian
          const viewContent = container.querySelector('.view-content');
          if (!viewContent) {
             throw new PlayerAppError(
@@ -73,22 +73,22 @@ export class PlayerUI implements IPlayerUI {
             );
          }
 
-         // Conteneur principal
+// Conteneur principal
          const mainContainer = document.createElement('div');
          mainContainer.id = 'youtube-flow-player';
          mainContainer.className = 'youtube-flow-container';
          
-         // Wrapper pour la vidéo et ses contrôles
+// Wrapper pour la vidéo et ses contrôles
          const playerWrapper = document.createElement('div');
          playerWrapper.className = 'player-wrapper';
          mainContainer.appendChild(playerWrapper);
          
-         // Élément vidéo
+// Élément vidéo
          const video = document.createElement('video') as HTMLVideoElement;
          video.className = 'video-js vjs-obsidian-theme';
          playerWrapper.appendChild(video);
          
-         // Ajouter le conteneur dans .view-content
+// Ajouter le conteneur dans .view-content
          viewContent.appendChild(mainContainer);
          
          console.log("[PlayerUI dans initializePlayer] Création du player VideoJS");
@@ -96,7 +96,7 @@ export class PlayerUI implements IPlayerUI {
          const lastVideoId = this.settings.getSettings().lastVideoId;
          console.log("[PlayerUI dans initializePlayer] Initialisation avec videoId:", lastVideoId);
 
-         // Configuration du player avec les types corrects
+// Configuration du player avec les types corrects
          const options: IVideoJsOptions = {
             techOrder: ['youtube'],
             sources: [{
@@ -170,7 +170,7 @@ export class PlayerUI implements IPlayerUI {
 
          console.log("[PlayerUI dans initializePlayer] Options du player:", options);
 
-         // Créer le player avec le bon élément
+// Créer le player avec le bon élément
          this.Player = videojs(video, options) as IVideoJsPlayer;
 
          if (!this.Player) {
@@ -180,7 +180,7 @@ export class PlayerUI implements IPlayerUI {
 
          console.log("[PlayerUI dans initializePlayer] Interface créée avec succès");
 
-         // Attendre que le player soit prêt
+// Attendre que le player soit prêt
          await new Promise<void>((resolve) => {
             this.Player!.ready(() => {
                console.log("[PlayerUI dans initializePlayer] Interface prête");
@@ -188,7 +188,7 @@ export class PlayerUI implements IPlayerUI {
             });
          });
 
-         // Initialiser les contrôles personnalisés
+// Initialiser les contrôles personnalisés
          await this.initializeCustomControls();
 
 // Mettre à jour le stockage quand la vitesse change
