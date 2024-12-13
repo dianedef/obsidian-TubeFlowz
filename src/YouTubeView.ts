@@ -12,7 +12,7 @@ export class YouTubeView extends ItemView {
    private playerContainer: HTMLElement | null = null;
    private player: any = null;
    private playbackRateButton: any = null;
-
+   private currentRate: number = this.settings.favoriteSpeed;
 
    getViewType(): string {
       return "youtube-player";

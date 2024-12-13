@@ -6,7 +6,7 @@ import { YouTubeView } from './YouTubeView';
 import { ViewMode } from './types';
 import { registerStyles } from './RegisterStyles';
 import { createDecorations } from './Decorations';
-import { TubeFlowzSettings, TubeFlowzSettingsTab, Settings } from './Settings'
+import { Settings, SettingsTab } from './Settings'
 
 interface DecorationState {
    decorations: DecorationSet;
@@ -18,7 +18,7 @@ interface DecorationState {
 
 export default class TubeFlowz extends Plugin {
    private viewModeService!: ViewModeService;
-   settings!: TubeFlowzSettings;
+   settings!: Settings;
 
    async refresh() {
       // Détacher les vues existantes
@@ -46,7 +46,7 @@ export default class TubeFlowz extends Plugin {
       this.settings = await Settings.loadSettings();
       this.viewModeService = new ViewModeService(this);
       
-      this.addSettingTab(new TubeFlowzSettingsTab(this.app, this, this.settings, this.viewModeService));
+      this.addSettingTab(new SettingsTab(this.app, this, this.settings, this.viewModeService));
 
       this.registerView(
          "youtube-player",

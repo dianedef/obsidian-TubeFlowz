@@ -1,7 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting} from 'obsidian';
 import { ViewModeService } from './ViewModeService';
 
-export interface TubeFlowzSettings {
+export interface DefaultSettings {
    language: string;
    lastVideoId: string;
    lastTimestamp: number;
@@ -30,7 +30,7 @@ export type ViewMode = 'tab' | 'sidebar' | 'overlay';
 export type PlaybackMode = 'stream' | 'download';
 export type PlaybackRate = 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5 | 3 | 4 | 5 | 8 | 10 | 16;
 
-export const DEFAULT_SETTINGS: TubeFlowzSettings = {
+export const DEFAULT_SETTINGS: DefaultSettings = {
    language: 'fr',
    lastVideoId: 'jNQXAC9IVRw',
    lastTimestamp: 0,
@@ -53,19 +53,19 @@ export const DEFAULT_SETTINGS: TubeFlowzSettings = {
 
 export class Settings {
    private static plugin: Plugin;
-   private static settings: TubeFlowzSettings;
+   private static settings: DefaultSettings;
 
    static initialize(plugin: Plugin) {
       this.plugin = plugin;
    }
 
-   static async loadSettings(): Promise<TubeFlowzSettings> {
+   static async loadSettings(): Promise<DefaultSettings> {
       const savedData = await this.plugin.loadData();
       this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData || {});
       return this.settings;
    }
 
-   static async saveSettings(settings: Partial<TubeFlowzSettings>) {
+   static async saveSettings(settings: Partial<DefaultSettings>) {
       this.settings = Object.assign(this.settings || DEFAULT_SETTINGS, settings);
       await this.plugin.saveData(this.settings);
    }
@@ -91,11 +91,11 @@ export class Settings {
    }
 }
 
-export class TubeFlowzSettingsTab extends PluginSettingTab {
+export class SettingsTab extends PluginSettingTab {
    plugin: Plugin;
-   settings: TubeFlowzSettings;
+   settings: Settings;
 
-   constructor(app: App, plugin: Plugin, settings: TubeFlowzSettings, private viewModeService: ViewModeService) {
+   constructor(app: App, plugin: Plugin, settings: Settings, private viewModeService: ViewModeService) {
       super(app, plugin);
       this.plugin = plugin;
       this.settings = settings;

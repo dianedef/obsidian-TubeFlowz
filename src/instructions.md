@@ -1,4 +1,3 @@
-vérifier la modif du mode a partir des settings
 ajouter raccourcis clavier
 trad
 

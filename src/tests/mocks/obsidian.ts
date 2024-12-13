@@ -86,6 +86,26 @@ HTMLElement.prototype.createSpan = function({ text }: { text: string }) {
 };
 
 // Mock des classes d'Obsidian
+export class PluginSettingTab {
+    app: any;
+    plugin: Plugin;
+    containerEl: HTMLElement;
+
+    constructor(app: any, plugin: Plugin) {
+        this.app = app;
+        this.plugin = plugin;
+        this.containerEl = document.createElement('div');
+    }
+
+    display() {
+        this.containerEl.empty();
+    }
+
+    hide() {
+        this.containerEl.empty();
+    }
+}
+
 export class WorkspaceLeaf {
     view: any;
     parent: any;
