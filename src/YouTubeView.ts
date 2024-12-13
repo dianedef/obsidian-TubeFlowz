@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, Plugin } from 'obsidian';
 import videojs from 'video.js';
 import 'videojs-youtube';
+import { Menu } from 'obsidian';
 
 interface TubeFlowzSettings {
    showYoutubeRecommendations: boolean;
@@ -16,6 +17,7 @@ export class YouTubeView extends ItemView {
    private playerContainer: HTMLElement | null = null;
    private plugin: Plugin;
    private player: any = null;
+   private playbackRateButton: any = null;
    private settings: TubeFlowzSettings = {
       showYoutubeRecommendations: false,
       isMuted: false,
@@ -81,6 +83,7 @@ export class YouTubeView extends ItemView {
             }
          },
          youtube: {
+            youtubeshowrecomendations: 0,
             ytControls: 0,
             noCookie: true,
             useCustomIframe: true,
@@ -131,7 +134,7 @@ export class YouTubeView extends ItemView {
                layout: 'absolute',
                seekBar: {
                   layout: 'absolute',
-                  loadProgressBar: true,
+                  loadProgressBar: false,
                   playProgressBar: true,
                   seekHandle: true,
                   mouseTimeDisplay: true
@@ -143,15 +146,6 @@ export class YouTubeView extends ItemView {
          errorDisplay: false,
          textTrackDisplay: false,
          posterImage: false,
-         progressControl: {
-            insertBeforeProgressBar: true,
-            keepTooltipsInside: true,
-            seekBar: {
-               mouseTimeDisplay: {
-                  displayBeforeBar: true
-               }
-            }
-         }
       };
    }
 
@@ -200,6 +194,9 @@ export class YouTubeView extends ItemView {
             if (controlBar) {
                controlsContainer.appendChild(controlBar);
             }
+
+            // Initialiser le bouton de vitesse
+            this.initializePlaybackRateButton();
          });
 
       } catch (error) {
@@ -208,6 +205,45 @@ export class YouTubeView extends ItemView {
 
       // Ajouter le resize handle dans son conteneur
       this.addResizeHandle(contentEl);
+   }
+
+   private initializePlaybackRateButton(): void {
+      if (!this.player) return;
+
+      // Ajouter le bouton de vitesse personnalisé
+      this.playbackRateButton = this.player.controlBar.addChild('button', {
+         className: 'vjs-playback-rate'
+      });
+
+      const buttonEl = this.playbackRateButton.el();
+      buttonEl.textContent = '1x';
+
+      // Gérer le hover pour afficher le menu
+      buttonEl.addEventListener('mouseenter', () => {
+         const menu = new Menu();
+         const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
+         const currentRate = this.player?.playbackRate();
+
+         rates.forEach(rate => {
+            menu.addItem(item => 
+               item
+                  .setTitle(`${rate}x`)
+                  .setChecked(currentRate === rate)
+                  .onClick(() => {
+                     if (this.player) {
+                        this.player.playbackRate(rate);
+                        buttonEl.textContent = `${rate}x`;
+                     }
+                  })
+            );
+         });
+
+         const rect = buttonEl.getBoundingClientRect();
+         menu.showAtPosition({
+            x: rect.right,
+            y: rect.bottom
+         });
+      });
    }
 
    async loadVideo(videoId: string) {

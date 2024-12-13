@@ -13,7 +13,7 @@ styleEl.textContent = `
         margin-left: 4px;
         position: relative;
         display: inline-block;
-        opacity: 0.8;
+        opacity: 0.6;
         transition: opacity 0.2s ease-in-out;
     }
 
@@ -26,29 +26,7 @@ styleEl.textContent = `
         text-decoration: none;
     }
 
-    .youtube-link:hover {
-        text-decoration: underline;
-    }
-
     /* ===== Structure de base ===== */
- 
-    /* Barre de progression */
-    .vjs-progress-control {
-        width: 100%;
-        height: 3px;
-        position: absolute;
-        top: 12px;
-        left: 0;
-        right: 0;
-        background: var(--background-modifier-border);
-        transition: height 0.2s ease;
-        cursor: pointer;
-        z-index: 101;
-    }
-
-    .vjs-progress-control:hover {
-        height: 6px;
-    }
 
     /* Barre de chargement (buffer) */
     .vjs-load-progress {
@@ -59,31 +37,6 @@ styleEl.textContent = `
         height: 100%;
         background: var(--background-modifier-success-hover);
         opacity: 0.2;
-    }
-
-    /* Barre de lecture */
-    .vjs-play-progress {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        background: var(--interactive-accent);
-    }
-
-    /* Curseur de temps */
-    .vjs-play-progress:before {
-        content: '●';
-        font-size: 8px;
-        position: absolute;
-        right: -4px;
-        top: -2px;
-        color: var(--interactive-accent);
-        text-shadow: 0 0 3px rgba(0,0,0,0.5);
-        transform: scale(0);
-        transition: transform 0.2s ease;
-    }
-
-    .vjs-progress-control:hover .vjs-play-progress:before {
-        transform: scale(1);
     }
 
     /* Boutons spécifiques */
@@ -117,16 +70,75 @@ styleEl.textContent = `
         justify-content: space-between;
         padding: 0 5px;
     }
+
+    /* Barre de progression */
     .vjs-progress-control {
         position: absolute;
         top: -10px;
         left: 0;
         right: 0;
         width: 100%;
-        height: 3px;
+        height: 6px;
         background: var(--background-modifier-border);
-        transition: height 0.2s ease;
         cursor: pointer;
+        z-index: 101;
+    }
+
+    /* Barre de chargement (buffer) */
+    .vjs-load-progress {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--background-modifier-success-hover);
+        opacity: 0.2;
+    }
+
+    /* Barre de lecture */
+    .vjs-play-progress {
+        height: 12px;
+        background: var(--interactive-accent);
+    }
+        
+
+    /* Tooltip de temps */
+    .vjs-mouse-display {
+        display: none;
+        position: absolute;
+        z-index: 102;
+    }
+    .vjs-progress-control:hover .vjs-mouse-display {
+        display: block;
+    }
+
+    /* Tooltip de la barre de progression uniquement */
+    .vjs-progress-holder .vjs-time-tooltip {
+        position: absolute;
+        top: -30px;
+        transform: translateX(-50%);
+        background: var(--background-secondary-alt);
+        color: var(--text-normal);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+        white-space: nowrap;
+    }
+
+    /* Masquer tous les autres tooltips */
+    .vjs-control-bar .vjs-time-tooltip:not(.vjs-progress-holder .vjs-time-tooltip) {
+        display: none;
+    }
+
+    /* Temps */
+    .vjs-current-time,
+    .vjs-time-divider,
+    .vjs-duration {
+        padding: 0 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: unset;
     }
 
     /* ===== Resize Handle ===== */
