@@ -22,9 +22,9 @@
       "@codemirror/language": "^6.0.0",
       "@codemirror/state": "^6.0.0",
       "@codemirror/view": "^6.0.0",
-      "@videojs/http-streaming": "^3.16.1",
+      "@videojs/http-streaming": "^3.16.2",
       "obsidian": "latest",
-      "video.js": "^8.20.0",
+      "video.js": "^8.21.0",
       "videojs-youtube": "^3.0.1",
       "youtube-transcript": "^1.0.6",
       "yt-dlp-wrap": "^2.3.12"

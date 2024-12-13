@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { WorkspaceLeaf } from 'obsidian';
+import { WorkspaceLeaf, Plugin } from 'obsidian';
 import { YouTubeView } from '../YouTubeView';
 
 describe('YouTubeView', () => {
     let leaf: WorkspaceLeaf;
     let view: YouTubeView;
+    let plugin: Plugin;
 
     beforeEach(() => {
         leaf = new WorkspaceLeaf();
-        view = new YouTubeView(leaf);
+        plugin = new Plugin();
+        view = new YouTubeView(leaf, plugin);
     });
 
     it('devrait avoir le bon type de vue', () => {
@@ -31,15 +33,15 @@ describe('YouTubeView', () => {
         expect(title?.textContent).toBe('YouTube Player');
 
         // Vérifie la présence du conteneur du player
-        const playerContainer = container.querySelector('.youtube-player-embed');
+        const playerContainer = container.querySelector('.youtube-player-embed') as HTMLElement;
         expect(playerContainer).toBeTruthy();
         
         // Vérifie le style du conteneur
-        expect(playerContainer?.style.width).toBe('100%');
-        expect(playerContainer?.style.height).toBe('60vh');
+        expect(playerContainer.style.width).toBe('100%');
+        expect(playerContainer.style.height).toBe('60vh');
 
         // Vérifie le texte par défaut
-        const defaultText = playerContainer?.querySelector('span');
+        const defaultText = playerContainer.querySelector('span');
         expect(defaultText?.textContent).toBe('Prêt à lire une vidéo YouTube');
     });
 }); 

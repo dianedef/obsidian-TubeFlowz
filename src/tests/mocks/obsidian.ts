@@ -1,5 +1,40 @@
 import { vi } from 'vitest';
 
+// Mock de ResizeObserver
+class MockResizeObserver {
+    callback: ResizeObserverCallback;
+
+    constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+    }
+
+    observe(target: Element) {
+        // Simule une observation initiale
+        this.callback([{
+            target,
+            contentRect: {
+                width: 100,
+                height: 100,
+                x: 0,
+                y: 0,
+                top: 0,
+                right: 100,
+                bottom: 100,
+                left: 0
+            } as DOMRectReadOnly,
+            borderBoxSize: [],
+            contentBoxSize: [],
+            devicePixelContentBoxSize: []
+        }], this);
+    }
+
+    unobserve() {}
+    disconnect() {}
+}
+
+// Ajoute ResizeObserver au global
+global.ResizeObserver = MockResizeObserver as any;
+
 // Types pour les méthodes DOM d'Obsidian
 interface DomElementInfo {
     text?: string;
@@ -133,14 +168,46 @@ export class Menu {
 
 export class Plugin {
     app: any;
+    private leaves: Map<string, WorkspaceLeaf>;
 
     constructor() {
+        this.leaves = new Map();
+        const self = this;
+        
         const workspace = {
             activeLeaf: null,
-            getRightLeaf: vi.fn().mockReturnValue(new WorkspaceLeaf()),
-            getLeaf: vi.fn().mockReturnValue(new WorkspaceLeaf()),
-            getMostRecentLeaf: vi.fn().mockReturnValue(new WorkspaceLeaf()),
-            createLeafBySplit: vi.fn().mockReturnValue(new WorkspaceLeaf()),
+            getRightLeaf: vi.fn().mockImplementation(() => {
+                const key = 'right';
+                if (!self.leaves.has(key)) {
+                    const leaf = new WorkspaceLeaf();
+                    self.leaves.set(key, leaf);
+                }
+                return self.leaves.get(key);
+            }),
+            getLeaf: vi.fn().mockImplementation(() => {
+                const key = 'split';
+                if (!self.leaves.has(key)) {
+                    const leaf = new WorkspaceLeaf();
+                    self.leaves.set(key, leaf);
+                }
+                return self.leaves.get(key);
+            }),
+            getMostRecentLeaf: vi.fn().mockImplementation(() => {
+                const key = 'active';
+                if (!self.leaves.has(key)) {
+                    const leaf = new WorkspaceLeaf();
+                    self.leaves.set(key, leaf);
+                }
+                return self.leaves.get(key);
+            }),
+            createLeafBySplit: vi.fn().mockImplementation(() => {
+                const key = 'overlay';
+                if (!self.leaves.has(key)) {
+                    const leaf = new WorkspaceLeaf();
+                    self.leaves.set(key, leaf);
+                }
+                return self.leaves.get(key);
+            }),
             revealLeaf: vi.fn(),
             getLeavesOfType: vi.fn().mockReturnValue([]),
             getActiveViewOfType: vi.fn(),
@@ -167,6 +234,13 @@ export class Plugin {
     }
 
     registerView() {}
+
+    registerEditorExtension() {}
+
+    // Méthode utilitaire pour les tests
+    getLeaves(): Map<string, WorkspaceLeaf> {
+        return this.leaves;
+    }
 }
 
 export const addIcon = vi.fn();

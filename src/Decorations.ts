@@ -1,4 +1,6 @@
 import { EditorView, Decoration, WidgetType } from '@codemirror/view';
+import { YouTubeView } from './YouTubeView';
+import { App } from 'obsidian';
 
 function extractVideoId(url: string): string | null {
    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
@@ -11,10 +13,12 @@ function cleanVideoId(id: string): string {
 
 class DecorationForUrl extends WidgetType {
    private videoId: string;
+   private app: App;
 
-   constructor(videoId: string) {
+   constructor(videoId: string, app: App) {
       super();
       this.videoId = videoId;
+      this.app = app;
    }
       
    toDOM(): HTMLElement {
@@ -24,16 +28,22 @@ class DecorationForUrl extends WidgetType {
       sparkle.setAttribute('aria-label', 'Ouvrir le player YouTube');
       sparkle.setAttribute('data-video-id', this.videoId);
       
-      sparkle.addEventListener('click', () => {
-         // On utilisera cette fonction plus tard pour ouvrir le player
-         console.log("Video ID à charger:", this.videoId);
+      sparkle.addEventListener('click', async () => {
+         try {
+            const view = this.app.workspace.getLeavesOfType('youtube-player')[0]?.view as YouTubeView;
+            if (view) {
+               view.loadVideo(this.videoId);
+            }
+         } catch (error) {
+            console.error('Erreur lors du chargement de la vidéo:', error);
+         }
       });
       
       return sparkle;
    }
 }
 
-export function createDecorations(view: EditorView) {
+export function createDecorations(view: EditorView, app: App) {
    const decorations = [];
    const doc = view.state.doc;
    
@@ -61,7 +71,7 @@ export function createDecorations(view: EditorView) {
             }).range(startPos, endPos));
             
             decorations.push(Decoration.widget({
-               widget: new DecorationForUrl(cleanedId),
+               widget: new DecorationForUrl(cleanedId, app),
                side: 1
             }).range(endPos));
          }

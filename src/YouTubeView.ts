@@ -1,4 +1,12 @@
 import { ItemView, WorkspaceLeaf, Plugin } from 'obsidian';
+import videojs from 'video.js';
+import 'videojs-youtube';
+
+interface TubeFlowzSettings {
+   showYoutubeRecommendations: boolean;
+   isMuted: boolean;
+   language: string;
+}
 
 export class YouTubeView extends ItemView {
    private isDragging: boolean = false;
@@ -7,6 +15,12 @@ export class YouTubeView extends ItemView {
    private resizeObserver: ResizeObserver | null = null;
    private playerContainer: HTMLElement | null = null;
    private plugin: Plugin;
+   private player: any = null;
+   private settings: TubeFlowzSettings = {
+      showYoutubeRecommendations: false,
+      isMuted: false,
+      language: 'fr'
+   };
 
    constructor(leaf: WorkspaceLeaf, plugin: Plugin) {
       super(leaf);
@@ -19,6 +33,92 @@ export class YouTubeView extends ItemView {
 
    getDisplayText(): string {
       return "YouTube Player";
+   }
+
+   private getPlayerConfig(): any {
+      return {
+         techOrder: ['youtube'],
+         autoplay: false,
+         controls: true,
+         fluid: true,
+         liveTracker: false,
+         liveui: false,
+         children: ['MediaLoader'],
+         controlBar: {
+            children: [
+               'playToggle',
+               'volumePanel',
+               'skipBackward',
+               'skipForward',
+               'currentTimeDisplay',
+               'timeDivider',
+               'durationDisplay',
+               'progressControl',
+               'pictureInPictureToggle',
+               'fullscreenToggle'
+            ]
+         },
+         languages: {
+            en: {
+               "Play": "Play",
+               "Pause": "Pause",
+               "Mute": "Mute",
+               "Unmute": "Unmute",
+               "Skip Backward": "Backward",
+               "Skip Forward": "Forward",
+               "Current Time": " ",
+               "Duration": " ",
+               "Fullscreen": "Fullscreen",
+               "Non-Fullscreen": "Exit Fullscreen",
+               "Picture-in-Picture": "PIP",
+               "Exit Picture-in-Picture": "PIP",
+               "Close": "Close"
+            },
+            fr: {
+               "Play": "Lecture",
+               "Pause": "Pause",
+               "Mute": "Muet",
+               "Unmute": "Son",
+               "Skip Backward": "Précédent",
+               "Skip Forward": "Suivant",
+               "Current Time": " ",
+               "Duration": " ",
+               "Fullscreen": "Plein écran",
+               "Non-Fullscreen": "Quitter le plein écran",
+               "Picture-in-Picture": "PIP",
+               "Exit Picture-in-Picture": "PIP",
+               "Close": "Fermer"
+            }
+         },
+         youtube: {
+            iv_load_policy: 3,
+            modestbranding: 1,
+            rel: this.settings.showYoutubeRecommendations ? 1 : 0,
+            endscreen: this.settings.showYoutubeRecommendations ? 1 : 0,
+            controls: 0,
+            ytControls: 0,
+            preload: 'auto',
+            showinfo: 0,
+            fs: 0,
+            playsinline: 1,
+            disablekb: 1,
+            enablejsapi: 1,
+            origin: window.location.origin,
+         },
+         progressControl: {
+            seekBar: true
+         },
+         enableSmoothSeeking: true,
+         userActions: {
+            hotkeys: true
+         },
+         fullscreen: {
+            options: {
+               navigationUI: 'hide'
+            }
+         },
+         muted: this.settings.isMuted
+      };
    }
 
    async onOpen() {
@@ -44,10 +144,40 @@ export class YouTubeView extends ItemView {
          justify-content: center;
          position: relative;
       `;
-      
-      playerEl.createSpan({ text: 'Prêt à lire une vidéo YouTube' });
+
+      // Créer l'élément vidéo pour video.js
+      const videoElement = document.createElement('video');
+      videoElement.className = 'video-js';
+      videoElement.style.width = '100%';
+      videoElement.style.height = '100%';
+      playerEl.appendChild(videoElement);
+
+      // Initialiser video.js avec la nouvelle configuration
+      this.player = videojs(videoElement, this.getPlayerConfig());
 
       this.addResizeHandle(playerEl);
+   }
+
+   async loadVideo(videoId: string) {
+      if (!this.player) return;
+
+      try {
+         this.player.src({
+            type: 'video/youtube',
+            src: `https://www.youtube.com/watch?v=${videoId}`
+         });
+      } catch (error) {
+         console.error('Erreur lors du chargement de la vidéo:', error);
+      }
+   }
+
+   async onClose() {
+      if (this.resizeObserver) {
+         this.resizeObserver.disconnect();
+      }
+      if (this.player) {
+         this.player.dispose();
+      }
    }
 
    private addResizeHandle(container: HTMLElement): void {
@@ -105,12 +235,6 @@ export class YouTubeView extends ItemView {
       if (this.playerContainer) {
          const height = this.playerContainer.style.height;
          this.plugin.saveData({ playerHeight: height });
-      }
-   }
-
-   async onClose() {
-      if (this.resizeObserver) {
-         this.resizeObserver.disconnect();
       }
    }
 } 

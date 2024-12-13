@@ -171,6 +171,7 @@ export class PlayerUI implements IPlayerUI {
          console.log("[PlayerUI dans initializePlayer] Options du player:", options);
 
 // Créer le player avec le bon élément
+
          this.Player = videojs(video, options) as IVideoJsPlayer;
 
          if (!this.Player) {

@@ -1,4 +1,4 @@
-import { Plugin, addIcon, Menu } from 'obsidian';
+import { Plugin, addIcon, Menu, App } from 'obsidian';
 import { EditorView, ViewPlugin, ViewUpdate, DecorationSet } from '@codemirror/view';
 import { YOUTUBE_ICON } from './constants';
 import { ViewModeService } from './ViewModeService';
@@ -9,6 +9,7 @@ import { createDecorations } from './Decorations';
 
 interface DecorationState {
    decorations: DecorationSet;
+   app: App;
    settings: any;
    viewModeService: ViewModeService;
    update(update: ViewUpdate): void;
@@ -30,12 +31,12 @@ export default class YoutubeReaderPlugin extends Plugin {
       
       this.registerEditorExtension([
          ViewPlugin.define<DecorationState>(view => ({
-            decorations: createDecorations(view),
+            decorations: createDecorations(view, this.app),
             settings: this.settings,
             viewModeService: this.viewModeService,
             update(update: ViewUpdate) {
                if (update.docChanged || update.viewportChanged) {
-                  this.decorations = createDecorations(update.view);
+                  this.decorations = createDecorations(update.view, this.app);
                }
             }
          }), {
