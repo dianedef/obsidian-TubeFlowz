@@ -38,26 +38,16 @@ export class YouTubeView extends ItemView {
    private getPlayerConfig(): any {
       return {
          techOrder: ['youtube'],
-         autoplay: false,
          controls: true,
+         textTrackSettings: false,
          fluid: true,
          liveTracker: false,
          liveui: false,
          children: ['MediaLoader'],
-         controlBar: {
-            children: [
-               'playToggle',
-               'volumePanel',
-               'skipBackward',
-               'skipForward',
-               'currentTimeDisplay',
-               'timeDivider',
-               'durationDisplay',
-               'progressControl',
-               'pictureInPictureToggle',
-               'fullscreenToggle'
-            ]
-         },
+         sources: [{
+            type: 'video/youtube',
+            src: 'https://www.youtube.com/watch?v=default'
+         }],
          languages: {
             en: {
                "Play": "Play",
@@ -90,25 +80,41 @@ export class YouTubeView extends ItemView {
                "Close": "Fermer"
             }
          },
-         sources: [{
-            type: 'video/youtube',
-            src: 'https://www.youtube.com/watch?v=M7lc1UVf-VE'
-         }],
          youtube: {
+            ytControls: 0,
+            noCookie: true,
+            useCustomIframe: true,
             iv_load_policy: 3,
             modestbranding: 1,
-            rel: this.settings.showYoutubeRecommendations ? 1 : 0,
-            endscreen: this.settings.showYoutubeRecommendations ? 1 : 0,
-            controls: 1,
-            ytControls: 0,
-            preload: 'auto',
+            controls: 0,
             showinfo: 0,
+            rel: 0,
+            disablekb: 0,
             fs: 1,
             playsinline: 1,
-            disablekb: 0,
             enablejsapi: 1,
             origin: window.location.origin,
+            noerror: 1,
+            privacy: true,
+            nocookie: true,
+            cc_load_policy: 0,
+            cc_lang_pref: 'fr',
+            hl: 'fr',
+            color: 'white',
+            autohide: 1,
+            widget_referrer: window.location.origin,
+            adsense: 0,
+            doubleclick: 0,
+            ad_tag: 0,
+            ad_preroll: 0,
+            ad_postroll: 0,
+            adTagUrl: '',
+            ima3: false,
+            ima: {
+               adTagUrl: ''
+            }
          },
+         modal: false,
          controlBar: {
             children: [
                'playToggle',
@@ -119,7 +125,32 @@ export class YouTubeView extends ItemView {
                'progressControl',
                'pictureInPictureToggle',
                'fullscreenToggle'
-            ]
+            ],
+            layout: 'absolute',
+            progressControl: {
+               layout: 'absolute',
+               seekBar: {
+                  layout: 'absolute',
+                  loadProgressBar: true,
+                  playProgressBar: true,
+                  seekHandle: true,
+                  mouseTimeDisplay: true
+               }
+            }
+         },
+         loadingSpinner: true,
+         bigPlayButton: true,
+         errorDisplay: false,
+         textTrackDisplay: false,
+         posterImage: false,
+         progressControl: {
+            insertBeforeProgressBar: true,
+            keepTooltipsInside: true,
+            seekBar: {
+               mouseTimeDisplay: {
+                  displayBeforeBar: true
+               }
+            }
          }
       };
    }
@@ -129,34 +160,33 @@ export class YouTubeView extends ItemView {
       const container = this.containerEl;
       container.empty();
       
+      // Conteneur principal
       const contentEl = container.createDiv({ cls: 'youtube-player-container' });
-      contentEl.createEl('h4', { text: 'YouTube Player' });
-      
-      const playerEl = contentEl.createDiv({ cls: 'youtube-player-embed' });
-      this.playerContainer = playerEl;
+      this.playerContainer = contentEl;
 
       // Récupérer la hauteur sauvegardée ou utiliser la valeur par défaut
       const savedHeight = await this.plugin.loadData();
       const height = savedHeight?.playerHeight || '60vh';
       
-      playerEl.style.cssText = `
-         width: 100%;
-         height: ${height};
-         background: var(--background-secondary);
-         display: flex;
-         align-items: center;
-         justify-content: center;
-         position: relative;
-      `;
+      // Appliquer la hauteur au conteneur principal
+      contentEl.style.height = height;
 
+      // Conteneur pour le player et ses contrôles
+      const playerWrapper = contentEl.createDiv({ cls: 'youtube-player-wrapper' });
+      
+      // Conteneur pour la vidéo uniquement
+      const videoContainer = playerWrapper.createDiv({ cls: 'youtube-video-container' });
+      
+      // Conteneur pour les contrôles
+      const controlsContainer = playerWrapper.createDiv({ cls: 'youtube-controls-container' });
+      
       // Créer l'élément vidéo pour video.js
       const videoElement = document.createElement('video');
       videoElement.className = 'video-js';
       videoElement.style.width = '100%';
       videoElement.style.height = '100%';
       videoElement.setAttribute('playsinline', 'true');
-      videoElement.setAttribute('controls', 'true');
-      playerEl.appendChild(videoElement);
+      videoContainer.appendChild(videoElement);
 
       console.log('YouTubeView: Initialisation du player video.js');
       try {
@@ -164,32 +194,34 @@ export class YouTubeView extends ItemView {
          
          this.player.ready(() => {
             console.log('YouTubeView: Player est prêt');
-            // S'assurer que le player est visible
-            this.player.show();
+            
+            // Déplacer les contrôles dans leur conteneur
+            const controlBar = videoContainer.querySelector('.vjs-control-bar');
+            if (controlBar) {
+               controlsContainer.appendChild(controlBar);
+            }
          });
 
       } catch (error) {
          console.error('YouTubeView: Erreur lors de l\'initialisation du player:', error);
       }
 
-      this.addResizeHandle(playerEl);
+      // Ajouter le resize handle dans son conteneur
+      this.addResizeHandle(contentEl);
    }
 
    async loadVideo(videoId: string) {
       console.log('YouTubeView: Chargement de la vidéo', videoId);
-      if (!this.player) {
-         console.error('YouTubeView: Player non initialisé');
-         return;
-      }
+      if (!this.player) return;
 
       try {
+         // Utiliser l'URL embed directement
+         const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
          this.player.src({
             type: 'video/youtube',
-            src: `https://www.youtube.com/watch?v=${videoId}`
+            src: embedUrl
          });
          console.log('YouTubeView: Source vidéo définie');
-         // Forcer le rechargement
-         this.player.load();
       } catch (error) {
          console.error('YouTubeView: Erreur lors du chargement de la vidéo:', error);
       }
