@@ -30,10 +30,9 @@ class DecorationForUrl extends WidgetType {
       
       sparkle.addEventListener('click', async () => {
          try {
+            console.log('DecorationForUrl: Ouvrir le player YouTube avec id:', this.videoId);
             const view = this.app.workspace.getLeavesOfType('youtube-player')[0]?.view as YouTubeView;
-            if (view) {
-               view.loadVideo(this.videoId);
-            }
+            await view.loadVideo(this.videoId);
          } catch (error) {
             console.error('Erreur lors du chargement de la vidéo:', error);
          }

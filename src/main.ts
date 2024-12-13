@@ -32,6 +32,7 @@ export default class YoutubeReaderPlugin extends Plugin {
       this.registerEditorExtension([
          ViewPlugin.define<DecorationState>(view => ({
             decorations: createDecorations(view, this.app),
+            app: this.app,
             settings: this.settings,
             viewModeService: this.viewModeService,
             update(update: ViewUpdate) {

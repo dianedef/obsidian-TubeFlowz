@@ -90,38 +90,42 @@ export class YouTubeView extends ItemView {
                "Close": "Fermer"
             }
          },
+         sources: [{
+            type: 'video/youtube',
+            src: 'https://www.youtube.com/watch?v=M7lc1UVf-VE'
+         }],
          youtube: {
             iv_load_policy: 3,
             modestbranding: 1,
             rel: this.settings.showYoutubeRecommendations ? 1 : 0,
             endscreen: this.settings.showYoutubeRecommendations ? 1 : 0,
-            controls: 0,
+            controls: 1,
             ytControls: 0,
             preload: 'auto',
             showinfo: 0,
-            fs: 0,
+            fs: 1,
             playsinline: 1,
-            disablekb: 1,
+            disablekb: 0,
             enablejsapi: 1,
             origin: window.location.origin,
          },
-         progressControl: {
-            seekBar: true
-         },
-         enableSmoothSeeking: true,
-         userActions: {
-            hotkeys: true
-         },
-         fullscreen: {
-            options: {
-               navigationUI: 'hide'
-            }
-         },
-         muted: this.settings.isMuted
+         controlBar: {
+            children: [
+               'playToggle',
+               'volumePanel',
+               'currentTimeDisplay',
+               'timeDivider',
+               'durationDisplay',
+               'progressControl',
+               'pictureInPictureToggle',
+               'fullscreenToggle'
+            ]
+         }
       };
    }
 
    async onOpen() {
+      console.log('YouTubeView: onOpen');
       const container = this.containerEl;
       container.empty();
       
@@ -150,24 +154,44 @@ export class YouTubeView extends ItemView {
       videoElement.className = 'video-js';
       videoElement.style.width = '100%';
       videoElement.style.height = '100%';
+      videoElement.setAttribute('playsinline', 'true');
+      videoElement.setAttribute('controls', 'true');
       playerEl.appendChild(videoElement);
 
-      // Initialiser video.js avec la nouvelle configuration
-      this.player = videojs(videoElement, this.getPlayerConfig());
+      console.log('YouTubeView: Initialisation du player video.js');
+      try {
+         this.player = videojs(videoElement, this.getPlayerConfig());
+         
+         this.player.ready(() => {
+            console.log('YouTubeView: Player est prêt');
+            // S'assurer que le player est visible
+            this.player.show();
+         });
+
+      } catch (error) {
+         console.error('YouTubeView: Erreur lors de l\'initialisation du player:', error);
+      }
 
       this.addResizeHandle(playerEl);
    }
 
    async loadVideo(videoId: string) {
-      if (!this.player) return;
+      console.log('YouTubeView: Chargement de la vidéo', videoId);
+      if (!this.player) {
+         console.error('YouTubeView: Player non initialisé');
+         return;
+      }
 
       try {
          this.player.src({
             type: 'video/youtube',
             src: `https://www.youtube.com/watch?v=${videoId}`
          });
+         console.log('YouTubeView: Source vidéo définie');
+         // Forcer le rechargement
+         this.player.load();
       } catch (error) {
-         console.error('Erreur lors du chargement de la vidéo:', error);
+         console.error('YouTubeView: Erreur lors du chargement de la vidéo:', error);
       }
    }
 
