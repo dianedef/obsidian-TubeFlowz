@@ -220,7 +220,7 @@ export class Plugin {
     }
 
     loadData() {
-        return Promise.resolve({ playerHeight: '60vh' });
+        return Promise.resolve({ viewHeight: '60vh' });
     }
 
     saveData() {

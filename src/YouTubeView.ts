@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, Plugin } from 'obsidian';
 import videojs from 'video.js';
 import 'videojs-youtube';
 import { Menu } from 'obsidian';
+import { Settings } from './Settings';
 
 interface TubeFlowzSettings {
    showYoutubeRecommendations: boolean;
@@ -158,9 +159,9 @@ export class YouTubeView extends ItemView {
       const contentEl = container.createDiv({ cls: 'youtube-player-container' });
       this.playerContainer = contentEl;
 
-      // Récupérer la hauteur sauvegardée ou utiliser la valeur par défaut
-      const savedHeight = await this.plugin.loadData();
-      const height = savedHeight?.playerHeight || '60vh';
+      // Récupérer la hauteur sauvegardée
+      const settings = await Settings.loadSettings();
+      const height = settings.viewHeight;
       
       // Appliquer la hauteur au conteneur principal
       contentEl.style.height = height;
@@ -326,7 +327,7 @@ export class YouTubeView extends ItemView {
       this.isDragging = false;
       if (this.playerContainer) {
          const height = this.playerContainer.style.height;
-         this.plugin.saveData({ playerHeight: height });
+         Settings.saveSettings({ viewHeight: height });
       }
    }
 } 

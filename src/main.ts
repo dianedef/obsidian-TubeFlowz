@@ -1,11 +1,12 @@
 import { Plugin, addIcon, Menu, App } from 'obsidian';
-import { EditorView, ViewPlugin, ViewUpdate, DecorationSet } from '@codemirror/view';
+import { ViewPlugin, ViewUpdate, DecorationSet } from '@codemirror/view';
 import { YOUTUBE_ICON } from './constants';
 import { ViewModeService } from './ViewModeService';
 import { YouTubeView } from './YouTubeView';
 import { ViewMode } from './types';
 import { registerStyles } from './RegisterStyles';
 import { createDecorations } from './Decorations';
+import { TubeFlowzSettings, TubeFlowzSettingsTab, DEFAULT_SETTINGS, Settings } from './Settings'
 
 interface DecorationState {
    decorations: DecorationSet;
@@ -15,10 +16,16 @@ interface DecorationState {
    update(update: ViewUpdate): void;
 }
 
-export default class YoutubeReaderPlugin extends Plugin {
+export default class TubeFlowz extends Plugin {
    private viewModeService!: ViewModeService;
+   settings!: TubeFlowzSettings;
 
    async onload() {
+      Settings.initialize(this);
+      this.settings = await Settings.loadSettings();
+      
+      this.addSettingTab(new TubeFlowzSettingsTab(this.app, this, this.settings));
+
       this.registerView(
          "youtube-player",
          (leaf) => {
