@@ -1,4 +1,5 @@
-import { App, Plugin, PluginSettingTab, Setting, DropdownComponent } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting} from 'obsidian';
+import { ViewModeService } from './ViewModeService';
 
 export interface TubeFlowzSettings {
    language: string;
@@ -69,11 +70,22 @@ export class Settings {
       await this.plugin.saveData(this.settings);
    }
 
+   static async refresh() {
+      if (this.plugin && 'refresh' in this.plugin) {
+         await (this.plugin as any).refresh();
+      }
+   }
+
    static async getViewHeight(): Promise<string> {
       const data = await this.plugin.loadData();
       return data?.viewHeight || DEFAULT_SETTINGS.viewHeight;
    }
 
+   static async getShowYoutubeRecommendations(): Promise<boolean> {
+      const data = await this.plugin.loadData();
+      return data?.showYoutubeRecommendations || DEFAULT_SETTINGS.showYoutubeRecommendations;
+   }
+   
    static async setViewHeight(height: string) {
       await this.saveSettings({ viewHeight: height });
    }
@@ -83,7 +95,7 @@ export class TubeFlowzSettingsTab extends PluginSettingTab {
    plugin: Plugin;
    settings: TubeFlowzSettings;
 
-   constructor(app: App, plugin: Plugin, settings: TubeFlowzSettings) {
+   constructor(app: App, plugin: Plugin, settings: TubeFlowzSettings, private viewModeService: ViewModeService) {
       super(app, plugin);
       this.plugin = plugin;
       this.settings = settings;
@@ -104,7 +116,10 @@ export class TubeFlowzSettingsTab extends PluginSettingTab {
             .setValue(this.settings.currentMode)
             .onChange(async (value) => {
                this.settings.currentMode = value as ViewMode;
-               await Settings.saveSettings({ currentMode: value });
+               console.log(this.settings.currentMode);
+               await Settings.saveSettings({ currentMode: value as ViewMode });
+               console.log(this.viewModeService);
+               await this.viewModeService.setView(value as ViewMode);
             }));
 
       // Mode de lecture
@@ -117,7 +132,8 @@ export class TubeFlowzSettingsTab extends PluginSettingTab {
             .setValue(this.settings.playbackMode)
             .onChange(async (value) => {
                this.settings.playbackMode = value as PlaybackMode;
-               await Settings.saveSettings({ playbackMode: value });
+               await Settings.saveSettings({ playbackMode: value as PlaybackMode });
+               await Settings.refresh();
             }));
 
       // Vitesse favorite

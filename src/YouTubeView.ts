@@ -4,31 +4,15 @@ import 'videojs-youtube';
 import { Menu } from 'obsidian';
 import { Settings } from './Settings';
 
-interface TubeFlowzSettings {
-   showYoutubeRecommendations: boolean;
-   isMuted: boolean;
-   language: string;
-}
-
 export class YouTubeView extends ItemView {
    private isDragging: boolean = false;
    private startY: number = 0;
    private startHeight: number = 0;
    private resizeObserver: ResizeObserver | null = null;
    private playerContainer: HTMLElement | null = null;
-   private plugin: Plugin;
    private player: any = null;
    private playbackRateButton: any = null;
-   private settings: TubeFlowzSettings = {
-      showYoutubeRecommendations: false,
-      isMuted: false,
-      language: 'fr'
-   };
 
-   constructor(leaf: WorkspaceLeaf, plugin: Plugin) {
-      super(leaf);
-      this.plugin = plugin;
-   }
 
    getViewType(): string {
       return "youtube-player";
@@ -84,14 +68,15 @@ export class YouTubeView extends ItemView {
             }
          },
          youtube: {
-            youtubeshowrecomendations: 0,
             ytControls: 0,
-            noCookie: true,
-            useCustomIframe: true,
-            iv_load_policy: 3,
-            modestbranding: 1,
             controls: 0,
+            noCookie: true,
             showinfo: 0,
+            useCustomIframe: true,
+            modestbranding: 1,
+            iv_load_policy: 3,
+            youtubeshowrecomendations: 0,
+            annotations: 0,
             rel: 0,
             disablekb: 0,
             fs: 1,

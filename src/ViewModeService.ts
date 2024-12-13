@@ -1,6 +1,7 @@
 import { Plugin, WorkspaceLeaf } from 'obsidian';
 import { ViewMode } from './types';
 import { YouTubeView } from './YouTubeView';
+import { Settings } from './Settings';
 
 export class ViewModeService {
    private currentView: YouTubeView | null = null;
@@ -9,17 +10,12 @@ export class ViewModeService {
    private leafId: string | null = null;
 
    constructor(private plugin: Plugin) {
-      // Nettoyer les anciennes leafs au démarrage
-      this.cleanupOrphanedLeaves();
-   }
-
-   private cleanupOrphanedLeaves() {
-      const leaves = this.plugin.app.workspace.getLeavesOfType("youtube-player");
-      leaves.forEach(leaf => {
-         if (leaf.view instanceof YouTubeView) {
-            leaf.detach();
-         }
+      // Initialiser le mode depuis les settings
+      Settings.loadSettings().then(settings => {
+         this.currentMode = settings.currentMode;
       });
+      // Nettoyer les anciennes leafs au démarrage
+      this.closeCurrentView();
    }
 
    private async closeCurrentView() {
@@ -84,8 +80,11 @@ export class ViewModeService {
          }
       });
 
-      this.currentView = leaf.view as YouTubeView;
       this.currentMode = mode;
+      // Sauvegarder le nouveau mode dans les settings
+      await Settings.saveSettings({ currentMode: mode });
+      
+      this.currentView = leaf.view as YouTubeView;
       this.activeLeaf = leaf;
       this.plugin.app.workspace.revealLeaf(leaf);
    }

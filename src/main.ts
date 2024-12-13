@@ -6,7 +6,7 @@ import { YouTubeView } from './YouTubeView';
 import { ViewMode } from './types';
 import { registerStyles } from './RegisterStyles';
 import { createDecorations } from './Decorations';
-import { TubeFlowzSettings, TubeFlowzSettingsTab, DEFAULT_SETTINGS, Settings } from './Settings'
+import { TubeFlowzSettings, TubeFlowzSettingsTab, Settings } from './Settings'
 
 interface DecorationState {
    decorations: DecorationSet;
@@ -20,22 +20,44 @@ export default class TubeFlowz extends Plugin {
    private viewModeService!: ViewModeService;
    settings!: TubeFlowzSettings;
 
-   async onload() {
-      Settings.initialize(this);
+   async refresh() {
+      // Détacher les vues existantes
+      this.app.workspace.detachLeavesOfType("youtube-player");
+      
+      // Recharger les paramètres
       this.settings = await Settings.loadSettings();
       
-      this.addSettingTab(new TubeFlowzSettingsTab(this.app, this, this.settings));
+      // Réinitialiser le service de mode de vue
+      this.viewModeService = new ViewModeService(this);
+      
+      // Réenregistrer la vue
+      this.registerView(
+         "youtube-player",
+         (leaf) => {
+            const view = new YouTubeView(leaf);
+            return view;
+         }
+      );
+   }
+
+   async onload() {
+// Initialisation
+      Settings.initialize(this);
+      this.settings = await Settings.loadSettings();
+      this.viewModeService = new ViewModeService(this);
+      
+      this.addSettingTab(new TubeFlowzSettingsTab(this.app, this, this.settings, this.viewModeService));
 
       this.registerView(
          "youtube-player",
          (leaf) => {
-            const view = new YouTubeView(leaf, this);
+            const view = new YouTubeView(leaf);
             return view;
          }
       );
+
       
-      this.viewModeService = new ViewModeService(this);
-      
+// Ajout des décorations
       this.registerEditorExtension([
          ViewPlugin.define<DecorationState>(view => ({
             decorations: createDecorations(view, this.app),
@@ -52,8 +74,9 @@ export default class TubeFlowz extends Plugin {
          })
       ]);
 
+// Création du menu
       addIcon('youtube', YOUTUBE_ICON);
-      const ribbonIcon = this.addRibbonIcon('youtube', 'YouTube Reader', () => {});
+      const ribbonIcon = this.addRibbonIcon('youtube', 'TubeFlowz', () => {});
 
       ribbonIcon.addEventListener('mouseenter', () => {
             const menu = new Menu();

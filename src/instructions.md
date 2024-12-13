@@ -1,3 +1,9 @@
+vérifier la modif du mode a partir des settings
+ajouter raccourcis clavier
+trad
+
+
+
 
 ### 1. Gestion des Vidéos YouTube
 - **Import de vidéos**
