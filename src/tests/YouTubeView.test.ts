@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WorkspaceLeaf, Plugin } from 'obsidian';
-import { YouTubeView } from '../YouTubeView';
+import { YouTube } from '../YouTube';
 import { Settings } from '../Settings';
 import '../tests/mocks/obsidian';
 import '../tests/mocks/video';
 
-describe('YouTubeView', () => {
+describe('YouTube', () => {
     let leaf: WorkspaceLeaf;
-    let view: YouTubeView;
+    let view: YouTube;
     let plugin: Plugin;
 
     beforeEach(() => {
@@ -19,7 +19,7 @@ describe('YouTubeView', () => {
         // Initialisation des Settings
         Settings.initialize(plugin);
         
-        view = new YouTubeView(leaf, plugin);
+        view = new YouTube(leaf);
     });
 
     it('devrait avoir le bon type de vue', () => {

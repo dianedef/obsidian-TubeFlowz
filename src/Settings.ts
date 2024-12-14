@@ -1,19 +1,20 @@
 import { App, Plugin, PluginSettingTab, Setting} from 'obsidian';
-import { ViewModeService } from './ViewModeService';
+import { ViewMode } from './ViewMode';
+import { Translations } from './Translations';
 
 export interface DefaultSettings {
    language: string;
    lastVideoId: string;
    lastTimestamp: number;
    isVideoOpen: boolean;
-   currentMode: ViewMode;
+   currentMode: TViewMode;
    isChangingMode: boolean;
    activeLeafId: string | null;
    overlayLeafId: string | null;
    isPlaying: boolean;
-   playbackMode: PlaybackMode;
+   playbackMode: TPlaybackMode;
    playbackRate: number;
-   favoriteSpeed: PlaybackRate;
+   favoriteSpeed: TPlaybackRate;
    volume: number;
    isMuted: boolean;
    viewHeight: string;
@@ -26,9 +27,9 @@ export interface DefaultSettings {
    }>;
 }
 
-export type ViewMode = 'tab' | 'sidebar' | 'overlay';
-export type PlaybackMode = 'stream' | 'download';
-export type PlaybackRate = 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5 | 3 | 4 | 5 | 8 | 10 | 16;
+export type TViewMode = 'tab' | 'sidebar' | 'overlay';
+export type TPlaybackMode = 'stream' | 'download';
+export type TPlaybackRate = 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.5 | 3 | 4 | 5 | 8 | 10 | 16;
 
 export const DEFAULT_SETTINGS: DefaultSettings = {
    language: 'fr',
@@ -93,9 +94,15 @@ export class Settings {
 
 export class SettingsTab extends PluginSettingTab {
    plugin: Plugin;
-   settings: Settings;
+   settings: DefaultSettings;
 
-   constructor(app: App, plugin: Plugin, settings: Settings, private viewModeService: ViewModeService) {
+   constructor(
+      app: App, 
+      plugin: Plugin, 
+      settings: DefaultSettings, 
+      private viewMode: ViewMode,
+      private translations: Translations
+   ) {
       super(app, plugin);
       this.plugin = plugin;
       this.settings = settings;
@@ -107,39 +114,37 @@ export class SettingsTab extends PluginSettingTab {
 
       // Mode d'affichage par défaut
       new Setting(containerEl)
-         .setName('Mode d\'affichage par défaut')
-         .setDesc('Choisissez comment la vidéo doit s\'afficher par défaut')
+         .setName(this.translations.t('settings.defaultViewMode'))
+         .setDesc(this.translations.t('settings.defaultViewModeDesc'))
          .addDropdown(dropdown => dropdown
-            .addOption('tab', 'Onglet')
-            .addOption('sidebar', 'Barre latérale')
-            .addOption('overlay', 'Superposition')
+            .addOption('tab', this.translations.t('settings.tab'))
+            .addOption('sidebar', this.translations.t('settings.sidebar'))
+            .addOption('overlay', this.translations.t('settings.overlay'))
             .setValue(this.settings.currentMode)
             .onChange(async (value) => {
-               this.settings.currentMode = value as ViewMode;
-               console.log(this.settings.currentMode);
-               await Settings.saveSettings({ currentMode: value as ViewMode });
-               console.log(this.viewModeService);
-               await this.viewModeService.setView(value as ViewMode);
+               this.settings.currentMode = value as TViewMode;
+               await Settings.saveSettings({ currentMode: value as TViewMode });
+               await this.viewMode.setView(value as TViewMode);
             }));
 
       // Mode de lecture
       new Setting(containerEl)
-         .setName('Mode de lecture')
-         .setDesc('Choisissez comment les vidéos doivent être lues')
+         .setName(this.translations.t('settings.playbackMode'))
+         .setDesc(this.translations.t('settings.playbackModeDesc'))
          .addDropdown(dropdown => dropdown
-            .addOption('stream', 'Streaming')
-            .addOption('download', 'Téléchargement')
+            .addOption('stream', this.translations.t('settings.stream'))
+            .addOption('download', this.translations.t('settings.download'))
             .setValue(this.settings.playbackMode)
             .onChange(async (value) => {
-               this.settings.playbackMode = value as PlaybackMode;
-               await Settings.saveSettings({ playbackMode: value as PlaybackMode });
+               this.settings.playbackMode = value as TPlaybackMode;
+               await Settings.saveSettings({ playbackMode: value as TPlaybackMode });
                await Settings.refresh();
             }));
 
       // Vitesse favorite
       new Setting(containerEl)
-         .setName('Vitesse favorite')
-         .setDesc('Vitesse de lecture accessible rapidement avec Ctrl+4')
+         .setName(this.translations.t('settings.favoriteSpeed'))
+         .setDesc(this.translations.t('settings.favoriteSpeedDesc'))
          .addDropdown(dropdown => {
             const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 8, 10, 16];
             speeds.forEach(speed => {
@@ -148,7 +153,7 @@ export class SettingsTab extends PluginSettingTab {
             return dropdown
                .setValue(this.settings.favoriteSpeed.toString())
                .onChange(async (value) => {
-                  const speed = parseFloat(value) as PlaybackRate;
+                  const speed = parseFloat(value) as TPlaybackRate;
                   this.settings.favoriteSpeed = speed;
                   await Settings.saveSettings({ favoriteSpeed: speed });
                });
@@ -156,8 +161,8 @@ export class SettingsTab extends PluginSettingTab {
 
       // Recommandations YouTube
       new Setting(containerEl)
-         .setName('Recommandations YouTube')
-         .setDesc('Afficher les recommandations YouTube à la fin des vidéos')
+         .setName(this.translations.t('settings.showRecommendations'))
+         .setDesc(this.translations.t('settings.showRecommendationsDesc'))
          .addToggle(toggle => toggle
             .setValue(this.settings.showYoutubeRecommendations)
             .onChange(async (value) => {

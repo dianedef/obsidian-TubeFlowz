@@ -1,24 +1,26 @@
 import { Plugin, addIcon, Menu, App } from 'obsidian';
 import { ViewPlugin, ViewUpdate, DecorationSet } from '@codemirror/view';
 import { YOUTUBE_ICON } from './constants';
-import { ViewModeService } from './ViewModeService';
-import { YouTubeView } from './YouTubeView';
-import { ViewMode } from './types';
+import { ViewMode } from './ViewMode';
+import { YouTube } from './YouTube';
+import { TViewMode } from './types';
 import { registerStyles } from './RegisterStyles';
 import { createDecorations } from './Decorations';
-import { Settings, SettingsTab } from './Settings'
+import { Settings, SettingsTab, DEFAULT_SETTINGS } from './Settings'
+import { Translations } from './Translations';
 
 interface DecorationState {
    decorations: DecorationSet;
    app: App;
    settings: any;
-   viewModeService: ViewModeService;
+   viewMode: ViewMode;
    update(update: ViewUpdate): void;
 }
 
 export default class TubeFlowz extends Plugin {
-   private viewModeService!: ViewModeService;
+   private viewMode!: ViewMode;
    settings!: Settings;
+   private translations: Translations = new Translations();
 
    async refresh() {
       // Détacher les vues existantes
@@ -28,42 +30,54 @@ export default class TubeFlowz extends Plugin {
       this.settings = await Settings.loadSettings();
       
       // Réinitialiser le service de mode de vue
-      this.viewModeService = new ViewModeService(this);
+      this.viewMode = new ViewMode(this);
       
       // Réenregistrer la vue
       this.registerView(
          "youtube-player",
          (leaf) => {
-            const view = new YouTubeView(leaf);
+            const view = new YouTube(leaf);
             return view;
          }
       );
    }
 
    async onload() {
-// Initialisation
+      // Attendre que l'app soit chargée
+      await this.loadApp();
+
+      // Initialisation
       Settings.initialize(this);
-      this.settings = await Settings.loadSettings();
-      this.viewModeService = new ViewModeService(this);
+      const settings = await Settings.loadSettings();
+      this.settings = settings;
+      this.viewMode = new ViewMode(this);
       
-      this.addSettingTab(new SettingsTab(this.app, this, this.settings, this.viewModeService));
+      // Initialiser les traductions maintenant que l'app est chargée
+      this.loadLanguage();
+      
+      this.addSettingTab(new SettingsTab(
+         this.app,
+         this,
+         settings,
+         this.viewMode,
+         this.translations
+      ));
 
       this.registerView(
          "youtube-player",
          (leaf) => {
-            const view = new YouTubeView(leaf);
+            const view = new YouTube(leaf);
             return view;
          }
       );
 
-      
-// Ajout des décorations
+      // Ajout des décorations
       this.registerEditorExtension([
          ViewPlugin.define<DecorationState>(view => ({
             decorations: createDecorations(view, this.app),
             app: this.app,
             settings: this.settings,
-            viewModeService: this.viewModeService,
+            viewMode: this.viewMode,
             update(update: ViewUpdate) {
                if (update.docChanged || update.viewportChanged) {
                   this.decorations = createDecorations(update.view, this.app);
@@ -74,19 +88,19 @@ export default class TubeFlowz extends Plugin {
          })
       ]);
 
-// Création du menu
+      // Création du menu
       addIcon('youtube', YOUTUBE_ICON);
       const ribbonIcon = this.addRibbonIcon('youtube', 'TubeFlowz', () => {});
 
       ribbonIcon.addEventListener('mouseenter', () => {
             const menu = new Menu();
 
-            const createMenuItem = (title: string, icon: string, mode: ViewMode) => {
+            const createMenuItem = (title: string, icon: string, mode: TViewMode) => {
                menu.addItem((item) => {
                   item.setTitle(title)
                         .setIcon(icon)
                         .onClick(async () => {
-                           await this.viewModeService.setView(mode);
+                           await this.viewMode.setView(mode);
                         });
                });
             };
@@ -124,6 +138,28 @@ export default class TubeFlowz extends Plugin {
       });
 
       registerStyles();
+   }
+
+   private async loadApp(): Promise<void> {
+      return new Promise((resolve) => {
+         // Attendre que l'app soit prête
+         if (this.app.workspace) {
+            resolve();
+         } else {
+            this.app.workspace.onLayoutReady(() => resolve());
+         }
+      });
+   }
+
+   private loadLanguage(): void {
+      try {
+         const locale = document.documentElement.lang?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+         console.log('Langue détectée:', locale);
+         this.translations.setLanguage(locale);
+      } catch (error) {
+         console.warn('Erreur lors de la détection de la langue, utilisation du français par défaut');
+         this.translations.setLanguage('fr');
+      }
    }
 
    onunload() {

@@ -1,11 +1,11 @@
 import { Plugin, WorkspaceLeaf } from 'obsidian';
-import { ViewMode } from './types';
-import { YouTubeView } from './YouTubeView';
+import { TViewMode } from './types';
+import { YouTube } from './YouTube';
 import { Settings } from './Settings';
 
-export class ViewModeService {
-   private currentView: YouTubeView | null = null;
-   private currentMode: ViewMode | null = null;
+export class ViewMode {
+   private currentView: YouTube | null = null;
+   private currentMode: TViewMode | null = null;
    private activeLeaf: WorkspaceLeaf | null = null;
    private leafId: string | null = null;
 
@@ -22,7 +22,7 @@ export class ViewModeService {
       if (this.currentView) {
          const leaves = this.plugin.app.workspace.getLeavesOfType("youtube-player");
          leaves.forEach(leaf => {
-            if (leaf.view instanceof YouTubeView) {
+            if (leaf.view instanceof YouTube) {
                leaf.detach();
             }
          });
@@ -32,13 +32,13 @@ export class ViewModeService {
       }
    }
 
-   private getLeafForMode(mode: ViewMode): WorkspaceLeaf {
+   private getLeafForMode(mode: TViewMode): WorkspaceLeaf {
       const workspace = this.plugin.app.workspace;
       
       // Fermer toutes les vues YouTube existantes
       const existingLeaves = workspace.getLeavesOfType("youtube-player");
       existingLeaves.forEach(leaf => {
-         if (leaf.view instanceof YouTubeView) {
+         if (leaf.view instanceof YouTube) {
             leaf.detach();
          }
       });
@@ -58,24 +58,22 @@ export class ViewModeService {
             break;
       }
 
-      // Générer et sauvegarder un nouvel ID pour la leaf
-      this.leafId = leaf.id;
       return leaf;
    }
 
-   async setView(mode: ViewMode) {
+   async setView(mode: TViewMode) {
       if (mode === this.currentMode && this.currentView && this.activeLeaf) {
          return;
       }
 
       await this.closeCurrentView();
 
-      const leaf = this.getLeafForMode(mode);
+      const leaf = this.getLeafForMode(mode as TViewMode);
       await leaf.setViewState({
          type: 'youtube-player',
          active: true,
          state: { 
-            mode: mode,
+            mode: mode as TViewMode,
             leafId: this.leafId
          }
       });
@@ -84,7 +82,7 @@ export class ViewModeService {
       // Sauvegarder le nouveau mode dans les settings
       await Settings.saveSettings({ currentMode: mode });
       
-      this.currentView = leaf.view as YouTubeView;
+      this.currentView = leaf.view as YouTube;
       this.activeLeaf = leaf;
       this.plugin.app.workspace.revealLeaf(leaf);
    }

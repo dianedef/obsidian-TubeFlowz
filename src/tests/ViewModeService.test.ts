@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Plugin, WorkspaceLeaf } from 'obsidian';
-import { ViewModeService } from '../ViewModeService';
-import { ViewMode } from '../types';
+import { ViewMode } from '../ViewMode';
+import { TViewMode } from '../types';
 import { Settings } from '../Settings';
 import '../tests/mocks/obsidian';
 
 describe('ViewModeService', () => {
     let plugin: Plugin;
-    let viewModeService: ViewModeService;
+    let viewMode: ViewMode;
     let mockWorkspace: any;
 
     beforeEach(() => {

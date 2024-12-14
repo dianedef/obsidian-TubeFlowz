@@ -96,8 +96,8 @@ export default class TubeFlows extends Plugin {
             this.eventBus.emit('plugin:layout-ready');
             this.registerEvent(
                this.app.workspace.on('layout-change', () => {
-                  const hasYouTubeView = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
-                  if (!hasYouTubeView && this.settings.isVideoOpen) {
+                  const hasYouTube = this.app.workspace.getLeavesOfType('youtube-player').length > 0;
+                  if (!hasYouTube && this.settings.isVideoOpen) {
                      this.settings.isVideoOpen = false;
                      this.settings.save();
                   }

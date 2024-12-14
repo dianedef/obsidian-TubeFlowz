@@ -1,1 +1,1 @@
-export type ViewMode = 'tab' | 'sidebar' | 'overlay'; 
+export type TViewMode = 'tab' | 'sidebar' | 'overlay'; 

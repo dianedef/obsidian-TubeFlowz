@@ -4,7 +4,7 @@ import 'videojs-youtube';
 import { Menu } from 'obsidian';
 import { Settings } from './Settings';
 
-export class YouTubeView extends ItemView {
+export class YouTube extends ItemView {
    private isDragging: boolean = false;
    private startY: number = 0;
    private startHeight: number = 0;
@@ -12,7 +12,6 @@ export class YouTubeView extends ItemView {
    private playerContainer: HTMLElement | null = null;
    private player: any = null;
    private playbackRateButton: any = null;
-   private currentRate: number = this.settings.favoriteSpeed;
 
    getViewType(): string {
       return "youtube-player";
@@ -28,6 +27,20 @@ export class YouTubeView extends ItemView {
          controls: true,
          textTrackSettings: false,
          fluid: true,
+         playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16],
+         controlBar: {
+            children: [
+               'playToggle',
+               'volumePanel',
+               'currentTimeDisplay',
+               'timeDivider',
+               'durationDisplay',
+               'progressControl',
+               'playbackRateMenuButton',
+               'pictureInPictureToggle',
+               'fullscreenToggle'
+            ]
+         },
          liveTracker: false,
          liveui: false,
          children: ['MediaLoader'],
@@ -104,29 +117,6 @@ export class YouTubeView extends ItemView {
             }
          },
          modal: false,
-         controlBar: {
-            children: [
-               'playToggle',
-               'volumePanel',
-               'currentTimeDisplay',
-               'timeDivider',
-               'durationDisplay',
-               'progressControl',
-               'pictureInPictureToggle',
-               'fullscreenToggle'
-            ],
-            layout: 'absolute',
-            progressControl: {
-               layout: 'absolute',
-               seekBar: {
-                  layout: 'absolute',
-                  loadProgressBar: false,
-                  playProgressBar: true,
-                  seekHandle: true,
-                  mouseTimeDisplay: true
-               }
-            }
-         },
          loadingSpinner: true,
          bigPlayButton: true,
          errorDisplay: false,
@@ -136,7 +126,7 @@ export class YouTubeView extends ItemView {
    }
 
    async onOpen() {
-      console.log('YouTubeView: onOpen');
+      console.log('YouTube: onOpen');
       const container = this.containerEl;
       container.empty();
       
@@ -168,72 +158,30 @@ export class YouTubeView extends ItemView {
       videoElement.setAttribute('playsinline', 'true');
       videoContainer.appendChild(videoElement);
 
-      console.log('YouTubeView: Initialisation du player video.js');
+      console.log('YouTube: Initialisation du player video.js');
       try {
          this.player = videojs(videoElement, this.getPlayerConfig());
          
          this.player.ready(() => {
-            console.log('YouTubeView: Player est prêt');
+            console.log('YouTube: Player est prêt');
             
             // Déplacer les contrôles dans leur conteneur
             const controlBar = videoContainer.querySelector('.vjs-control-bar');
             if (controlBar) {
                controlsContainer.appendChild(controlBar);
             }
-
-            // Initialiser le bouton de vitesse
-            this.initializePlaybackRateButton();
          });
 
       } catch (error) {
-         console.error('YouTubeView: Erreur lors de l\'initialisation du player:', error);
+         console.error('YouTube: Erreur lors de l\'initialisation du player:', error);
       }
 
       // Ajouter le resize handle dans son conteneur
       this.addResizeHandle(contentEl);
    }
 
-   private initializePlaybackRateButton(): void {
-      if (!this.player) return;
-
-      // Ajouter le bouton de vitesse personnalisé
-      this.playbackRateButton = this.player.controlBar.addChild('button', {
-         className: 'vjs-playback-rate'
-      });
-
-      const buttonEl = this.playbackRateButton.el();
-      buttonEl.textContent = '1x';
-
-      // Gérer le hover pour afficher le menu
-      buttonEl.addEventListener('mouseenter', () => {
-         const menu = new Menu();
-         const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
-         const currentRate = this.player?.playbackRate();
-
-         rates.forEach(rate => {
-            menu.addItem(item => 
-               item
-                  .setTitle(`${rate}x`)
-                  .setChecked(currentRate === rate)
-                  .onClick(() => {
-                     if (this.player) {
-                        this.player.playbackRate(rate);
-                        buttonEl.textContent = `${rate}x`;
-                     }
-                  })
-            );
-         });
-
-         const rect = buttonEl.getBoundingClientRect();
-         menu.showAtPosition({
-            x: rect.right,
-            y: rect.bottom
-         });
-      });
-   }
-
    async loadVideo(videoId: string) {
-      console.log('YouTubeView: Chargement de la vidéo', videoId);
+      console.log('YouTube: Chargement de la vidéo', videoId);
       if (!this.player) return;
 
       try {
@@ -243,9 +191,9 @@ export class YouTubeView extends ItemView {
             type: 'video/youtube',
             src: embedUrl
          });
-         console.log('YouTubeView: Source vidéo définie');
+         console.log('YouTube: Source vidéo définie');
       } catch (error) {
-         console.error('YouTubeView: Erreur lors du chargement de la vidéo:', error);
+         console.error('YouTube: Erreur lors du chargement de la vidéo:', error);
       }
    }
 
@@ -315,4 +263,45 @@ export class YouTubeView extends ItemView {
          Settings.saveSettings({ viewHeight: height });
       }
    }
+
+   // Méthodes publiques pour interagir avec le player
+   togglePlayPause(): void {
+      this.player.togglePlay();
+   }
+
+   seekBackward(seconds: number): void {
+      this.player.currentTime(this.player.currentTime() - seconds);
+   }
+
+   seekForward(seconds: number): void {
+      this.player.currentTime(this.player.currentTime() + seconds);
+   }
+
+   setPlaybackRate(rate: number): void {
+      this.player.playbackRate(rate);
+   }
+
+   increasePlaybackRate(): void {
+      const rates = this.player.options_.playbackRates;
+      const currentRate = this.player.playbackRate();
+      const nextRate = rates.find(rate => rate > currentRate);
+      if (nextRate) this.player.playbackRate(nextRate);
+   }
+
+   decreasePlaybackRate(): void {
+      const rates = this.player.options_.playbackRates;
+      const currentRate = this.player.playbackRate();
+      const prevRate = rates.reverse().find(rate => rate < currentRate);
+      if (prevRate) this.player.playbackRate(prevRate);
+   }
+
+   toggleMute(): void {
+      this.player.muted(!this.player.muted());
+   }
+
+   toggleFullscreen(): void {
+      this.player.requestFullscreen();
+   }
+
+
 } 
