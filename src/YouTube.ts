@@ -27,7 +27,8 @@ export class YouTube extends ItemView {
          controls: true,
          textTrackSettings: false,
          fluid: true,
-         playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16],
+         loadingSpinner: true,
+         bigPlayButton: true,
          controlBar: {
             children: [
                'playToggle',
@@ -36,7 +37,6 @@ export class YouTube extends ItemView {
                'timeDivider',
                'durationDisplay',
                'progressControl',
-               'playbackRateMenuButton',
                'pictureInPictureToggle',
                'fullscreenToggle'
             ]
@@ -116,12 +116,14 @@ export class YouTube extends ItemView {
                adTagUrl: ''
             }
          },
-         modal: false,
-         loadingSpinner: true,
-         bigPlayButton: true,
          errorDisplay: false,
          textTrackDisplay: false,
          posterImage: false,
+         modal: false,
+         modalDialog: false, 
+         imageQuality: false,
+         thumbnail: false,
+         poster: false,
       };
    }
 
@@ -171,9 +173,18 @@ export class YouTube extends ItemView {
             
             // Déplacer les contrôles dans leur conteneur
             const controlBar = videoContainer.querySelector('.vjs-control-bar');
-            if (controlBar) {
-               controlsContainer.appendChild(controlBar);
+            const progressControl = videoContainer.querySelector('.vjs-progress-control');
+            
+            if (progressControl) {
+                controlsContainer.appendChild(progressControl);
             }
+            
+            if (controlBar) {
+                controlsContainer.appendChild(controlBar);
+            }
+            
+            // Initialiser le bouton de vitesse
+            this.initializePlaybackRateButton();
 
             // Initialiser les événements du player
             this.player.on('error', (error: any) => {
@@ -205,6 +216,46 @@ export class YouTube extends ItemView {
 
       // Ajouter le resize handle dans son conteneur
       this.addResizeHandle(contentEl);
+   }
+
+   
+   private initializePlaybackRateButton(): void {
+      if (!this.player) return;
+
+      // Ajouter le bouton de vitesse personnalisé
+      this.playbackRateButton = this.player.controlBar.addChild('button', {
+         className: 'vjs-playback-rate'
+      });
+
+      const buttonEl = this.playbackRateButton.el();
+      buttonEl.textContent = '1x';
+
+      // Gérer le hover pour afficher le menu
+      buttonEl.addEventListener('mouseenter', () => {
+         const menu = new Menu();
+         const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
+         const currentRate = this.player?.playbackRate();
+
+         rates.forEach(rate => {
+            menu.addItem(item => 
+               item
+                  .setTitle(`${rate}x`)
+                  .setChecked(currentRate === rate)
+                  .onClick(() => {
+                     if (this.player) {
+                        this.player.playbackRate(rate);
+                        buttonEl.textContent = `${rate}x`;
+                     }
+                  })
+            );
+         });
+
+         const rect = buttonEl.getBoundingClientRect();
+         menu.showAtPosition({
+            x: rect.right,
+            y: rect.bottom
+         });
+      });
    }
 
    async loadVideo(videoId: string) {

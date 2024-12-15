@@ -34,7 +34,7 @@ styleEl.textContent = `
         bottom: 0;
         left: 0;
         width: 100%;
-        height: 100%;
+        height: 12px;
         background: var(--background-modifier-success-hover);
         opacity: 0.2;
     }
@@ -73,22 +73,21 @@ styleEl.textContent = `
 
     /* Barre de progression */
     .vjs-progress-control {
-        position: absolute;
-        top: -10px;
-        left: 0;
-        right: 0;
+        position: relative;
         width: 100%;
-        height: 6px;
+        height:30px;
         background: var(--background-modifier-border);
         cursor: pointer;
         z-index: 101;
+        margin: 0;
+        padding: 0;
     }
 
     /* Barre de chargement (buffer) */
     .vjs-load-progress {
         position: absolute;
-        bottom: 0;
         left: 0;
+        top: 0;
         width: 100%;
         height: 100%;
         background: var(--background-modifier-success-hover);
@@ -97,8 +96,23 @@ styleEl.textContent = `
 
     /* Barre de lecture */
     .vjs-play-progress {
-        height: 12px;
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
         background: var(--interactive-accent);
+        width: 0;
+        opacity: 0.5;
+    }
+
+    /* État initial de la barre de progression */
+    .vjs-progress-holder {
+        position: relative;
+        height: 30px;
+    }
+    
+    .video-js:not(.vjs-has-started) .vjs-play-progress {
+        width: 0 !important;
     }
         
 
@@ -123,6 +137,17 @@ styleEl.textContent = `
         border-radius: 4px;
         font-size: 0.9em;
         white-space: nowrap;
+        display: none;
+    }
+
+    /* N'afficher le tooltip que lors du survol et du mouvement de la souris */
+    .vjs-progress-control:hover .vjs-mouse-display .vjs-time-tooltip {
+        display: block;
+    }
+
+    /* Masquer spécifiquement le tooltip de durée totale */
+    .vjs-progress-holder .vjs-play-progress .vjs-time-tooltip {
+        display: none !important;
     }
 
     /* Masquer tous les autres tooltips */
@@ -206,7 +231,9 @@ styleEl.textContent = `
     .youtube-controls-container {
         width: 100%;
         background: var(--background-secondary-alt);
-        padding: 5px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
     }
 
     .video-js {
