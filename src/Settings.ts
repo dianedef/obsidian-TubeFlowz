@@ -90,6 +90,10 @@ export class Settings {
    static async setViewHeight(height: string) {
       await this.saveSettings({ viewHeight: height });
    }
+
+   static getSettings(): DefaultSettings {
+      return this.settings;
+   }
 }
 
 export class SettingsTab extends PluginSettingTab {

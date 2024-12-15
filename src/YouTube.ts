@@ -160,7 +160,11 @@ export class YouTube extends ItemView {
 
       console.log('YouTube: Initialisation du player video.js');
       try {
-         this.player = videojs(videoElement, this.getPlayerConfig());
+         const config = this.getPlayerConfig();
+         console.log('YouTube: Configuration du player:', config);
+         
+         this.player = videojs(videoElement, config);
+         console.log('YouTube: Player créé:', this.player);
          
          this.player.ready(() => {
             console.log('YouTube: Player est prêt');
@@ -170,6 +174,29 @@ export class YouTube extends ItemView {
             if (controlBar) {
                controlsContainer.appendChild(controlBar);
             }
+
+            // Initialiser les événements du player
+            this.player.on('error', (error: any) => {
+               console.error('YouTube: Erreur du player:', error);
+            });
+
+            this.player.on('play', () => {
+               console.log('YouTube: Lecture démarrée');
+            });
+
+            this.player.on('pause', () => {
+               console.log('YouTube: Lecture en pause');
+            });
+
+            this.player.on('ratechange', () => {
+               console.log('YouTube: Changement de vitesse:', this.player.playbackRate());
+            });
+
+            this.player.on('volumechange', () => {
+               console.log('YouTube: Changement de volume:', this.player.volume());
+            });
+
+            console.log('YouTube: Tous les événements sont enregistrés');
          });
 
       } catch (error) {
@@ -266,42 +293,104 @@ export class YouTube extends ItemView {
 
    // Méthodes publiques pour interagir avec le player
    togglePlayPause(): void {
-      this.player.togglePlay();
+      console.log('YouTube: Toggle play/pause');
+      if (!this.player) return;
+      if (this.player.paused()) {
+         console.log('YouTube: Play');
+         this.player.play();
+      } else {
+         console.log('YouTube: Pause');
+         this.player.pause();
+      }
    }
 
    seekBackward(seconds: number): void {
-      this.player.currentTime(this.player.currentTime() - seconds);
+      console.log('YouTube: Seek backward', seconds);
+      if (!this.player) return;
+      const currentTime = this.player.currentTime();
+      const newTime = Math.max(0, currentTime - seconds);
+      console.log('YouTube: New time', newTime);
+      this.player.currentTime(newTime);
    }
 
    seekForward(seconds: number): void {
-      this.player.currentTime(this.player.currentTime() + seconds);
+      console.log('YouTube: Seek forward', seconds);
+      if (!this.player) return;
+      const currentTime = this.player.currentTime();
+      const duration = this.player.duration();
+      const newTime = Math.min(duration, currentTime + seconds);
+      console.log('YouTube: New time', newTime);
+      this.player.currentTime(newTime);
    }
 
    setPlaybackRate(rate: number): void {
+      console.log('YouTube: Set playback rate', rate);
+      if (!this.player) return;
       this.player.playbackRate(rate);
    }
 
    increasePlaybackRate(): void {
-      const rates = this.player.options_.playbackRates;
+      console.log('YouTube: Increase playback rate');
+      if (!this.player) return;
+      const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
       const currentRate = this.player.playbackRate();
+      console.log('YouTube: Current rate', currentRate);
       const nextRate = rates.find(rate => rate > currentRate);
-      if (nextRate) this.player.playbackRate(nextRate);
+      if (nextRate) {
+         console.log('YouTube: New rate', nextRate);
+         this.player.playbackRate(nextRate);
+      }
    }
 
    decreasePlaybackRate(): void {
-      const rates = this.player.options_.playbackRates;
+      console.log('YouTube: Decrease playback rate');
+      if (!this.player) return;
+      const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
       const currentRate = this.player.playbackRate();
+      console.log('YouTube: Current rate', currentRate);
       const prevRate = rates.reverse().find(rate => rate < currentRate);
-      if (prevRate) this.player.playbackRate(prevRate);
+      if (prevRate) {
+         console.log('YouTube: New rate', prevRate);
+         this.player.playbackRate(prevRate);
+      }
    }
 
    toggleMute(): void {
-      this.player.muted(!this.player.muted());
+      console.log('YouTube: Toggle mute');
+      if (!this.player) return;
+      const isMuted = this.player.muted();
+      console.log('YouTube: Current muted state', isMuted);
+      this.player.muted(!isMuted);
    }
 
    toggleFullscreen(): void {
-      this.player.requestFullscreen();
+      console.log('YouTube: Toggle fullscreen');
+      if (!this.player) return;
+      if (this.player.isFullscreen()) {
+         console.log('YouTube: Exit fullscreen');
+         this.player.exitFullscreen();
+      } else {
+         console.log('YouTube: Enter fullscreen');
+         this.player.requestFullscreen();
+      }
    }
 
+   increaseVolume(step: number = 0.1): void {
+      console.log('YouTube: Increase volume', step);
+      if (!this.player) return;
+      const currentVolume = this.player.volume();
+      const newVolume = Math.min(1, currentVolume + step);
+      console.log('YouTube: New volume', newVolume);
+      this.player.volume(newVolume);
+   }
+
+   decreaseVolume(step: number = 0.1): void {
+      console.log('YouTube: Decrease volume', step);
+      if (!this.player) return;
+      const currentVolume = this.player.volume();
+      const newVolume = Math.max(0, currentVolume - step);
+      console.log('YouTube: New volume', newVolume);
+      this.player.volume(newVolume);
+   }
 
 } 

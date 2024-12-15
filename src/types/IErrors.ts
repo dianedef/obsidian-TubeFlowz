@@ -1,4 +1,4 @@
-import { type TranslationKey, TranslationsService, ERROR_MESSAGE_KEYS } from '../services/TranslationsService';
+import { type TranslationKey, TranslationsService, ERROR_MESSAGE_KEYS } from '../../src-ancien/services/TranslationsService';
 
 // Codes d'erreur génériques de l'application
 export enum AppErrorCode {

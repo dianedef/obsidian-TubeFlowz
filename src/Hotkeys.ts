@@ -2,12 +2,12 @@ import { Plugin, Notice } from 'obsidian';
 import { Settings } from './Settings';
 import { Translations } from './Translations';
 import { YouTube } from './YouTube';
-import { CommandError, CommandErrorCode } from '../types/IErrors';
+import { CommandError, CommandErrorCode } from './types/IErrors';
 
 export class Hotkeys {
    constructor(
       private plugin: Plugin,
-      private settings: Settings,
+      private settings: typeof Settings,
       private youtube: YouTube,
       private translations: Translations
    ) {}
@@ -22,19 +22,21 @@ export class Hotkeys {
    }
 
    registerHotkeys() {
+      const youtube = this.youtube;
+
       // Lecture/Pause
       this.plugin.addCommand({
          id: 'youtube-play-pause',
          name: this.translations.t('commands.playPause'),
          icon: 'play',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.togglePlayPause();
+               youtube.togglePlayPause();
             } catch (error) {
                this.handleCommandError(error);
             }
          },
-         hotkeys: [{ modifiers: [], key: this.settings.getSettings().hotkeys?.togglePlay || 'space' }]
+         hotkeys: [{ modifiers: ["Shift"], key: " " }]
       });
 
       // Reculer de 10 secondes
@@ -42,14 +44,14 @@ export class Hotkeys {
          id: 'youtube-seek-backward',
          name: this.translations.t('commands.seekBackward'),
          icon: 'arrow-left',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.seekBackward(10);
+               youtube.seekBackward(10);
             } catch (error) {
                this.handleCommandError(error);
             }
          },
-         hotkeys: [{ modifiers: [], key: this.settings.getSettings().hotkeys?.rewind || 'arrowleft' }]
+         hotkeys: [{ modifiers: ['Ctrl'], key: 'ArrowLeft' }]
       });
 
       // Avancer de 10 secondes
@@ -57,29 +59,59 @@ export class Hotkeys {
          id: 'youtube-seek-forward',
          name: this.translations.t('commands.seekForward'),
          icon: 'arrow-right',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.seekForward(10);
+               youtube.seekForward(10);
             } catch (error) {
                this.handleCommandError(error);
             }
          },
-         hotkeys: [{ modifiers: [], key: this.settings.getSettings().hotkeys?.forward || 'arrowright' }]
+         hotkeys: [{ modifiers: ['Ctrl'], key: 'ArrowRight' }]
       });
 
-      // Vitesse de lecture
+      // Augmenter la vitesse
       this.plugin.addCommand({
          id: 'youtube-speed-up',
          name: this.translations.t('commands.speedUp'),
          icon: 'fast-forward',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.increasePlaybackRate();
+               youtube.increasePlaybackRate();
             } catch (error) {
                this.handleCommandError(error);
             }
          },
-         hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.speedUp || '>' }]
+         hotkeys: [{ modifiers: ['Ctrl'], key: '3' }]
+      });
+
+      // Vitesse normale
+      this.plugin.addCommand({
+         id: 'youtube-default-speed',
+         name: this.translations.t('commands.defaultSpeed'),
+         icon: 'refresh-cw',
+         callback: () => {
+            try {
+               youtube.setPlaybackRate(1);
+            } catch (error) {
+               this.handleCommandError(error);
+            }
+         },
+         hotkeys: [{ modifiers: ['Ctrl'], key: '2' }]
+      });
+
+      // Diminuer la vitesse
+      this.plugin.addCommand({
+         id: 'youtube-speed-down',
+         name: this.translations.t('commands.speedDown'),
+         icon: 'rewind',
+         callback: () => {
+            try {
+               youtube.decreasePlaybackRate();
+            } catch (error) {
+               this.handleCommandError(error);
+            }
+         },
+         hotkeys: [{ modifiers: ['Ctrl'], key: '1' }]
       });
 
       // Muet/Son
@@ -87,14 +119,14 @@ export class Hotkeys {
          id: 'youtube-toggle-mute',
          name: this.translations.t('commands.toggleMute'),
          icon: 'volume-x',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.toggleMute();
+               youtube.toggleMute();
             } catch (error) {
                this.handleCommandError(error);
             }
          },
-         hotkeys: [{ modifiers: ['Shift'], key: this.settings.getSettings().hotkeys?.toggleMute || 'm' }]
+         hotkeys: [{ modifiers: ['Alt'], key: 'm' }]
       });
 
       // Plein écran
@@ -102,25 +134,26 @@ export class Hotkeys {
          id: 'youtube-toggle-fullscreen',
          name: this.translations.t('commands.toggleFullscreen'),
          icon: 'maximize',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.toggleFullscreen();
+               youtube.toggleFullscreen();
             } catch (error) {
                this.handleCommandError(error);
             }
          },
-         hotkeys: [{ modifiers: ['Shift'], key: this.settings.settings?.hotkeys?.toggleFullscreen || 'f' }]
+         hotkeys: [{ modifiers: ['Alt'], key: 'a' }]
       });
 
       // Vitesse favorite
       this.plugin.addCommand({
          id: 'youtube-favorite-speed',
          name: this.translations.t('commands.favoriteSpeed'),
-         icon: 'fast-forward',
-         editorCallback: () => {
+         icon: 'star',
+         callback: () => {
             try {
-               const favoriteSpeed = this.settings.getSettings().favoriteSpeed || 2;
-               this.youtube.setPlaybackRate(favoriteSpeed);
+               const settings = this.settings.getSettings();
+               const favoriteSpeed = settings.favoriteSpeed || 2;
+               youtube.setPlaybackRate(favoriteSpeed);
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -133,9 +166,9 @@ export class Hotkeys {
          id: 'youtube-volume-up',
          name: 'Augmenter le volume',
          icon: 'volume-2',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.increaseVolume(0.1);
+               youtube.increaseVolume(0.1);
             } catch (error) {
                this.handleCommandError(error);
             }
@@ -148,9 +181,9 @@ export class Hotkeys {
          id: 'youtube-volume-down',
          name: 'Diminuer le volume',
          icon: 'volume-1',
-         editorCallback: () => {
+         callback: () => {
             try {
-               this.youtube.decreaseVolume(0.1);
+               youtube.decreaseVolume(0.1);
             } catch (error) {
                this.handleCommandError(error);
             }

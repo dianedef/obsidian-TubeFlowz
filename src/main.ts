@@ -8,6 +8,7 @@ import { registerStyles } from './RegisterStyles';
 import { createDecorations } from './Decorations';
 import { Settings, SettingsTab, DEFAULT_SETTINGS } from './Settings'
 import { Translations } from './Translations';
+import { Hotkeys } from './Hotkeys';
 
 interface DecorationState {
    decorations: DecorationSet;
@@ -20,7 +21,9 @@ interface DecorationState {
 export default class TubeFlowz extends Plugin {
    private viewMode!: ViewMode;
    settings!: Settings;
+   private youtube!: YouTube;
    private translations: Translations = new Translations();
+   private hotkeys!: Hotkeys;
 
    async refresh() {
       // Détacher les vues existantes
@@ -33,10 +36,25 @@ export default class TubeFlowz extends Plugin {
       this.viewMode = new ViewMode(this);
       
       // Réenregistrer la vue
+      this.registerYouTubeView();
+   }
+
+   private registerYouTubeView() {
       this.registerView(
          "youtube-player",
          (leaf) => {
             const view = new YouTube(leaf);
+            this.youtube = view;
+            // Initialiser les hotkeys une fois que la vue est créée
+            if (!this.hotkeys) {
+               this.hotkeys = new Hotkeys(
+                  this,
+                  Settings,
+                  this.youtube,
+                  this.translations
+               );
+               this.hotkeys.registerHotkeys();
+            }
             return view;
          }
       );
@@ -48,9 +66,7 @@ export default class TubeFlowz extends Plugin {
 
       // Initialisation
       Settings.initialize(this);
-      const settings = await Settings.loadSettings();
-      this.settings = settings;
-      this.viewMode = new ViewMode(this);
+      await this.refresh();
       
       // Initialiser les traductions maintenant que l'app est chargée
       this.loadLanguage();
@@ -58,18 +74,10 @@ export default class TubeFlowz extends Plugin {
       this.addSettingTab(new SettingsTab(
          this.app,
          this,
-         settings,
+         this.settings,
          this.viewMode,
          this.translations
       ));
-
-      this.registerView(
-         "youtube-player",
-         (leaf) => {
-            const view = new YouTube(leaf);
-            return view;
-         }
-      );
 
       // Ajout des décorations
       this.registerEditorExtension([
@@ -93,48 +101,48 @@ export default class TubeFlowz extends Plugin {
       const ribbonIcon = this.addRibbonIcon('youtube', 'TubeFlowz', () => {});
 
       ribbonIcon.addEventListener('mouseenter', () => {
-            const menu = new Menu();
+         const menu = new Menu();
 
-            const createMenuItem = (title: string, icon: string, mode: TViewMode) => {
-               menu.addItem((item) => {
-                  item.setTitle(title)
-                        .setIcon(icon)
-                        .onClick(async () => {
-                           await this.viewMode.setView(mode);
-                        });
-               });
-            };
-
-            createMenuItem("YouTube Tab", "tab", "tab");
-            createMenuItem("YouTube Sidebar", "layout-sidebar-right", "sidebar");
-            createMenuItem("YouTube Overlay", "layout-top", "overlay");
-
-            const iconRect = ribbonIcon.getBoundingClientRect();
-            menu.showAtPosition({ 
-               x: iconRect.left, 
-               y: iconRect.top - 10
+         const createMenuItem = (title: string, icon: string, mode: TViewMode) => {
+            menu.addItem((item) => {
+               item.setTitle(title)
+                  .setIcon(icon)
+                  .onClick(async () => {
+                     await this.viewMode.setView(mode);
+                  });
             });
+         };
 
-            const handleMouseLeave = (e: MouseEvent) => {
-               const target = e.relatedTarget as Node;
-               const menuDom = (menu as any).dom;
-               const isOverIcon = ribbonIcon.contains(target);
-               const isOverMenu = menuDom && menuDom.contains(target);
-               
-               if (!isOverIcon && !isOverMenu) {
-                  menu.hide();
-                  ribbonIcon.removeEventListener('mouseleave', handleMouseLeave);
-                  if (menuDom) {
-                        menuDom.removeEventListener('mouseleave', handleMouseLeave);
-                  }
-               }
-            };
+         createMenuItem("YouTube Tab", "tab", "tab");
+         createMenuItem("YouTube Sidebar", "layout-sidebar-right", "sidebar");
+         createMenuItem("YouTube Overlay", "layout-top", "overlay");
 
-            ribbonIcon.addEventListener('mouseleave', handleMouseLeave);
+         const iconRect = ribbonIcon.getBoundingClientRect();
+         menu.showAtPosition({ 
+            x: iconRect.left, 
+            y: iconRect.top - 10
+         });
+
+         const handleMouseLeave = (e: MouseEvent) => {
+            const target = e.relatedTarget as Node;
             const menuDom = (menu as any).dom;
-            if (menuDom) {
-               menuDom.addEventListener('mouseleave', handleMouseLeave);
+            const isOverIcon = ribbonIcon.contains(target);
+            const isOverMenu = menuDom && menuDom.contains(target);
+            
+            if (!isOverIcon && !isOverMenu) {
+               menu.hide();
+               ribbonIcon.removeEventListener('mouseleave', handleMouseLeave);
+               if (menuDom) {
+                  menuDom.removeEventListener('mouseleave', handleMouseLeave);
+               }
             }
+         };
+
+         ribbonIcon.addEventListener('mouseleave', handleMouseLeave);
+         const menuDom = (menu as any).dom;
+         if (menuDom) {
+            menuDom.addEventListener('mouseleave', handleMouseLeave);
+         }
       });
 
       registerStyles();
