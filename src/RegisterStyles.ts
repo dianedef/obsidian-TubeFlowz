@@ -64,10 +64,19 @@ styleEl.textContent = `
         position: relative;
         background: none;
         height: 40px;
+        min-height: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 0 5px;
+    }
+
+    /* Boutons de la barre de contrôle */
+    .vjs-control-bar .vjs-control,
+    .vjs-control-bar .vjs-button,
+    .vjs-control-bar .vjs-playback-rate {
+        font-size: 16px;
+        cursor: pointer;
     }
 
     /* Barre de progression */
@@ -188,7 +197,6 @@ styleEl.textContent = `
     .vjs-poster,
     .vjs-loading-spinner,
     .vjs-big-play-button,
-    .vjs-control-text[role="presentation"],
     .vjs-remaining-time,
     .vjs-load-progress div,
     .vjs-load-progress span {
@@ -212,7 +220,6 @@ styleEl.textContent = `
         width: 100%;
         display: flex;
         flex-direction: column;
-        --video-js-size-factor: 1.5;
     }
 
     .youtube-player-wrapper {

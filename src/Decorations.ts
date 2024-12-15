@@ -33,6 +33,7 @@ class DecorationForUrl extends WidgetType {
             console.log('DecorationForUrl: Ouvrir le player YouTube avec id:', this.videoId);
             const view = this.app.workspace.getLeavesOfType('youtube-player')[0]?.view as YouTube;
             await view.loadVideo(this.videoId);
+            view.togglePlayPause();
          } catch (error) {
             console.error('Erreur lors du chargement de la vidéo:', error);
          }
