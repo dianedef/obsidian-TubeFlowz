@@ -63,8 +63,7 @@ styleEl.textContent = `
         width: 100%;
         position: relative;
         background: none;
-        height: 30px;
-        min-height: 0;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -169,11 +168,11 @@ styleEl.textContent = `
     /* ===== Resize Handle ===== */
     .youtube-resize-handle {
         position: absolute;
-        bottom: 0;
+        bottom: -10px;
         left: 0;
         z-index: 999;
         width: 100%;
-        height: 12px;
+        height: 16px;
         cursor: ns-resize;
         background: transparent;
         transition: background-color 0.2s;
@@ -222,6 +221,7 @@ styleEl.textContent = `
         width: 100%;
         background: var(--background-secondary);
         min-height: 0;
+        padding-bottom: 5px;
     }
 
     .youtube-video-container {
@@ -233,10 +233,9 @@ styleEl.textContent = `
 
     .youtube-controls-container {
         width: 100%;
-        background: var(--background-secondary-alt);
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        padding: 0 0 10 0;
     }
 
     .video-js {
