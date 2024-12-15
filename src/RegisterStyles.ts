@@ -78,7 +78,7 @@ styleEl.textContent = `
         background: var(--background-modifier-border);
         cursor: pointer;
         z-index: 101;
-        margin: 0;
+        margin-bottom: 5px;
         padding: 0;
     }
 
@@ -212,6 +212,7 @@ styleEl.textContent = `
         width: 100%;
         display: flex;
         flex-direction: column;
+        --video-js-size-factor: 1.5;
     }
 
     .youtube-player-wrapper {
@@ -221,7 +222,6 @@ styleEl.textContent = `
         width: 100%;
         background: var(--background-secondary);
         min-height: 0;
-        padding-bottom: 5px;
     }
 
     .youtube-video-container {
@@ -235,7 +235,8 @@ styleEl.textContent = `
         width: 100%;
         display: flex;
         flex-direction: column;
-        padding: 0 0 10 0;
+        gap: 5px;
+        padding: 0 0 10px 0;
     }
 
     .video-js {

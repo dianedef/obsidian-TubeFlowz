@@ -162,6 +162,12 @@ export class SettingsTab extends PluginSettingTab {
                   await Settings.saveSettings({ favoriteSpeed: speed });
                });
          });
+         
+      // Note sur les raccourcis clavier
+      containerEl.createEl('div', {
+         cls: 'setting-item-description',
+         text: this.translations.t('settings.hotkeysFocusNote')
+      }).style.marginBottom = '1em';
 
       // Recommandations YouTube
       new Setting(containerEl)
@@ -173,5 +179,6 @@ export class SettingsTab extends PluginSettingTab {
                this.settings.showYoutubeRecommendations = value;
                await Settings.saveSettings({ showYoutubeRecommendations: value });
             }));
+
    }
 }

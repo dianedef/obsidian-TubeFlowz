@@ -22,7 +22,8 @@ export type TranslationKey =
    | 'settings.favoriteSpeed'
    | 'settings.favoriteSpeedDesc'
    | 'settings.showRecommendations'
-   | 'settings.showRecommendationsDesc';
+   | 'settings.showRecommendationsDesc'
+   | 'settings.hotkeysFocusNote';
 
 export const translations: { [lang: string]: Record<TranslationKey, string> } = {
    en: {
@@ -49,7 +50,8 @@ export const translations: { [lang: string]: Record<TranslationKey, string> } = 
       'settings.favoriteSpeed': 'Favorite Playback Speed',
       'settings.favoriteSpeedDesc': 'Speed that will be used with Ctrl+4',
       'settings.showRecommendations': 'YouTube Recommendations',
-      'settings.showRecommendationsDesc': 'Show YouTube recommendations at the end of videos'
+      'settings.showRecommendationsDesc': 'Show YouTube recommendations at the end of videos',
+      'settings.hotkeysFocusNote': 'Note: Hotkeys only work when the YouTube player is not focused. Click outside the player to use hotkeys.'
    },
    fr: {
       // Commands
@@ -75,7 +77,8 @@ export const translations: { [lang: string]: Record<TranslationKey, string> } = 
       'settings.favoriteSpeed': 'Vitesse de lecture favorite',
       'settings.favoriteSpeedDesc': 'Vitesse qui sera utilisée avec Ctrl+4',
       'settings.showRecommendations': 'Recommandations YouTube',
-      'settings.showRecommendationsDesc': 'Afficher les recommandations YouTube à la fin des vidéos'
+      'settings.showRecommendationsDesc': 'Afficher les recommandations YouTube à la fin des vidéos',
+      'settings.hotkeysFocusNote': 'Note : Les raccourcis clavier ne fonctionnent que lorsque le player YouTube n\'est pas en focus. Cliquez en dehors du player pour utiliser les raccourcis.'
    }
 };
 

@@ -290,8 +290,8 @@ export class YouTube extends ItemView {
       if (!this.player) return;
 
       try {
-         // Utiliser l'URL embed directement
-         const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+         // Utiliser l'URL embed avec les paramètres pour désactiver les raccourcis
+         const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?disablekb=1&enablejsapi=1&controls=0&modestbranding=1&rel=0&showinfo=0`;
          this.player.src({
             type: 'video/youtube',
             src: embedUrl
@@ -401,6 +401,16 @@ export class YouTube extends ItemView {
       this.player.currentTime(newTime);
    }
 
+   async setPlaybackRate(rate: number): Promise<void> {
+      console.log('YouTube: Set playback rate', rate);
+      if (!this.player) return;
+      this.player.playbackRate(rate);
+      if (this.playbackRateButton) {
+         this.playbackRateButton.el().textContent = `${rate}x`;
+      }
+      await Settings.saveSettings({ playbackRate: rate });
+   }
+
    async increasePlaybackRate(): Promise<void> {
       console.log('YouTube: Increase playback rate');
       if (!this.player) return;
@@ -410,7 +420,7 @@ export class YouTube extends ItemView {
       const nextRate = rates.find(rate => rate > currentRate);
       if (nextRate) {
          console.log('YouTube: New rate', nextRate);
-         this.player.playbackRate(nextRate);
+         await this.setPlaybackRate(nextRate);
       }
    }
 
@@ -423,7 +433,7 @@ export class YouTube extends ItemView {
       const prevRate = rates.reverse().find(rate => rate < currentRate);
       if (prevRate) {
          console.log('YouTube: New rate', prevRate);
-         this.player.playbackRate(prevRate);
+         await this.setPlaybackRate(prevRate);
       }
    }
 
@@ -464,5 +474,4 @@ export class YouTube extends ItemView {
       console.log('YouTube: New volume', newVolume);
       this.player.volume(newVolume);
    }
-
 } 
