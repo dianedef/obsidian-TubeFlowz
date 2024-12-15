@@ -189,8 +189,11 @@ styleEl.textContent = `
     .vjs-poster,
     .vjs-loading-spinner,
     .vjs-big-play-button,
-    .vjs-control-text[role="presentation"] {
-        display: none;
+    .vjs-control-text[role="presentation"],
+    .vjs-remaining-time,
+    .vjs-load-progress div,
+    .vjs-load-progress span {
+        display: none !important;
     }
 
     /* ===== Overlay Mode ===== */
