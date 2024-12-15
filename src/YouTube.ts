@@ -136,7 +136,7 @@ export class YouTube extends ItemView {
       const contentEl = container.createDiv({ cls: 'youtube-player-container' });
       this.playerContainer = contentEl;
 
-      // Récupérer la hauteur sauvegardée
+      // Récupérer les settings
       const settings = await Settings.loadSettings();
       const height = settings.viewHeight;
       
@@ -186,6 +186,12 @@ export class YouTube extends ItemView {
             // Initialiser le bouton de vitesse
             this.initializePlaybackRateButton();
 
+            // Appliquer la vitesse sauvegardée
+            const savedRate = settings.playbackRate;
+            if (savedRate) {
+               this.setPlaybackRate(savedRate);
+            }
+
             // Initialiser les événements du player
             this.player.on('error', (error: any) => {
                console.error('YouTube: Erreur du player:', error);
@@ -199,8 +205,13 @@ export class YouTube extends ItemView {
                console.log('YouTube: Lecture en pause');
             });
 
-            this.player.on('ratechange', () => {
-               console.log('YouTube: Changement de vitesse:', this.player.playbackRate());
+            this.player.on('ratechange', async () => {
+               const newRate = this.player.playbackRate();
+               console.log('YouTube: Changement de vitesse:', newRate);
+               await Settings.saveSettings({ playbackRate: newRate });
+               if (this.playbackRateButton) {
+                  this.playbackRateButton.el().textContent = `${newRate}x`;
+               }
             });
 
             this.player.on('volumechange', () => {
@@ -374,13 +385,14 @@ export class YouTube extends ItemView {
       this.player.currentTime(newTime);
    }
 
-   setPlaybackRate(rate: number): void {
+   async setPlaybackRate(rate: number): Promise<void> {
       console.log('YouTube: Set playback rate', rate);
       if (!this.player) return;
       this.player.playbackRate(rate);
+      await Settings.saveSettings({ playbackRate: rate });
    }
 
-   increasePlaybackRate(): void {
+   async increasePlaybackRate(): Promise<void> {
       console.log('YouTube: Increase playback rate');
       if (!this.player) return;
       const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
@@ -389,11 +401,11 @@ export class YouTube extends ItemView {
       const nextRate = rates.find(rate => rate > currentRate);
       if (nextRate) {
          console.log('YouTube: New rate', nextRate);
-         this.player.playbackRate(nextRate);
+         await this.setPlaybackRate(nextRate);
       }
    }
 
-   decreasePlaybackRate(): void {
+   async decreasePlaybackRate(): Promise<void> {
       console.log('YouTube: Decrease playback rate');
       if (!this.player) return;
       const rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 16];
@@ -402,7 +414,7 @@ export class YouTube extends ItemView {
       const prevRate = rates.reverse().find(rate => rate < currentRate);
       if (prevRate) {
          console.log('YouTube: New rate', prevRate);
-         this.player.playbackRate(prevRate);
+         await this.setPlaybackRate(prevRate);
       }
    }
 
