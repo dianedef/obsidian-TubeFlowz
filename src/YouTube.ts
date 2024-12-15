@@ -91,7 +91,7 @@ export class YouTube extends ItemView {
             youtubeshowrecomendations: 0,
             annotations: 0,
             rel: 0,
-            disablekb: 0,
+            disablekb: 1,
             fs: 1,
             playsinline: 1,
             enablejsapi: 1,
@@ -186,10 +186,20 @@ export class YouTube extends ItemView {
             // Initialiser le bouton de vitesse
             this.initializePlaybackRateButton();
 
-            // Appliquer la vitesse sauvegardée
+            // Appliquer les paramètres sauvegardés
             const savedRate = settings.playbackRate;
             if (savedRate) {
-               this.setPlaybackRate(savedRate);
+               this.player.playbackRate(savedRate);
+            }
+
+            const savedVolume = settings.volume;
+            if (savedVolume !== undefined) {
+               this.player.volume(savedVolume);
+            }
+
+            const savedMuted = settings.isMuted;
+            if (savedMuted !== undefined) {
+               this.player.muted(savedMuted);
             }
 
             // Initialiser les événements du player
@@ -214,8 +224,14 @@ export class YouTube extends ItemView {
                }
             });
 
-            this.player.on('volumechange', () => {
-               console.log('YouTube: Changement de volume:', this.player.volume());
+            this.player.on('volumechange', async () => {
+               const newVolume = this.player.volume();
+               const isMuted = this.player.muted();
+               console.log('YouTube: Changement de volume:', newVolume, 'Muet:', isMuted);
+               await Settings.saveSettings({ 
+                  volume: newVolume,
+                  isMuted: isMuted
+               });
             });
 
             console.log('YouTube: Tous les événements sont enregistrés');
@@ -385,13 +401,6 @@ export class YouTube extends ItemView {
       this.player.currentTime(newTime);
    }
 
-   async setPlaybackRate(rate: number): Promise<void> {
-      console.log('YouTube: Set playback rate', rate);
-      if (!this.player) return;
-      this.player.playbackRate(rate);
-      await Settings.saveSettings({ playbackRate: rate });
-   }
-
    async increasePlaybackRate(): Promise<void> {
       console.log('YouTube: Increase playback rate');
       if (!this.player) return;
@@ -401,7 +410,7 @@ export class YouTube extends ItemView {
       const nextRate = rates.find(rate => rate > currentRate);
       if (nextRate) {
          console.log('YouTube: New rate', nextRate);
-         await this.setPlaybackRate(nextRate);
+         this.player.playbackRate(nextRate);
       }
    }
 
@@ -414,7 +423,7 @@ export class YouTube extends ItemView {
       const prevRate = rates.reverse().find(rate => rate < currentRate);
       if (prevRate) {
          console.log('YouTube: New rate', prevRate);
-         await this.setPlaybackRate(prevRate);
+         this.player.playbackRate(prevRate);
       }
    }
 
