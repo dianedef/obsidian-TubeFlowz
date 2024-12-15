@@ -4,11 +4,16 @@ export type TranslationKey =
    | 'commands.seekBackward'
    | 'commands.seekForward'
    | 'commands.speedUp'
+   | 'commands.speedDown'
+   | 'commands.defaultSpeed'
    | 'commands.favoriteSpeed'
    | 'commands.toggleMute'
    | 'commands.toggleFullscreen'
+   | 'commands.insertTimestamp'
    // Errors
    | 'errors.NO_PLAYER'
+   | 'errors.INVALID_STATE'
+   | 'errors.PLAYBACK_ERROR'
    // Settings
    | 'settings.defaultViewMode'
    | 'settings.defaultViewModeDesc'
@@ -32,11 +37,16 @@ export const translations: { [lang: string]: Record<TranslationKey, string> } = 
       'commands.seekBackward': 'Seek Backward',
       'commands.seekForward': 'Seek Forward',
       'commands.speedUp': 'Speed Up',
+      'commands.speedDown': 'Speed Down',
+      'commands.defaultSpeed': 'Default Speed',
       'commands.favoriteSpeed': 'Favorite Speed',
       'commands.toggleMute': 'Toggle Mute',
       'commands.toggleFullscreen': 'Toggle Fullscreen',
+      'commands.insertTimestamp': 'Insert timestamp link',
       // Errors
       'errors.NO_PLAYER': 'No video player available',
+      'errors.INVALID_STATE': 'Invalid state',
+      'errors.PLAYBACK_ERROR': 'Playback error',
       // Settings
       'settings.defaultViewMode': 'Default View Mode',
       'settings.defaultViewModeDesc': 'Choose how videos will open by default',
@@ -59,11 +69,16 @@ export const translations: { [lang: string]: Record<TranslationKey, string> } = 
       'commands.seekBackward': 'Reculer',
       'commands.seekForward': 'Avancer',
       'commands.speedUp': 'Augmenter la vitesse',
+      'commands.speedDown': 'Réduire la vitesse',
+      'commands.defaultSpeed': 'Vitesse par défaut',
       'commands.favoriteSpeed': 'Vitesse favorite',
       'commands.toggleMute': 'Activer/Désactiver le son',
       'commands.toggleFullscreen': 'Plein écran',
+      'commands.insertTimestamp': 'Insérer un lien avec timestamp',
       // Errors
       'errors.NO_PLAYER': 'Aucun lecteur vidéo disponible',
+      'errors.INVALID_STATE': 'État invalide',
+      'errors.PLAYBACK_ERROR': 'Erreur de lecture',
       // Settings
       'settings.defaultViewMode': 'Mode d\'affichage par défaut',
       'settings.defaultViewModeDesc': 'Choisissez comment les vidéos s\'ouvriront par défaut',

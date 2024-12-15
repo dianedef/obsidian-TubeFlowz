@@ -1,10 +1,19 @@
-import { EditorView, Decoration, WidgetType } from '@codemirror/view';
+import { EditorView, Decoration, WidgetType, ViewPlugin, DecorationSet } from '@codemirror/view';
+import { RangeSetBuilder, Extension, Transaction, StateField, StateEffect } from '@codemirror/state';
 import { YouTube } from './YouTube';
-import { App } from 'obsidian';
+import { App, TFile } from 'obsidian';
 
 function extractVideoId(url: string): string | null {
-   const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+   const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
    return match ? match[1] : null;
+}
+
+function extractTimestamp(url: string): number | null {
+   const match = url.match(/[?&]t=(\d+)/);
+   if (match) {
+      return parseInt(match[1], 10);
+   }
+   return null;
 }
 
 function cleanVideoId(id: string): string {
@@ -13,11 +22,13 @@ function cleanVideoId(id: string): string {
 
 class DecorationForUrl extends WidgetType {
    private videoId: string;
+   private timestamp: number | null;
    private app: App;
 
-   constructor(videoId: string, app: App) {
+   constructor(videoId: string, timestamp: number | null, app: App) {
       super();
       this.videoId = videoId;
+      this.timestamp = timestamp;
       this.app = app;
    }
       
@@ -27,13 +38,15 @@ class DecorationForUrl extends WidgetType {
       sparkle.className = 'youtube-sparkle-decoration';
       sparkle.setAttribute('aria-label', 'Ouvrir le player YouTube');
       sparkle.setAttribute('data-video-id', this.videoId);
+      if (this.timestamp !== null) {
+         sparkle.setAttribute('data-timestamp', this.timestamp.toString());
+      }
       
       sparkle.addEventListener('click', async () => {
          try {
-            console.log('DecorationForUrl: Ouvrir le player YouTube avec id:', this.videoId);
+            console.log('DecorationForUrl: Ouvrir le player YouTube avec id:', this.videoId, 'timestamp:', this.timestamp);
             const view = this.app.workspace.getLeavesOfType('youtube-player')[0]?.view as YouTube;
-            await view.loadVideo(this.videoId);
-            view.togglePlayPause();
+            await view.loadVideo(this.videoId, true, this.timestamp || undefined);
          } catch (error) {
             console.error('Erreur lors du chargement de la vidéo:', error);
          }
@@ -44,7 +57,8 @@ class DecorationForUrl extends WidgetType {
 }
 
 export function createDecorations(view: EditorView, app: App) {
-   const decorations = [];
+   console.log("📍 Création des décorations...");
+   const builder = new RangeSetBuilder<Decoration>();
    const doc = view.state.doc;
    
    for (let pos = 0; pos < doc.length;) {
@@ -61,24 +75,48 @@ export function createDecorations(view: EditorView, app: App) {
          const endPos = startPos + fullMatch.length;
          
          const videoId = extractVideoId(url);
+         const timestamp = extractTimestamp(url);
+         
          if (videoId) {
             const cleanedId = cleanVideoId(videoId);
-            decorations.push(Decoration.mark({
+            builder.add(startPos, endPos, Decoration.mark({
                class: "youtube-link",
                attributes: {
-                  "data-video-id": cleanedId
+                  "data-video-id": cleanedId,
+                  ...(timestamp !== null && { "data-timestamp": timestamp.toString() })
                }
-            }).range(startPos, endPos));
+            }));
             
-            decorations.push(Decoration.widget({
-               widget: new DecorationForUrl(cleanedId, app),
+            builder.add(endPos, endPos, Decoration.widget({
+               widget: new DecorationForUrl(cleanedId, timestamp, app),
                side: 1
-            }).range(endPos));
+            }));
          }
       }
       
-      pos = line.to + 1;
+      pos = line.to + 1;   
    }
    
-   return Decoration.set(decorations, true);
+   const result = builder.finish();
+   console.log("✅ Décorations créées");
+   return result;
 } 
+
+export const youtubeDecorations = (app: App): Extension => {
+   return ViewPlugin.fromClass(class {
+      decorations: DecorationSet;
+
+      constructor(view: EditorView) {
+         this.decorations = createDecorations(view, app);
+      }
+
+      update(update) {
+         if (update.docChanged) {
+            this.decorations = createDecorations(update.view, app);
+         }
+         return this.decorations;
+      }
+   }, {
+      decorations: v => v.decorations
+   });
+}; 

@@ -1,22 +1,13 @@
 import { Plugin, addIcon, Menu, App } from 'obsidian';
-import { ViewPlugin, ViewUpdate, DecorationSet } from '@codemirror/view';
 import { YOUTUBE_ICON } from './constants';
 import { ViewMode } from './ViewMode';
 import { YouTube } from './YouTube';
 import { TViewMode } from './types';
 import { registerStyles } from './RegisterStyles';
-import { createDecorations } from './Decorations';
+import { youtubeDecorations } from './Decorations';
 import { Settings, SettingsTab, DEFAULT_SETTINGS } from './Settings'
 import { Translations } from './Translations';
 import { Hotkeys } from './Hotkeys';
-
-interface DecorationState {
-   decorations: DecorationSet;
-   app: App;
-   settings: any;
-   viewMode: ViewMode;
-   update(update: ViewUpdate): void;
-}
 
 export default class TubeFlowz extends Plugin {
    private viewMode!: ViewMode;
@@ -68,33 +59,19 @@ export default class TubeFlowz extends Plugin {
       Settings.initialize(this);
       await this.refresh();
       
-      // Initialiser les traductions maintenant que l'app est chargée
+      // Initialiser les traductions
       this.loadLanguage();
       
       this.addSettingTab(new SettingsTab(
          this.app,
          this,
-         this.settings,
+         DEFAULT_SETTINGS,
          this.viewMode,
          this.translations
       ));
 
       // Ajout des décorations
-      this.registerEditorExtension([
-         ViewPlugin.define<DecorationState>(view => ({
-            decorations: createDecorations(view, this.app),
-            app: this.app,
-            settings: this.settings,
-            viewMode: this.viewMode,
-            update(update: ViewUpdate) {
-               if (update.docChanged || update.viewportChanged) {
-                  this.decorations = createDecorations(update.view, this.app);
-               }
-            }
-         }), {
-            decorations: v => v.decorations
-         })
-      ]);
+      this.registerEditorExtension(youtubeDecorations(this.app));
 
       // Création du menu
       addIcon('youtube', YOUTUBE_ICON);
@@ -150,11 +127,10 @@ export default class TubeFlowz extends Plugin {
 
    private async loadApp(): Promise<void> {
       return new Promise((resolve) => {
-         // Attendre que l'app soit prête
-         if (this.app.workspace) {
-            resolve();
+         if (!this.app.workspace) {
+            setTimeout(resolve, 0);
          } else {
-            this.app.workspace.onLayoutReady(() => resolve());
+            resolve();
          }
       });
    }

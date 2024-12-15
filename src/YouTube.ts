@@ -12,6 +12,7 @@ export class YouTube extends ItemView {
    private playerContainer: HTMLElement | null = null;
    private player: any = null;
    private playbackRateButton: any = null;
+   private currentVideoId: string | null = null;
 
    getViewType(): string {
       return "youtube-player";
@@ -285,18 +286,64 @@ export class YouTube extends ItemView {
       });
    }
 
-   async loadVideo(videoId: string) {
-      console.log('YouTube: Chargement de la vidéo', videoId);
+   getCurrentVideoId(): string | null {
+      return this.currentVideoId;
+   }
+
+   getCurrentTime(): number | null {
+      if (!this.player) return null;
+      return this.player.currentTime();
+   }
+
+   setCurrentTime(seconds: number): void {
+      if (!this.player) return;
+      this.player.currentTime(seconds);
+   }
+
+   getCurrentTimestamp(): { displayTimestamp: string, seconds: number } | null {
+      const currentTime = this.getCurrentTime();
+      console.log('YouTube: Current time:', currentTime);
+      if (currentTime === null) return null;
+      return {
+         displayTimestamp: new Date(currentTime * 1000).toISOString().substr(11, 8),
+         seconds: Math.floor(currentTime)
+      };
+   }
+
+   async loadVideo(videoId: string, autoplay: boolean = true, startTime?: number) {
+      console.log('YouTube: Chargement de la vidéo', { videoId, autoplay, startTime });
       if (!this.player) return;
 
       try {
-         // Utiliser l'URL embed avec les paramètres pour désactiver les raccourcis
-         const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?disablekb=1&enablejsapi=1&controls=0&modestbranding=1&rel=0&showinfo=0`;
+         // Si c'est la même vidéo et qu'on a un timestamp, on met juste à jour le timestamp
+         if (videoId === this.currentVideoId && startTime !== undefined) {
+            console.log('YouTube: Même vidéo, mise à jour du timestamp:', startTime);
+            this.player.currentTime(startTime);
+            if (autoplay) {
+               this.player.play();
+            }
+            return;
+         }
+
+         // Sinon, on charge la nouvelle vidéo
+         this.currentVideoId = videoId;
+         const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?disablekb=1&enablejsapi=1&controls=0&modestbranding=1&rel=0&showinfo=0&autoplay=${autoplay ? 1 : 0}`;
          this.player.src({
             type: 'video/youtube',
             src: embedUrl
          });
-         console.log('YouTube: Source vidéo définie');
+
+         // Attendre que la vidéo soit chargée
+         this.player.one('loadedmetadata', () => {
+            if (startTime !== undefined) {
+               console.log('YouTube: Définition du timestamp:', startTime);
+               this.player.currentTime(startTime);
+            }
+            if (autoplay) {
+               this.player.play();
+            }
+         });
+
       } catch (error) {
          console.error('YouTube: Erreur lors du chargement de la vidéo:', error);
       }
@@ -384,21 +431,22 @@ export class YouTube extends ItemView {
 
    seekBackward(seconds: number): void {
       console.log('YouTube: Seek backward', seconds);
-      if (!this.player) return;
-      const currentTime = this.player.currentTime();
+      const currentTime = this.getCurrentTime();
+      if (currentTime === null) return;
       const newTime = Math.max(0, currentTime - seconds);
       console.log('YouTube: New time', newTime);
-      this.player.currentTime(newTime);
+      this.setCurrentTime(newTime);
    }
 
    seekForward(seconds: number): void {
       console.log('YouTube: Seek forward', seconds);
-      if (!this.player) return;
-      const currentTime = this.player.currentTime();
-      const duration = this.player.duration();
+      const currentTime = this.getCurrentTime();
+      if (currentTime === null) return;
+      const duration = this.player?.duration();
+      if (typeof duration !== 'number') return;
       const newTime = Math.min(duration, currentTime + seconds);
       console.log('YouTube: New time', newTime);
-      this.player.currentTime(newTime);
+      this.setCurrentTime(newTime);
    }
 
    async setPlaybackRate(rate: number): Promise<void> {

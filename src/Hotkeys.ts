@@ -190,5 +190,31 @@ export class Hotkeys {
          },
          hotkeys: [{ modifiers: ['Shift'], key: 'ArrowDown' }]
       });
+
+      // Insérer un timestamp
+      this.plugin.addCommand({
+         id: 'youtube-insert-timestamp',
+         name: this.translations.t('commands.insertTimestamp'),
+         icon: 'clock',
+         callback: () => {
+            try {
+               console.log('YouTube: Insert timestamp command triggered', youtube.getCurrentTimestamp());
+               const timestamp = youtube.getCurrentTimestamp();
+               const videoId = youtube.getCurrentVideoId();
+
+               // Créer le lien YouTube avec timestamp
+               const youtubeLink = `https://youtu.be/${videoId}?t=${timestamp.seconds}`;
+               
+               // Insérer dans l'éditeur actif
+               const editor = this.plugin.app.workspace.activeEditor;
+               if (editor?.editor) {
+                  editor.editor.replaceSelection(`[${timestamp.displayTimestamp}](${youtubeLink})`);
+               }
+            } catch (error) {
+               this.handleCommandError(error);
+            }
+         },
+         hotkeys: [{ modifiers: ["Alt"], key: "t" }]
+      });
    }
 }
